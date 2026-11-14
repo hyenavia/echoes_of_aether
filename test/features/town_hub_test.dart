@@ -218,34 +218,34 @@ void main() {
         expect(find.text('Progres room tertinggi: 1 / 1'), findsOneWidget);
         expect(find.text('Total dungeon selesai: 2'), findsOneWidget);
 
-        // Buka Tas (InventoryOverlay)
-        await tester.tap(find.text('Tas'));
-        await tester.pump();
-        expect(find.text('Slime Gel'), findsOneWidget);
-        await tester.tap(find.byTooltip('Tutup'));
-        await tester.pump();
-        expect(find.text('Slime Gel'), findsNothing);
-
-        // Buka Perlengkapan (EquipmentOverlay) dan pasang equipment
-        await tester.tap(find.text('Perlengkapan'));
+        // Buka Bag -> sub-tab Tas (InventoryOverlay) & Perlengkapan (EquipmentOverlay)
+        await tester.tap(find.text('Bag'));
         await tester.pump();
         expect(find.text('Tas perlengkapan (1)'), findsOneWidget);
+        await tester.ensureVisible(find.text('Pakai'));
         await tester.tap(find.text('Pakai'));
         await tester.pump();
         expect(character.loadout.instanceIn(EquipmentSlot.weapon)?.id, 'eq_1');
-        await tester.tap(find.byTooltip('Tutup'));
-        await tester.pump();
 
-        // Buka Karakter (CharacterOverlay) dan pilih spesialisasi
-        await tester.tap(find.text('Karakter'));
+        await tester.tap(find.text('Tas'));
         await tester.pump();
+        expect(find.text('Slime Gel'), findsOneWidget);
+
+        // Buka Hero lewat HeroShowcaseCard dan pilih spesialisasi
+        await tester.tap(find.text('Adventure'));
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('hero_showcase_card')));
+        await tester.tap(find.byKey(const Key('hero_showcase_card')));
+        await tester.pump();
+        await tester.ensureVisible(find.text('Pilih'));
         await tester.tap(find.text('Pilih'));
         await tester.pump();
         expect(character.specializationId, 'vanguard');
-        await tester.tap(find.byTooltip('Tutup'));
+        await tester.tap(find.text('Adventure'));
         await tester.pump();
 
         // Masuk dungeon
+        await tester.ensureVisible(find.text('Masuk Forgotten Forest'));
         await tester.tap(find.text('Masuk Forgotten Forest'));
         await tester.pump();
         expect(entered, isTrue);
@@ -279,9 +279,12 @@ void main() {
 
         expect(find.text('Town / Camp'), findsNothing);
         expect(find.text('Forgotten Forest • Forest Entrance'), findsOneWidget);
-        expect(find.text('Kembali ke Town'), findsOneWidget);
+        expect(find.byKey(const Key('hud_menu_toggle_button')), findsOneWidget);
 
-        // Kembali ke Town.
+        // Buka Menu ringkas dan kembali ke Town.
+        await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
+        await tester.pump();
+        expect(find.text('Kembali ke Town'), findsOneWidget);
         await tester.tap(find.text('Kembali ke Town'));
         await tester.pump();
         await tester.pump();

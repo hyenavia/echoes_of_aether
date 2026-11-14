@@ -19,7 +19,6 @@ import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_progression_service.dart';
 import '../../domain/services/shop_service.dart';
 import '../../game/hud/inventory_views.dart';
-import '../../game/overlays.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'character_overlay.dart';
 import 'equipment_overlay.dart';
@@ -119,25 +118,11 @@ class TownHubView extends StatefulWidget {
 }
 
 class _TownHubViewState extends State<TownHubView> {
-  String? _openPanel;
   TownTab _selectedTab = TownTab.adventure;
   int _bagSubTab = 0;
 
-  void _togglePanel(String panel) {
-    setState(() {
-      _openPanel = _openPanel == panel ? null : panel;
-    });
-  }
-
-  void _closePanel() {
-    if (_openPanel != null) {
-      setState(() => _openPanel = null);
-    }
-  }
-
   void _selectTab(TownTab tab) {
     setState(() {
-      _openPanel = null;
       _selectedTab = tab;
     });
   }
@@ -209,186 +194,128 @@ class _TownHubViewState extends State<TownHubView> {
       lastFailedDungeonId: widget.lastFailedDungeonId,
     );
 
-    return Stack(
+    return Column(
       children: [
-        Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: ValueListenableBuilder<CharacterSnapshot>(
-                  valueListenable: widget.views.characterView,
-                  builder: (context, charSnap, _) => TownTopBar(
-                    level: charSnap.level,
-                    currentExp: widget.character.currentExp,
-                    expToNext: widget.character.expToNext,
-                    gold: widget.character.gold,
-                    ascensionRank: widget.cycleProgress.ascensionRank,
-                    specializationName: widget.character.specialization?.name,
-                    maxHp: widget.character.stats.maxHp,
-                  ),
-                ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: ValueListenableBuilder<CharacterSnapshot>(
+              valueListenable: widget.views.characterView,
+              builder: (context, charSnap, _) => TownTopBar(
+                level: charSnap.level,
+                currentExp: widget.character.currentExp,
+                expToNext: widget.character.expToNext,
+                gold: widget.character.gold,
+                ascensionRank: widget.cycleProgress.ascensionRank,
+                specializationName: widget.character.specialization?.name,
+                maxHp: widget.character.stats.maxHp,
               ),
             ),
-            Expanded(
-              child: switch (_selectedTab) {
-                TownTab.adventure => _buildAdventureBody(
-                  context,
-                  theme,
-                  dungeon: dungeon,
-                  catalog: catalog,
-                  progressMap: progressMap,
-                  progression: progression,
-                  totalRooms: totalRooms,
-                  clearedCount: clearedCount,
-                  selectedRecLevel: selectedRecLevel,
-                  selectedReqLevel: selectedReqLevel,
-                  selectedUnlockedNoLevel: selectedUnlockedNoLevel,
-                  deathLoopSuggestion: deathLoopSuggestion,
-                ),
-                TownTab.hero => CharacterOverlay(
-                  snapshot: widget.views.characterView,
-                  onChooseSpecialization: widget.onChooseSpecialization,
-                  onUpgradeSkill: widget.onUpgradeSkill,
-                  onClose: () => _selectTab(TownTab.adventure),
-                ),
-                TownTab.bag => _buildBagTabBody(context),
-                TownTab.shop =>
-                  (widget.shopCatalog != null &&
-                          widget.shopService != null &&
-                          widget.shopContext != null &&
-                          widget.onShopBuy != null &&
-                          widget.onShopSellEquipment != null &&
-                          widget.onShopSellMaterialBulk != null)
-                      ? ShopOverlay(
-                          catalog: widget.shopCatalog!,
-                          items: widget.items,
-                          dungeons: widget.availableDungeons,
-                          shopService: widget.shopService!,
-                          playerContext: widget.shopContext!,
-                          playerGold: widget.character.gold,
-                          views: widget.views,
-                          onBuy: widget.onShopBuy!,
-                          onSellEquipment: widget.onShopSellEquipment!,
-                          onSellMaterialBulk: widget.onShopSellMaterialBulk!,
-                          onSellBatch: widget.onShopSellBatch,
-                          onClose: () => _selectTab(TownTab.adventure),
-                        )
-                      : const Center(
-                          child: PanelFrame(
-                            child: Text('Toko belum tersedia.'),
-                          ),
-                        ),
-                TownTab.settings =>
-                  (widget.settings != null && widget.onSettingsChanged != null)
-                      ? SettingsOverlay(
-                          settings: widget.settings!,
-                          onChanged: widget.onSettingsChanged!,
-                          onTestSfx: widget.onTestSfx,
-                          onClose: () => _selectTab(TownTab.adventure),
-                        )
-                      : const Center(
-                          child: PanelFrame(
-                            child: Text('Pengaturan belum tersedia.'),
-                          ),
-                        ),
-              },
-            ),
-            NavigationBar(
-              key: const Key('town_bottom_nav'),
-              height: 64,
-              selectedIndex: _selectedTab.index,
-              onDestinationSelected: (index) =>
-                  _selectTab(TownTab.values[index]),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.explore_outlined),
-                  selectedIcon: Icon(Icons.explore),
-                  label: 'Adventure',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Hero',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  selectedIcon: Icon(Icons.inventory_2),
-                  label: 'Bag',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.storefront_outlined),
-                  selectedIcon: Icon(Icons.storefront),
-                  label: 'Shop',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
-                  label: 'Settings',
-                ),
-              ],
-            ),
-          ],
-        ),
-        if (_openPanel != null) ...[
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _closePanel,
-              child: const ColoredBox(color: Color(0x88000000)),
-            ),
           ),
-          if (_openPanel == GameOverlays.inventory)
-            InventoryOverlay(
-              entries: widget.views.stacks,
-              onClose: _closePanel,
+        ),
+        Expanded(
+          child: switch (_selectedTab) {
+            TownTab.adventure => _buildAdventureBody(
+              context,
+              theme,
+              dungeon: dungeon,
+              catalog: catalog,
+              progressMap: progressMap,
+              progression: progression,
+              totalRooms: totalRooms,
+              clearedCount: clearedCount,
+              selectedRecLevel: selectedRecLevel,
+              selectedReqLevel: selectedReqLevel,
+              selectedUnlockedNoLevel: selectedUnlockedNoLevel,
+              deathLoopSuggestion: deathLoopSuggestion,
             ),
-          if (_openPanel == GameOverlays.equipment)
-            EquipmentOverlay(
-              snapshot: widget.views.equipment,
-              items: widget.items,
-              onEquip: widget.onEquip,
-              onUnequip: widget.onUnequip,
-              onClose: _closePanel,
-            ),
-          if (_openPanel == GameOverlays.character)
-            CharacterOverlay(
+            TownTab.hero => CharacterOverlay(
               snapshot: widget.views.characterView,
               onChooseSpecialization: widget.onChooseSpecialization,
               onUpgradeSkill: widget.onUpgradeSkill,
-              onClose: _closePanel,
+              onClose: () => _selectTab(TownTab.adventure),
             ),
-          if (_openPanel == GameOverlays.settings &&
-              widget.settings != null &&
-              widget.onSettingsChanged != null)
-            SettingsOverlay(
-              settings: widget.settings!,
-              onChanged: widget.onSettingsChanged!,
-              onTestSfx: widget.onTestSfx,
-              onClose: _closePanel,
+            TownTab.bag => _buildBagTabBody(context),
+            TownTab.shop =>
+              (widget.shopCatalog != null &&
+                      widget.shopService != null &&
+                      widget.shopContext != null &&
+                      widget.onShopBuy != null &&
+                      widget.onShopSellEquipment != null &&
+                      widget.onShopSellMaterialBulk != null)
+                  ? ShopOverlay(
+                      catalog: widget.shopCatalog!,
+                      items: widget.items,
+                      dungeons: widget.availableDungeons,
+                      shopService: widget.shopService!,
+                      playerContext: widget.shopContext!,
+                      playerGold: widget.character.gold,
+                      views: widget.views,
+                      onBuy: widget.onShopBuy!,
+                      onSellEquipment: widget.onShopSellEquipment!,
+                      onSellMaterialBulk: widget.onShopSellMaterialBulk!,
+                      onSellBatch: widget.onShopSellBatch,
+                      onClose: () => _selectTab(TownTab.adventure),
+                    )
+                  : const Center(
+                      child: PanelFrame(child: Text('Toko belum tersedia.')),
+                    ),
+            TownTab.settings =>
+              (widget.settings != null && widget.onSettingsChanged != null)
+                  ? SettingsOverlay(
+                      settings: widget.settings!,
+                      onChanged: widget.onSettingsChanged!,
+                      onTestSfx: widget.onTestSfx,
+                      onClose: () => _selectTab(TownTab.adventure),
+                    )
+                  : const Center(
+                      child: PanelFrame(
+                        child: Text('Pengaturan belum tersedia.'),
+                      ),
+                    ),
+          },
+        ),
+        Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.panelBorder, width: 1),
             ),
-          if (_openPanel == GameOverlays.shop &&
-              widget.shopCatalog != null &&
-              widget.shopService != null &&
-              widget.shopContext != null &&
-              widget.onShopBuy != null &&
-              widget.onShopSellEquipment != null &&
-              widget.onShopSellMaterialBulk != null)
-            ShopOverlay(
-              catalog: widget.shopCatalog!,
-              items: widget.items,
-              dungeons: widget.availableDungeons,
-              shopService: widget.shopService!,
-              playerContext: widget.shopContext!,
-              playerGold: widget.character.gold,
-              views: widget.views,
-              onBuy: widget.onShopBuy!,
-              onSellEquipment: widget.onShopSellEquipment!,
-              onSellMaterialBulk: widget.onShopSellMaterialBulk!,
-              onSellBatch: widget.onShopSellBatch,
-              onClose: _closePanel,
-            ),
-        ],
+          ),
+          child: NavigationBar(
+            key: const Key('town_bottom_nav'),
+            height: 60,
+            selectedIndex: _selectedTab.index,
+            onDestinationSelected: (index) => _selectTab(TownTab.values[index]),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.explore_outlined),
+                selectedIcon: Icon(Icons.explore),
+                label: 'Adventure',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Hero',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.inventory_2_outlined),
+                selectedIcon: Icon(Icons.inventory_2),
+                label: 'Bag',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.storefront_outlined),
+                selectedIcon: Icon(Icons.storefront),
+                label: 'Shop',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'Settings',
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -453,22 +380,63 @@ class _TownHubViewState extends State<TownHubView> {
   }) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Town / Camp',
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.shield_moon_outlined,
+                    size: 16,
+                    color: EchoesTheme.of(context).gold,
+                  ),
+                  const SizedBox(width: AppSpacing.xs + 2),
+                  Flexible(
+                    child: Text(
+                      'Town / Camp',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: EchoesTheme.of(context).gold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
+              ValueListenableBuilder<CharacterSnapshot>(
+                valueListenable: widget.views.characterView,
+                builder: (context, charSnap, _) {
+                  final specId = charSnap.specializationId;
+                  String? specName;
+                  if (specId != null) {
+                    for (final sp in charSnap.specializations) {
+                      if (sp.id == specId) {
+                        specName = sp.name;
+                        break;
+                      }
+                    }
+                  }
+                  return HeroShowcaseCard(
+                    level: charSnap.level,
+                    ascensionRank: widget.cycleProgress.ascensionRank,
+                    specializationId: specId,
+                    specializationName: specName,
+                    stats: charSnap.stats,
+                    onTap: () => _selectTab(TownTab.hero),
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
               if (widget.cycleProgress.highestAscensionRank >= 1) ...[
                 _buildCycleRankSwitcherCard(theme),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
               ],
               if (deathLoopSuggestion != null) ...[
                 _buildDeathLoopSuggestionCard(
@@ -476,7 +444,7 @@ class _TownHubViewState extends State<TownHubView> {
                   theme,
                   deathLoopSuggestion,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
               ],
               ValueListenableBuilder<CharacterSnapshot>(
                 valueListenable: widget.views.characterView,
@@ -496,16 +464,50 @@ class _TownHubViewState extends State<TownHubView> {
                             ? 'Terkunci — butuh minimal Lv ${NumberFormatter.format(selectedReqLevel)} (saat ini Lv ${NumberFormatter.format(charSnap.level)}).'
                             : null);
                   final ext = EchoesTheme.of(context);
+                  final biomeStyle = dungeon != null
+                      ? BiomeStyle.resolve(
+                          dungeon.biome,
+                          isAscension: dungeon.isAscension,
+                        )
+                      : BiomeStyle.resolve('default');
                   return PanelFrame(
+                    showCornerOrnaments: true,
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     borderColor: (dungeon?.isAscension ?? false)
                         ? ext.rank
                         : ext.gold,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [biomeStyle.backgroundTint, AppColors.panelDark],
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.xs + 2),
+                              decoration: BoxDecoration(
+                                color: biomeStyle.accentColor.withValues(
+                                  alpha: 0.16,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm,
+                                ),
+                                border: Border.all(
+                                  color: biomeStyle.accentColor.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                ),
+                              ),
+                              child: Icon(
+                                biomeStyle.icon,
+                                size: 18,
+                                color: biomeStyle.accentColor,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 dungeon?.name ?? 'Pilih Dungeon',
@@ -537,7 +539,7 @@ class _TownHubViewState extends State<TownHubView> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs + 2),
                         Text(
                           dungeon == null
                               ? 'Konfigurasi dungeon belum tersedia.'
@@ -545,20 +547,22 @@ class _TownHubViewState extends State<TownHubView> {
                           style: theme.textTheme.bodySmall,
                         ),
                         if (dungeon != null) ...[
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             'Rekomendasi Lv ${NumberFormatter.format(selectedRecLevel)} • Siklus Rank ${widget.cycleProgress.ascensionRank}',
                             style: theme.textTheme.bodySmall,
                           ),
                         ],
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           totalRooms > 0
                               ? 'Progres room tertinggi: $clearedCount / $totalRooms'
                               : 'Progres room tertinggi: $clearedCount',
+                          style: theme.textTheme.bodyMedium,
                         ),
                         Text(
                           'Total dungeon selesai: ${widget.dungeonProgress.clearsCount}',
+                          style: theme.textTheme.bodySmall,
                         ),
                         if (selectedLockReason != null) ...[
                           const SizedBox(height: 6),
@@ -573,69 +577,24 @@ class _TownHubViewState extends State<TownHubView> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: (dungeon == null || !selectedUnlocked)
-                                ? null
-                                : widget.onEnterDungeon,
-                            icon: Icon(
-                              selectedUnlocked
-                                  ? Icons.play_arrow
-                                  : Icons.lock_outline,
-                            ),
-                            label: Text('Masuk ${dungeon?.name ?? 'Dungeon'}'),
-                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        PrimaryButton(
+                          expand: true,
+                          onPressed: (dungeon == null || !selectedUnlocked)
+                              ? null
+                              : widget.onEnterDungeon,
+                          icon: selectedUnlocked
+                              ? Icons.play_arrow
+                              : Icons.lock_outline,
+                          label: 'Masuk ${dungeon?.name ?? 'Dungeon'}',
                         ),
                       ],
                     ),
                   );
                 },
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: () => _togglePanel(GameOverlays.inventory),
-                    icon: const Icon(Icons.inventory_2_outlined),
-                    label: const Text('Tas'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => _togglePanel(GameOverlays.equipment),
-                    icon: const Icon(Icons.shield_outlined),
-                    label: const Text('Perlengkapan'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => _togglePanel(GameOverlays.character),
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                    label: const Text('Karakter'),
-                  ),
-                  if (widget.shopCatalog != null &&
-                      widget.shopService != null &&
-                      widget.shopContext != null &&
-                      widget.onShopBuy != null &&
-                      widget.onShopSellEquipment != null &&
-                      widget.onShopSellMaterialBulk != null)
-                    FilledButton.tonalIcon(
-                      onPressed: () => _togglePanel(GameOverlays.shop),
-                      icon: const Icon(Icons.storefront_outlined),
-                      label: const Text('Toko'),
-                    ),
-                  if (widget.settings != null &&
-                      widget.onSettingsChanged != null)
-                    FilledButton.tonalIcon(
-                      onPressed: () => _togglePanel(GameOverlays.settings),
-                      icon: const Icon(Icons.settings_outlined),
-                      label: const Text('Pengaturan'),
-                    ),
-                ],
-              ),
               if (catalog.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 _buildDungeonListCard(
                   context,
                   theme,
@@ -644,7 +603,7 @@ class _TownHubViewState extends State<TownHubView> {
                   progression: progression,
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _buildOfflineActivityCard(
                 context,
                 theme,
@@ -831,10 +790,25 @@ class _TownHubViewState extends State<TownHubView> {
                               ? () => widget.onEnterDungeonById!(d.id)
                               : (isSelected ? widget.onEnterDungeon : null));
 
+                    final biomeStyle = BiomeStyle.resolve(
+                      d.biome,
+                      isAscension: d.isAscension,
+                    );
+
                     return PanelFrame(
                       key: Key('dungeon_row_${d.id}'),
-                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      padding: const EdgeInsets.all(AppSpacing.sm + 2),
                       backgroundColor: AppColors.surfaceDark,
+                      gradient: isSelected
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                biomeStyle.backgroundTint,
+                                AppColors.surfaceDark,
+                              ],
+                            )
+                          : null,
                       borderColor: d.isAscension
                           ? ext.rank
                           : (isSelected ? ext.gold : ext.panelInnerBorder),
@@ -843,6 +817,14 @@ class _TownHubViewState extends State<TownHubView> {
                         children: [
                           Row(
                             children: [
+                              Icon(
+                                biomeStyle.icon,
+                                size: 16,
+                                color: unlocked
+                                    ? biomeStyle.accentColor
+                                    : ext.locked,
+                              ),
+                              const SizedBox(width: AppSpacing.xs + 2),
                               Expanded(
                                 child: Text(
                                   '${d.order}. ${d.name}',
@@ -990,93 +972,100 @@ class _TownHubViewState extends State<TownHubView> {
           'Mode aktif: Continue Dungeon${selectedDungeonName != null ? ' — $selectedDungeonName' : ''}';
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Aktivitas Offline', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(activeStatusText, style: theme.textTheme.labelLarge),
+    return PanelFrame(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionHeader(
+            title: 'Aktivitas Offline',
+            trailing: Icon(
+              isPausedSelected ? Icons.pause_circle_outline : Icons.autorenew,
+              size: 16,
+              color: isPausedSelected
+                  ? AppColors.textSecondary
+                  : EchoesTheme.of(context).expBar,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(activeStatusText, style: theme.textTheme.labelLarge),
+          const SizedBox(height: 4),
+          Text(
+            'Maks 8 jam offline • Auto Farming berhenti otomatis jika kalah (stopOnDefeat).',
+            style: theme.textTheme.bodySmall,
+          ),
+          if (defaultFarmName != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Maks 8 jam offline • Auto Farming berhenti otomatis jika kalah (stopOnDefeat).',
+              'Target default Auto Farming: $defaultFarmName',
               style: theme.textTheme.bodySmall,
             ),
-            if (defaultFarmName != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Target default Auto Farming: $defaultFarmName',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 10),
-            isPausedSelected
-                ? FilledButton.tonalIcon(
-                    onPressed: widget.onSelectPauseOffline,
-                    icon: const Icon(Icons.pause_circle_outline),
-                    label: const Text('Pause Progression (Default)'),
-                  )
-                : OutlinedButton.icon(
-                    onPressed: widget.onSelectPauseOffline,
-                    icon: const Icon(Icons.pause_circle_outline),
-                    label: const Text('Pause Progression (Default)'),
-                  ),
-            for (final d in normalCatalog) ...[
-              const SizedBox(height: 8),
-              Builder(
-                builder: (context) {
-                  final unlocked = progression.isClearedInCurrentCycle(
-                    d.id,
-                    widget.cycleProgress,
-                    progressMap,
-                  );
-                  final selected =
-                      !isPausedSelected &&
-                      activity.mode == OfflineActivityMode.autoFarming &&
-                      activity.selectedDungeonId == d.id;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      selected
-                          ? FilledButton.icon(
-                              onPressed: unlocked
-                                  ? () => widget.onSelectAutoFarming?.call(d.id)
-                                  : null,
-                              icon: const Icon(Icons.autorenew),
-                              label: Text('Auto Farming: ${d.name}'),
-                            )
-                          : OutlinedButton.icon(
-                              onPressed: unlocked
-                                  ? () => widget.onSelectAutoFarming?.call(d.id)
-                                  : null,
-                              icon: Icon(
-                                unlocked ? Icons.autorenew : Icons.lock_outline,
-                              ),
-                              label: Text('Auto Farming: ${d.name}'),
-                            ),
-                      if (!unlocked) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Terkunci — selesaikan ${d.name} pada siklus ini untuk membuka Auto Farming.',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
-            ],
-            for (final d in ascensionCatalog) ...[
-              const SizedBox(height: 6),
-              Text(
-                '${d.name}: Hanya manual (Ascension Dungeon tidak berjalan offline).',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
           ],
-        ),
+          const SizedBox(height: 10),
+          isPausedSelected
+              ? FilledButton.tonalIcon(
+                  onPressed: widget.onSelectPauseOffline,
+                  icon: const Icon(Icons.pause_circle_outline),
+                  label: const Text('Pause Progression (Default)'),
+                )
+              : OutlinedButton.icon(
+                  onPressed: widget.onSelectPauseOffline,
+                  icon: const Icon(Icons.pause_circle_outline),
+                  label: const Text('Pause Progression (Default)'),
+                ),
+          for (final d in normalCatalog) ...[
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final unlocked = progression.isClearedInCurrentCycle(
+                  d.id,
+                  widget.cycleProgress,
+                  progressMap,
+                );
+                final selected =
+                    !isPausedSelected &&
+                    activity.mode == OfflineActivityMode.autoFarming &&
+                    activity.selectedDungeonId == d.id;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    selected
+                        ? FilledButton.icon(
+                            onPressed: unlocked
+                                ? () => widget.onSelectAutoFarming?.call(d.id)
+                                : null,
+                            icon: const Icon(Icons.autorenew),
+                            label: Text('Auto Farming: ${d.name}'),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: unlocked
+                                ? () => widget.onSelectAutoFarming?.call(d.id)
+                                : null,
+                            icon: Icon(
+                              unlocked ? Icons.autorenew : Icons.lock_outline,
+                            ),
+                            label: Text('Auto Farming: ${d.name}'),
+                          ),
+                    if (!unlocked) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Terkunci — selesaikan ${d.name} pada siklus ini untuk membuka Auto Farming.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
+          for (final d in ascensionCatalog) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${d.name}: Hanya manual (Ascension Dungeon tidak berjalan offline).',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ],
       ),
     );
   }

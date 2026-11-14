@@ -276,8 +276,7 @@ Jika file atau struktur dokumentasi aktual berbeda, audit terlebih dahulu dan ja
 
 ## 10. Git dan Release Safety
 
-- Jangan menjalankan `git push` tanpa konfirmasi eksplisit dari pengguna.
-- Jangan menggunakan `git push --force` pada branch utama.
+- **AI agent dilarang menjalankan `git push` (termasuk `git push --force`) dalam kondisi apa pun.** Hanya pengguna yang boleh menjalankan `git push` secara manual.
 - Jangan melakukan destructive Git operation seperti `reset --hard`, menghapus branch, atau menghapus perubahan lokal tanpa persetujuan eksplisit.
 - Jangan membuat commit atas nama pengguna kecuali diminta.
 - Sebelum perubahan besar, periksa status Git agar perubahan pengguna yang belum di-commit tidak tertimpa.

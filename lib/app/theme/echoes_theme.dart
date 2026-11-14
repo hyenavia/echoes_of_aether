@@ -144,9 +144,14 @@ abstract final class EchoesTheme {
     const scheme = ColorScheme.dark(
       primary: AppColors.aetherBlue,
       onPrimary: AppColors.backgroundDark,
+      primaryContainer: AppColors.deepForest,
+      onPrimaryContainer: AppColors.aetherBlue,
       secondary: AppColors.warmGold,
       onSecondary: AppColors.backgroundDark,
+      secondaryContainer: AppColors.panelElevated,
+      onSecondaryContainer: AppColors.textPrimary,
       tertiary: AppColors.arcanePurple,
+      onTertiary: AppColors.backgroundDark,
       surface: AppColors.surfaceDark,
       onSurface: AppColors.textPrimary,
       surfaceContainerHighest: AppColors.deepForest,
@@ -211,11 +216,62 @@ abstract final class EchoesTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textPrimary,
           side: const BorderSide(color: AppColors.panelBorder),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surfaceDark,
+        indicatorColor: AppColors.warmGold.withValues(alpha: 0.16),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.warmGold, size: 22);
+          }
+          return const IconThemeData(color: AppColors.textSecondary, size: 20);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.warmGold,
+              letterSpacing: 0.2,
+            );
+          }
+          return const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          );
+        }),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.warmGold.withValues(alpha: 0.18);
+            }
+            return AppColors.surfaceDark;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.warmGold;
+            }
+            return AppColors.textSecondary;
+          }),
+          side: WidgetStateProperty.all(
+            const BorderSide(color: AppColors.panelBorder),
+          ),
+        ),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: AppColors.surfaceDark,
+        selectedColor: AppColors.aetherBlue.withValues(alpha: 0.2),
+        side: const BorderSide(color: AppColors.panelInnerBorder),
+        labelStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
       ),
     );
   }

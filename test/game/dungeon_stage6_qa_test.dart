@@ -382,7 +382,9 @@ void main() {
         }
         expect(game.world.mountedRoomId, 'ancient_path');
 
-        // Tinggalkan dungeon melalui tombol 'Kembali ke Town' di menu kanan atas.
+        // Tinggalkan dungeon melalui menu ringkas -> 'Kembali ke Town' di kanan atas.
+        await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
+        await tester.pump();
         await tester.tap(find.text('Kembali ke Town'));
         await tester.pump();
         await tester.runAsync(_flushAsyncDb);

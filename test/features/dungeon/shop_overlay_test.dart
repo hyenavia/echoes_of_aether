@@ -136,7 +136,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Toko'));
+      await tester.tap(find.text('Shop'));
       await tester.pumpAndSettle();
 
       expect(find.byType(ShopOverlay), findsOneWidget);

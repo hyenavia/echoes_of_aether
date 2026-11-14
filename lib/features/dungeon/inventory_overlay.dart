@@ -148,14 +148,15 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
                     ),
                     Flexible(
                       child: list.isEmpty
-                          ? const Padding(
-                              padding: EdgeInsets.all(AppSpacing.lg),
-                              child: Text('Belum ada item.'),
+                          ? const EmptyState(
+                              icon: Icons.inventory_2_outlined,
+                              title: 'Belum ada item.',
+                              subtitle: 'Material dan item dari dungeon akan tersimpan di sini.',
                             )
                           : filtered.isEmpty
-                          ? const Padding(
-                              padding: EdgeInsets.all(AppSpacing.lg),
-                              child: Text('Tidak ada item yang sesuai filter.'),
+                          ? const EmptyState(
+                              icon: Icons.filter_alt_off_outlined,
+                              title: 'Tidak ada item yang sesuai filter.',
                             )
                           : ListView.separated(
                               shrinkWrap: true,

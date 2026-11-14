@@ -207,16 +207,15 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
                             ],
                             const SizedBox(height: AppSpacing.xs),
                             if (s.bag.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(AppSpacing.sm),
-                                child: Text('Belum ada equipment.'),
+                              const EmptyState(
+                                icon: Icons.shield_outlined,
+                                title: 'Belum ada equipment.',
+                                subtitle: 'Kalahkan monster atau beli perlengkapan di Toko.',
                               )
                             else if (filteredBag.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(AppSpacing.sm),
-                                child: Text(
-                                  'Tidak ada perlengkapan yang sesuai filter.',
-                                ),
+                              const EmptyState(
+                                icon: Icons.filter_alt_off_outlined,
+                                title: 'Tidak ada perlengkapan yang sesuai filter.',
                               )
                             else
                               for (final e in filteredBag)

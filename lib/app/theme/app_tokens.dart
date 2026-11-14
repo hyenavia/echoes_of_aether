@@ -17,11 +17,17 @@ abstract final class AppColors {
   static const Color backgroundDark = Color(0xFF13201C);
   static const Color surfaceDark = Color(0xFF1A2C26);
   static const Color panelDark = Color(0xFF21362F);
+  static const Color panelElevated = Color(0xFF274038);
   static const Color panelBorder = Color(0xFF476D59);
   static const Color panelInnerBorder = Color(0xFF2E4B3E);
   static const Color textPrimary = Color(0xFFF1F4EE);
   static const Color textSecondary = Color(0xFFB7C4BA);
   static const Color textMuted = Color(0xFF8C9A90);
+
+  // Aksen glow halus (Aether, Gold, Arcane)
+  static const Color aetherGlow = Color(0x3365BFE8);
+  static const Color goldGlow = Color(0x33E6BD68);
+  static const Color arcaneGlow = Color(0x339879CE);
 
   // Warna rarity (Common..Legendary)
   static const Color rarityCommon = Color(0xFFA8B3AE);

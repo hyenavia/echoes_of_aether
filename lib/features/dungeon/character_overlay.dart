@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_tokens.dart';
 import '../../app/theme/echoes_theme.dart';
 import '../../core/utils/number_formatter.dart';
+import '../../domain/entities/combat_stats.dart';
 import '../../domain/entities/specialization.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
@@ -77,14 +78,7 @@ class CharacterOverlay extends StatelessWidget {
                         children: [
                           if (s.stats != null) ...[
                             const SectionHeader(title: 'Stat Tempur'),
-                            PanelFrame(
-                              padding: const EdgeInsets.all(AppSpacing.sm),
-                              backgroundColor: AppColors.surfaceDark,
-                              child: Text(
-                                describeCombatStats(s.stats!),
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ),
+                            _CombatStatGrid(stats: s.stats!),
                             const SizedBox(height: AppSpacing.sm),
                           ],
                           const SectionHeader(title: 'Spesialisasi'),
@@ -203,6 +197,7 @@ class CharacterOverlay extends StatelessWidget {
     final affinityLine = affinities.isEmpty ? '' : '\nAfinitas: $affinities';
 
     return PanelFrame(
+      showCornerOrnaments: selected,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xs,
         vertical: 2,
@@ -227,6 +222,132 @@ class CharacterOverlay extends StatelessWidget {
                     : null,
                 child: const Text('Pilih'),
               ),
+      ),
+    );
+  }
+}
+
+class _CombatStatGrid extends StatelessWidget {
+  const _CombatStatGrid({required this.stats});
+
+  final CombatStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = EchoesTheme.of(context);
+    final entries = <({String label, String value, Color color})>[
+      (
+        label: 'HP',
+        value: NumberFormatter.format(stats.maxHp),
+        color: ext.hpBar,
+      ),
+      (label: 'ATK', value: NumberFormatter.format(stats.atk), color: ext.gold),
+      (
+        label: 'DEF',
+        value: NumberFormatter.format(stats.def),
+        color: ext.expBar,
+      ),
+      (
+        label: 'ASPD',
+        value: '${stats.attackSpeed.toStringAsFixed(2)}/s',
+        color: AppColors.textPrimary,
+      ),
+      (
+        label: 'CRIT',
+        value: '${(stats.critRate * 100).round()}%',
+        color: ext.warning,
+      ),
+      (
+        label: 'CRIT DMG',
+        value: '${(stats.critDamage * 100).round()}%',
+        color: ext.warning,
+      ),
+      (
+        label: 'HASTE',
+        value: '${(stats.skillHaste * 100).round()}%',
+        color: ext.rank,
+      ),
+      (
+        label: 'RNG',
+        value: stats.attackRange.toStringAsFixed(1),
+        color: AppColors.textSecondary,
+      ),
+    ];
+
+    return PanelFrame(
+      showCornerOrnaments: true,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      backgroundColor: AppColors.surfaceDark,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cols = constraints.maxWidth >= 320 ? 4 : 2;
+              const spacing = AppSpacing.xs + 2;
+              final cellWidth =
+                  (constraints.maxWidth - spacing * (cols - 1)) / cols;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final e in entries)
+                    SizedBox(
+                      width: cellWidth,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs + 2,
+                          vertical: AppSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundDark.withValues(
+                            alpha: 0.7,
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          border: Border.all(color: AppColors.panelInnerBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              e.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textMuted,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              e.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: e.color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.xs + 2),
+          Text(
+            describeCombatStats(stats),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: AppColors.textMuted),
+          ),
+        ],
       ),
     );
   }

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_tokens.dart';
+import '../../app/theme/echoes_theme.dart';
 import '../../core/utils/number_formatter.dart';
 import '../shared/widgets/shared_widgets.dart';
 
-/// Top bar Town Hub (M11 Stage 2) menampilkan level, bar EXP, gold, dan
-/// Ascension Rank menggunakan [NumberFormatter] dan komponen bersama Stage 1.
+/// Top bar Town Hub menampilkan identitas ringkas, HP, bar EXP, gold, dan
+/// Ascension Rank menggunakan token RPG Echoes of Aether.
 class TownTopBar extends StatelessWidget {
   const TownTopBar({
     super.key,
@@ -29,6 +30,7 @@ class TownTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
     final specLabel = specializationName ?? 'Petualang';
     final effectiveMaxExp = expToNext > 0 ? expToNext : 1;
     final effectiveCurrentExp = expToNext > 0 ? currentExp : effectiveMaxExp;
@@ -36,8 +38,9 @@ class TownTopBar extends StatelessWidget {
     return PanelFrame(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm + 2,
+        vertical: AppSpacing.sm,
       ),
+      backgroundColor: AppColors.surfaceDark,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -45,22 +48,42 @@ class TownTopBar extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                child: Wrap(
+                  spacing: AppSpacing.xs + 2,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       '$specLabel • Lv ${NumberFormatter.format(level)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     if (maxHp != null)
-                      Text(
-                        'HP ${NumberFormatter.format(maxHp!)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ext.hpBar.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          border: Border.all(
+                            color: ext.hpBar.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          'HP ${NumberFormatter.format(maxHp!)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: ext.hpBar,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -82,7 +105,7 @@ class TownTopBar extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs + 2),
+          const SizedBox(height: AppSpacing.xs),
           StatBar.exp(
             key: const Key('top_bar_exp'),
             current: effectiveCurrentExp,

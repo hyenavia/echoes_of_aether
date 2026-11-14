@@ -1,4 +1,5 @@
 import 'package:echoes_of_aether/app/theme/echoes_theme.dart';
+import 'package:echoes_of_aether/domain/entities/combat_stats.dart';
 import 'package:echoes_of_aether/domain/entities/equipment.dart';
 import 'package:echoes_of_aether/domain/entities/game_settings.dart';
 import 'package:echoes_of_aether/domain/entities/item_definition.dart';
@@ -178,6 +179,64 @@ void main() {
 
       await tester.tap(find.byTooltip('Tutup'));
       expect(closed, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'HeroShowcaseCard, EmptyState, dan BiomeStyle berfungsi tanpa overflow di layar sempit',
+    (tester) async {
+      var tapped = false;
+      const stats = CombatStats(maxHp: 320, atk: 42, def: 18, critRate: 0.15);
+      final expectedPower = HeroShowcaseCard.computeCombatPower(stats);
+
+      await tester.pumpWidget(
+        wrapWithTheme(
+          width: 320,
+          textScale: 1.5,
+          Column(
+            children: [
+              HeroShowcaseCard(
+                level: 14,
+                ascensionRank: 2,
+                specializationId: 'vanguard',
+                specializationName: 'Vanguard',
+                stats: stats,
+                onTap: () => tapped = true,
+              ),
+              const SizedBox(height: 8),
+              const EmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'Tas kosong',
+                subtitle: 'Kalahkan monster untuk loot.',
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.text('Vanguard'), findsOneWidget);
+      expect(find.text('Lv 14'), findsOneWidget);
+      expect(find.text('Rank 2'), findsOneWidget);
+      expect(find.text('Combat Power $expectedPower'), findsOneWidget);
+      expect(find.text('Tas kosong'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('hero_showcase_card')));
+      expect(tapped, isTrue);
+
+      for (final biome in const [
+        'forgotten_forest',
+        'crystal_cavern',
+        'ancient_crypt',
+        'ashen_wasteland',
+        'aether_sanctum',
+      ]) {
+        expect(BiomeStyle.resolve(biome).label, isNotEmpty);
+      }
+      expect(
+        BiomeStyle.resolve('aether_sanctum', isAscension: true).label,
+        'Ascension Sanctum',
+      );
       expect(tester.takeException(), isNull);
     },
   );

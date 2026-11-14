@@ -5,6 +5,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/theme/app_tokens.dart';
 import '../../application/providers/database_provider.dart';
 import '../../application/providers/game_config_provider.dart';
 import '../../application/services/game_session_coordinator.dart';
@@ -34,6 +35,7 @@ import '../../game/audio/audio_service.dart';
 import '../../game/echoes_game.dart';
 import '../../game/hud/inventory_views.dart';
 import '../../game/overlays.dart';
+import '../shared/widgets/shared_widgets.dart';
 import 'character_overlay.dart';
 import 'dungeon_completed_overlay.dart';
 import 'equipment_overlay.dart';
@@ -1274,15 +1276,45 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     g.overlays.add(name);
   }
 
-  Widget _menuButton({
+  Widget _compactChipButton({
+    Key? key,
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
+    Color? accentColor,
   }) {
-    return FilledButton.tonalIcon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
+    final color = accentColor ?? AppColors.textPrimary;
+    return Material(
+      color: AppColors.backgroundDark.withValues(alpha: 0.82),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        side: BorderSide(
+          color: (accentColor ?? AppColors.panelBorder).withValues(alpha: 0.75),
+        ),
+      ),
+      child: InkWell(
+        key: key,
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1299,72 +1331,19 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           final continueOffline =
               _offlineActivity.mode == OfflineActivityMode.continueDungeon &&
               !_offlineActivity.isPaused;
-          return Align(
-            alignment: Alignment.topRight,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    _menuButton(
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Tas',
-                      onPressed: () => _togglePanel(g, GameOverlays.inventory),
-                    ),
-                    const SizedBox(height: 6),
-                    _menuButton(
-                      icon: Icons.shield_outlined,
-                      label: 'Perlengkapan',
-                      onPressed: () => _togglePanel(g, GameOverlays.equipment),
-                    ),
-                    const SizedBox(height: 6),
-                    _menuButton(
-                      icon: Icons.auto_awesome_outlined,
-                      label: 'Karakter',
-                      onPressed: () => _togglePanel(g, GameOverlays.character),
-                    ),
-                    const SizedBox(height: 6),
-                    _menuButton(
-                      icon: Icons.settings_outlined,
-                      label: 'Pengaturan',
-                      onPressed: () => _togglePanel(g, GameOverlays.settings),
-                    ),
-                    const SizedBox(height: 6),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: g.autoSkill,
-                      builder: (context, on, _) => _menuButton(
-                        icon: on ? Icons.flash_on : Icons.flash_off,
-                        label: 'Auto Skill: ${on ? 'ON' : 'OFF'}',
-                        onPressed: () {
-                          g.autoSkill.value = !on;
-                          unawaited(_flushSaveNow());
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _menuButton(
-                      icon: continueOffline
-                          ? Icons.play_circle_outline
-                          : Icons.pause_circle_outline,
-                      label: continueOffline
-                          ? 'Offline: Lanjut'
-                          : 'Offline: Pause',
-                      onPressed: continueOffline
-                          ? _selectPauseOffline
-                          : _selectContinueDungeon,
-                    ),
-                    const SizedBox(height: 6),
-                    _menuButton(
-                      icon: Icons.home_outlined,
-                      label: 'Kembali ke Town',
-                      onPressed: _returnToTown,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          return _DungeonCompactMenuCluster(
+            game: g,
+            continueOffline: continueOffline,
+            onToggleAutoSkill: (on) {
+              g.autoSkill.value = !on;
+              unawaited(_flushSaveNow());
+            },
+            onToggleOffline: continueOffline
+                ? _selectPauseOffline
+                : _selectContinueDungeon,
+            onTogglePanel: (panel) => _togglePanel(g, panel),
+            onReturnToTown: _returnToTown,
+            chipBuilder: _compactChipButton,
           );
         },
         GameOverlays.inventory: (context, g) => InventoryOverlay(
@@ -1445,6 +1424,182 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           );
         },
       },
+    );
+  }
+}
+
+class _DungeonCompactMenuCluster extends StatefulWidget {
+  const _DungeonCompactMenuCluster({
+    required this.game,
+    required this.continueOffline,
+    required this.onToggleAutoSkill,
+    required this.onToggleOffline,
+    required this.onTogglePanel,
+    required this.onReturnToTown,
+    required this.chipBuilder,
+  });
+
+  final EchoesGame game;
+  final bool continueOffline;
+  final void Function(bool current) onToggleAutoSkill;
+  final VoidCallback onToggleOffline;
+  final void Function(String panel) onTogglePanel;
+  final VoidCallback onReturnToTown;
+  final Widget Function({
+    Key? key,
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color? accentColor,
+  })
+  chipBuilder;
+
+  @override
+  State<_DungeonCompactMenuCluster> createState() =>
+      _DungeonCompactMenuClusterState();
+}
+
+class _DungeonCompactMenuClusterState
+    extends State<_DungeonCompactMenuCluster> {
+  bool _expanded = false;
+
+  void _openPanel(String panel) {
+    setState(() => _expanded = false);
+    widget.onTogglePanel(panel);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomRight,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.50,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (_expanded) ...[
+                PanelFrame(
+                  padding: const EdgeInsets.all(AppSpacing.xs + 2),
+                  backgroundColor: AppColors.backgroundDark.withValues(
+                    alpha: 0.94,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _drawerItem(
+                        icon: Icons.inventory_2_outlined,
+                        label: 'Tas',
+                        onTap: () => _openPanel(GameOverlays.inventory),
+                      ),
+                      _drawerItem(
+                        icon: Icons.shield_outlined,
+                        label: 'Perlengkapan',
+                        onTap: () => _openPanel(GameOverlays.equipment),
+                      ),
+                      _drawerItem(
+                        icon: Icons.auto_awesome_outlined,
+                        label: 'Karakter',
+                        onTap: () => _openPanel(GameOverlays.character),
+                      ),
+                      _drawerItem(
+                        icon: Icons.settings_outlined,
+                        label: 'Pengaturan',
+                        onTap: () => _openPanel(GameOverlays.settings),
+                      ),
+                      const Divider(height: 8),
+                      _drawerItem(
+                        icon: Icons.home_outlined,
+                        label: 'Kembali ke Town',
+                        color: AppColors.warmGold,
+                        onTap: () {
+                          setState(() => _expanded = false);
+                          widget.onReturnToTown();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.end,
+                children: [
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.game.autoSkill,
+                    builder: (context, on, _) => widget.chipBuilder(
+                      key: const Key('hud_auto_skill_button'),
+                      icon: on ? Icons.flash_on : Icons.flash_off,
+                      label: 'Auto Skill: ${on ? 'ON' : 'OFF'}',
+                      accentColor: on
+                          ? AppColors.aetherBlue
+                          : AppColors.textSecondary,
+                      onPressed: () => widget.onToggleAutoSkill(on),
+                    ),
+                  ),
+                  widget.chipBuilder(
+                    key: const Key('hud_offline_button'),
+                    icon: widget.continueOffline
+                        ? Icons.play_circle_outline
+                        : Icons.pause_circle_outline,
+                    label: widget.continueOffline
+                        ? 'Offline: Lanjut'
+                        : 'Offline: Pause',
+                    accentColor: widget.continueOffline
+                        ? AppColors.success
+                        : AppColors.textSecondary,
+                    onPressed: widget.onToggleOffline,
+                  ),
+                  widget.chipBuilder(
+                    key: const Key('hud_menu_toggle_button'),
+                    icon: _expanded ? Icons.close : Icons.menu,
+                    label: 'Menu',
+                    accentColor: AppColors.warmGold,
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color color = AppColors.textPrimary,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

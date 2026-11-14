@@ -467,6 +467,8 @@ void main() {
         expect(modeASaved.offlineActivity.activeRunId, isNotEmpty);
 
         // Keluar ke Town membatalkan run sehingga Mode A harus reset aman ke Pause.
+        await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
+        await tester.pump();
         await tester.tap(find.text('Kembali ke Town'));
         for (var i = 0; i < 10; i++) {
           await tester.pump();

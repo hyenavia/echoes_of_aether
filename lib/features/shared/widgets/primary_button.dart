@@ -41,7 +41,20 @@ class PrimaryButton extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 44),
         child: SizedBox(
           width: expand ? double.infinity : null,
-          child: FilledButton(onPressed: onPressed, child: content),
+          child: FilledButton(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.warmGold,
+              foregroundColor: AppColors.backgroundDark,
+              disabledBackgroundColor: AppColors.panelInnerBorder,
+              disabledForegroundColor: AppColors.textMuted,
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+            child: content,
+          ),
         ),
       ),
     );

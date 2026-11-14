@@ -1346,6 +1346,7 @@ void main() {
         expect(find.byType(TownHubView), findsOneWidget);
         expect(find.textContaining('Siklus Rank 5'), findsAtLeastNWidgets(1));
 
+        await tester.ensureVisible(find.text('Masuk Forgotten Forest'));
         await tester.tap(find.text('Masuk Forgotten Forest'));
         await tester.pump();
         await tester.pump();
