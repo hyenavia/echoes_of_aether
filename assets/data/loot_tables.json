@@ -1,0 +1,751 @@
+{
+  "loot_tables": [
+    {
+      "id": "slime_loot",
+      "entries": [
+        {
+          "item_id": "slime_gel",
+          "chance": 0.7,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "forest_herb",
+          "chance": 0.25
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.08
+        },
+        {
+          "item_id": "rusty_sword",
+          "chance": 0.05
+        },
+        {
+          "item_id": "leather_cap",
+          "chance": 0.05
+        },
+        {
+          "item_id": "padded_vest",
+          "chance": 0.04
+        },
+        {
+          "item_id": "copper_ring",
+          "chance": 0.04
+        }
+      ]
+    },
+    {
+      "id": "goblin_loot",
+      "entries": [
+        {
+          "item_id": "goblin_ear",
+          "chance": 0.5
+        },
+        {
+          "item_id": "forest_herb",
+          "chance": 0.2,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.15
+        },
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.05
+        },
+        {
+          "item_id": "rusty_sword",
+          "chance": 0.05
+        },
+        {
+          "item_id": "hunters_bow",
+          "chance": 0.04
+        },
+        {
+          "item_id": "apprentice_staff",
+          "chance": 0.04
+        },
+        {
+          "item_id": "iron_helm",
+          "chance": 0.05
+        },
+        {
+          "item_id": "forest_mail",
+          "chance": 0.04
+        },
+        {
+          "item_id": "mossy_charm",
+          "chance": 0.04
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.015
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.015
+        },
+        {
+          "item_id": "swift_charm",
+          "chance": 0.04
+        }
+      ]
+    },
+    {
+      "id": "elite_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.85,
+          "min_quantity": 1,
+          "max_quantity": 3
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.4,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.12
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.12
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.03
+        }
+      ]
+    },
+    {
+      "id": "boss_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 3,
+          "max_quantity": 5
+        },
+        {
+          "item_id": "aether_sigil",
+          "chance": 0.5
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.25
+        },
+        {
+          "item_id": "heart_of_aether",
+          "chance": 0.08
+        }
+      ]
+    },
+    {
+      "id": "dungeon_clear_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.6,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.15
+        }
+      ]
+    },
+    {
+      "id": "aether_slime_loot",
+      "entries": [
+        {
+          "item_id": "slime_gel",
+          "chance": 0.7,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "forest_herb",
+          "chance": 0.25
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.1
+        },
+        {
+          "item_id": "rusty_sword",
+          "chance": 0.05
+        },
+        {
+          "item_id": "leather_cap",
+          "chance": 0.05
+        },
+        {
+          "item_id": "copper_ring",
+          "chance": 0.04
+        }
+      ]
+    },
+    {
+      "id": "forest_wolf_loot",
+      "entries": [
+        {
+          "item_id": "wolf_fang",
+          "chance": 0.65,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.12
+        },
+        {
+          "item_id": "hunters_bow",
+          "chance": 0.05
+        },
+        {
+          "item_id": "padded_vest",
+          "chance": 0.05
+        },
+        {
+          "item_id": "swift_charm",
+          "chance": 0.04
+        }
+      ]
+    },
+    {
+      "id": "corrupted_treant_loot",
+      "entries": [
+        {
+          "item_id": "corrupted_bark",
+          "chance": 0.7,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.15
+        },
+        {
+          "item_id": "apprentice_staff",
+          "chance": 0.05
+        },
+        {
+          "item_id": "iron_helm",
+          "chance": 0.05
+        },
+        {
+          "item_id": "forest_mail",
+          "chance": 0.05
+        },
+        {
+          "item_id": "mossy_charm",
+          "chance": 0.05
+        }
+      ]
+    },
+    {
+      "id": "crystal_normal_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.35
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.14
+        },
+        {
+          "item_id": "hunters_bow",
+          "chance": 0.06
+        },
+        {
+          "item_id": "apprentice_staff",
+          "chance": 0.06
+        },
+        {
+          "item_id": "iron_helm",
+          "chance": 0.06
+        },
+        {
+          "item_id": "forest_mail",
+          "chance": 0.06
+        },
+        {
+          "item_id": "swift_charm",
+          "chance": 0.05
+        }
+      ]
+    },
+    {
+      "id": "crystal_elite_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.9,
+          "min_quantity": 1,
+          "max_quantity": 3
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.45,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.15
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.15
+        }
+      ]
+    },
+    {
+      "id": "crystal_boss_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 3,
+          "max_quantity": 6
+        },
+        {
+          "item_id": "aether_sigil",
+          "chance": 0.4
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.35
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.35
+        }
+      ]
+    },
+    {
+      "id": "crystal_clear_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 3,
+          "max_quantity": 5
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.65,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.2
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.18
+        }
+      ]
+    },
+    {
+      "id": "crypt_normal_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.45
+        },
+        {
+          "item_id": "wolf_fang",
+          "chance": 0.3
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.16
+        },
+        {
+          "item_id": "hunters_bow",
+          "chance": 0.06
+        },
+        {
+          "item_id": "apprentice_staff",
+          "chance": 0.06
+        },
+        {
+          "item_id": "iron_helm",
+          "chance": 0.06
+        },
+        {
+          "item_id": "forest_mail",
+          "chance": 0.06
+        },
+        {
+          "item_id": "mossy_charm",
+          "chance": 0.05
+        }
+      ]
+    },
+    {
+      "id": "crypt_elite_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.95,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.5,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.18
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.18
+        }
+      ]
+    },
+    {
+      "id": "crypt_boss_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 4,
+          "max_quantity": 7
+        },
+        {
+          "item_id": "aether_sigil",
+          "chance": 0.5
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.45
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.45
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.12
+        }
+      ]
+    },
+    {
+      "id": "crypt_clear_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 4,
+          "max_quantity": 6
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.7,
+          "min_quantity": 1,
+          "max_quantity": 3
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.25
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.25
+        }
+      ]
+    },
+    {
+      "id": "ashen_normal_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.55,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "corrupted_bark",
+          "chance": 0.35
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.18
+        },
+        {
+          "item_id": "iron_helm",
+          "chance": 0.06
+        },
+        {
+          "item_id": "forest_mail",
+          "chance": 0.06
+        },
+        {
+          "item_id": "swift_charm",
+          "chance": 0.06
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.03
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.03
+        }
+      ]
+    },
+    {
+      "id": "ashen_elite_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.55,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.2
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.2
+        }
+      ]
+    },
+    {
+      "id": "ashen_boss_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 5,
+          "max_quantity": 8
+        },
+        {
+          "item_id": "aether_sigil",
+          "chance": 0.6
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.5
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.5
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.22
+        }
+      ]
+    },
+    {
+      "id": "ashen_clear_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 5,
+          "max_quantity": 8
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.75,
+          "min_quantity": 2,
+          "max_quantity": 3
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.3
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.3
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.1
+        }
+      ]
+    },
+    {
+      "id": "sanctum_normal_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.65,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.2,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "iron_helm",
+          "chance": 0.07
+        },
+        {
+          "item_id": "forest_mail",
+          "chance": 0.07
+        },
+        {
+          "item_id": "swift_charm",
+          "chance": 0.06
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.05
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.05
+        }
+      ]
+    },
+    {
+      "id": "sanctum_elite_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 3,
+          "max_quantity": 5
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.6,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.22
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.22
+        }
+      ]
+    },
+    {
+      "id": "sanctum_boss_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 6,
+          "max_quantity": 10
+        },
+        {
+          "item_id": "aether_sigil",
+          "chance": 0.8
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.35
+        },
+        {
+          "item_id": "heart_of_aether",
+          "chance": 0.15
+        }
+      ]
+    },
+    {
+      "id": "sanctum_clear_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 1.0,
+          "min_quantity": 6,
+          "max_quantity": 10
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.8,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.35
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.35
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.2
+        },
+        {
+          "item_id": "heart_of_aether",
+          "chance": 0.06
+        }
+      ]
+    },
+    {
+      "id": "ascension_clear_loot",
+      "entries": [
+        {
+          "item_id": "ancient_fragment",
+          "chance": 0.9,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
+        {
+          "item_id": "small_potion",
+          "chance": 0.5,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "ranger_blade",
+          "chance": 0.3
+        },
+        {
+          "item_id": "guardian_amulet",
+          "chance": 0.3
+        },
+        {
+          "item_id": "aether_blade",
+          "chance": 0.35
+        },
+        {
+          "item_id": "heart_of_aether",
+          "chance": 0.15
+        }
+      ]
+    }
+  ]
+}

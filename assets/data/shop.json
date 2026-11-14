@@ -1,0 +1,117 @@
+{
+  "entries": [
+    {
+      "id": "shop_rusty_sword",
+      "item_id": "rusty_sword",
+      "price": 1200,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_leather_cap",
+      "item_id": "leather_cap",
+      "price": 1200,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_padded_vest",
+      "item_id": "padded_vest",
+      "price": 1500,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_copper_ring",
+      "item_id": "copper_ring",
+      "price": 1600,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_hunters_bow",
+      "item_id": "hunters_bow",
+      "price": 4500,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_apprentice_staff",
+      "item_id": "apprentice_staff",
+      "price": 4500,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_mossy_charm",
+      "item_id": "mossy_charm",
+      "price": 5000,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_iron_helm",
+      "item_id": "iron_helm",
+      "price": 5500,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_swift_charm",
+      "item_id": "swift_charm",
+      "price": 5500,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_forest_mail",
+      "item_id": "forest_mail",
+      "price": 7000,
+      "purchase_limit": null,
+      "requirements": []
+    },
+    {
+      "id": "shop_guardian_amulet",
+      "item_id": "guardian_amulet",
+      "price": 25000,
+      "purchase_limit": null,
+      "requirements": [
+        { "type": "min_level", "value": 10 }
+      ]
+    },
+    {
+      "id": "shop_ranger_blade",
+      "item_id": "ranger_blade",
+      "price": 30000,
+      "purchase_limit": null,
+      "requirements": [
+        { "type": "min_level", "value": 10 }
+      ]
+    },
+    {
+      "id": "shop_aether_blade",
+      "item_id": "aether_blade",
+      "price": 120000,
+      "purchase_limit": null,
+      "requirements": [
+        { "type": "min_level", "value": 20 },
+        { "type": "dungeon_cleared", "dungeon_id": "ancient_crypt" }
+      ]
+    },
+    {
+      "id": "shop_heart_of_aether",
+      "item_id": "heart_of_aether",
+      "price": 500000,
+      "purchase_limit": 1,
+      "requirements": [
+        { "type": "min_ascension_rank", "value": 1 }
+      ]
+    }
+  ],
+  "sell": {
+    "sellable_categories": ["equipment", "material"],
+    "confirm_min_rarity": "rare",
+    "equipped_sellable": false,
+    "max_sell_ratio": 0.4
+  }
+}

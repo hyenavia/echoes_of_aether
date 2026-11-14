@@ -1,0 +1,52 @@
+{
+  "damage": {
+    "formula": "ratio"
+  },
+  "revive": {
+    "delay_seconds": 3.0,
+    "hp_percent": 0.3,
+    "invulnerability_seconds": 2.0,
+    "cooldown_seconds": 90.0
+  },
+  "progression": {
+    "max_level": null,
+    "exp": { "type": "polynomial", "base": 60, "exponent": 1.8 },
+    "base_stats": {
+      "hp": 100,
+      "atk": 12,
+      "def": 2,
+      "attack_speed": 1.5,
+      "crit_rate": 0.1,
+      "crit_damage": 1.5,
+      "move_speed": 4.0,
+      "attack_range": 1.5
+    },
+    "per_level": { "hp": 15, "atk": 2, "def": 0.5 }
+  },
+  "equipment": {
+    "roll_variance": 0.15
+  },
+  "difficulty": {
+    "cycle_per_rank": 6.5,
+    "ascension_multiplier": 1.35,
+    "cycle_level_step": 44,
+    "stat_exponents": { "hp": 1.0, "atk": 1.0, "def": 0.9 },
+    "cycle_stat_exponents": { "hp": 0.25, "atk": 0.22, "def": 0.20 },
+    "reward_exponent": 0.85,
+    "drop": {
+      "rare_chance_per_rank": 0.1,
+      "max_chance_multiplier": 3.0,
+      "roll_bonus_per_rank": 0.02,
+      "max_roll_bonus": 0.5
+    },
+    "max_multiplier": 1000000000
+  },
+  "farming": {
+    "death_loop_suggest_after": 3
+  },
+  "dungeon_completion": {
+    "exp_reward": 120,
+    "gold_reward": 50,
+    "loot_table_id": "dungeon_clear_loot"
+  }
+}

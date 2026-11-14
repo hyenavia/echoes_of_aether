@@ -1,0 +1,38 @@
+{
+  "unlock_level": 5,
+  "specializations": [
+    {
+      "id": "vanguard",
+      "name": "Vanguard",
+      "description": "Physical combat dan survivability. Bertarung jarak dekat.",
+      "bonus": { "hp": 60, "def": 3 },
+      "attack_range": 1.5,
+      "skill_affinities": {
+        "power_strike": 0.2,
+        "vitality": 0.25
+      }
+    },
+    {
+      "id": "arcanist",
+      "name": "Arcanist",
+      "description": "Magic damage dan Aether mastery. Serangan area jarak menengah.",
+      "bonus": { "atk": 6, "skill_haste": 0.05 },
+      "attack_range": 4.0,
+      "skill_affinities": {
+        "aether_burst": 0.25,
+        "healing_pulse": 0.15
+      }
+    },
+    {
+      "id": "ranger",
+      "name": "Ranger",
+      "description": "Ranged combat dengan attack speed dan critical presisi.",
+      "bonus": { "attack_speed": 0.4, "crit_rate": 0.05 },
+      "attack_range": 5.0,
+      "skill_affinities": {
+        "power_strike": 0.1,
+        "focus": 0.25
+      }
+    }
+  ]
+}

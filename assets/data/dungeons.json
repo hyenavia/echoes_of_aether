@@ -1,0 +1,1116 @@
+{
+  "maps": {
+    "forest_entrance_map": [
+      "####################",
+      "#..................#",
+      "#..###........###..#",
+      "#..#............#..#",
+      "#..................#",
+      "#..................#",
+      "#..................#",
+      "#..#............#..#",
+      "#..###........###..#",
+      "#..................#",
+      "####################"
+    ],
+    "ancient_path_map": [
+      "######################",
+      "#....................#",
+      "#....####....####....#",
+      "#....................#",
+      "#..##............##..#",
+      "#....................#",
+      "#..##............##..#",
+      "#....................#",
+      "#....####....####....#",
+      "#....................#",
+      "######################"
+    ],
+    "ruined_shrine_map": [
+      "######################",
+      "#....................#",
+      "#...##..........##...#",
+      "#...##..........##...#",
+      "#....................#",
+      "#........####........#",
+      "#....................#",
+      "#........####........#",
+      "#....................#",
+      "#...##..........##...#",
+      "#...##..........##...#",
+      "#....................#",
+      "######################"
+    ],
+    "hidden_chamber_map": [
+      "######################",
+      "#....................#",
+      "#..###..........###..#",
+      "#..#..............#..#",
+      "#....................#",
+      "#......#......#......#",
+      "#....................#",
+      "#......#......#......#",
+      "#....................#",
+      "#..#..............#..#",
+      "#..###..........###..#",
+      "#....................#",
+      "######################"
+    ],
+    "ancient_heart_map": [
+      "########################",
+      "#......................#",
+      "#...##............##...#",
+      "#...#..............#...#",
+      "#......................#",
+      "#........#....#........#",
+      "#......................#",
+      "#........#....#........#",
+      "#......................#",
+      "#...#..............#...#",
+      "#...##............##...#",
+      "#......................#",
+      "########################"
+    ]
+  },
+  "dungeons": [
+    {
+      "id": "forgotten_forest",
+      "name": "Forgotten Forest",
+      "biome": "forgotten_forest",
+      "kind": "normal",
+      "order": 1,
+      "recommended_level": 5,
+      "start_room_id": "forest_entrance",
+      "difficulty_scale": 1.0,
+      "rooms": [
+        {
+          "id": "forest_entrance",
+          "name": "Forest Entrance",
+          "type": "normal",
+          "map_ref": "forest_entrance_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 18, "y": 5 },
+          "spawns": [
+            {
+              "id": "fe_slime_1",
+              "monster_id": "aether_slime",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "entrance_wave",
+              "required": true
+            },
+            {
+              "id": "fe_slime_2",
+              "monster_id": "aether_slime",
+              "position": { "x": 14, "y": 5 },
+              "quantity": 1,
+              "spawn_group": "entrance_wave",
+              "required": true
+            },
+            {
+              "id": "fe_slime_3",
+              "monster_id": "aether_slime",
+              "position": { "x": 10, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "entrance_wave",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["ancient_path"],
+          "reward": {
+            "exp_reward": 15,
+            "gold_reward": 5
+          }
+        },
+        {
+          "id": "ancient_path",
+          "name": "Ancient Path",
+          "type": "normal",
+          "map_ref": "ancient_path_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 20, "y": 5 },
+          "spawns": [
+            {
+              "id": "ap_slime_1",
+              "monster_id": "aether_slime",
+              "position": { "x": 9, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "path_patrol",
+              "required": true
+            },
+            {
+              "id": "ap_slime_2",
+              "monster_id": "aether_slime",
+              "position": { "x": 9, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "path_patrol",
+              "required": true
+            },
+            {
+              "id": "ap_wolf_1",
+              "monster_id": "forest_wolf",
+              "position": { "x": 15, "y": 4 },
+              "quantity": 1,
+              "spawn_group": "path_pack",
+              "required": true
+            },
+            {
+              "id": "ap_wolf_2",
+              "monster_id": "forest_wolf",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "path_pack",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["ruined_shrine"],
+          "reward": {
+            "exp_reward": 20,
+            "gold_reward": 8
+          }
+        },
+        {
+          "id": "ruined_shrine",
+          "name": "Ruined Shrine",
+          "type": "normal",
+          "map_ref": "ruined_shrine_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "rs_wolf_1",
+              "monster_id": "forest_wolf",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "shrine_guards",
+              "required": true
+            },
+            {
+              "id": "rs_wolf_2",
+              "monster_id": "forest_wolf",
+              "position": { "x": 10, "y": 9 },
+              "quantity": 1,
+              "spawn_group": "shrine_guards",
+              "required": true
+            },
+            {
+              "id": "rs_treant_1",
+              "monster_id": "corrupted_treant",
+              "position": { "x": 16, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "shrine_guards",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["hidden_chamber"],
+          "reward": {
+            "exp_reward": 25,
+            "gold_reward": 12
+          }
+        },
+        {
+          "id": "hidden_chamber",
+          "name": "Hidden Chamber",
+          "type": "elite",
+          "map_ref": "hidden_chamber_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "hc_elite_guardian",
+              "monster_id": "corrupted_guardian",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "elite_guardian",
+              "is_elite": true,
+              "required": true,
+              "stat_modifier": {
+                "hp_multiplier": 1.0,
+                "atk_multiplier": 1.0,
+                "def_multiplier": 1.0
+              }
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_elite",
+            "required_spawn_group": "elite_guardian"
+          },
+          "next_room_ids": ["ancient_heart"],
+          "reward": {
+            "exp_reward": 40,
+            "gold_reward": 20
+          }
+        },
+        {
+          "id": "ancient_heart",
+          "name": "Ancient Heart",
+          "type": "boss",
+          "map_ref": "ancient_heart_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 22, "y": 6 },
+          "spawns": [
+            {
+              "id": "ah_boss_guardian",
+              "monster_id": "ancient_heart_guardian",
+              "position": { "x": 17, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "boss_ancient_heart",
+              "is_boss": true,
+              "required": true,
+              "stat_modifier": {
+                "hp_multiplier": 1.0,
+                "atk_multiplier": 1.0,
+                "def_multiplier": 1.0
+              }
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_boss",
+            "required_spawn_group": "boss_ancient_heart"
+          },
+          "next_room_ids": []
+        }
+      ]
+    },
+    {
+      "id": "crystal_cavern",
+      "name": "Crystal Cavern",
+      "biome": "crystal_cavern",
+      "kind": "normal",
+      "order": 2,
+      "recommended_level": 8,
+      "unlock_requires_dungeon_id": "forgotten_forest",
+      "start_room_id": "cc_cavern_mouth",
+      "difficulty_scale": 1.5,
+      "completion_reward": {
+        "exp_reward": 160,
+        "gold_reward": 70,
+        "loot_table_id": "crystal_clear_loot"
+      },
+      "rooms": [
+        {
+          "id": "cc_cavern_mouth",
+          "name": "Cavern Mouth",
+          "type": "normal",
+          "map_ref": "forest_entrance_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 18, "y": 5 },
+          "spawns": [
+            {
+              "id": "cc_slime_1",
+              "monster_id": "crystal_slime",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "cc_mouth_wave",
+              "required": true
+            },
+            {
+              "id": "cc_slime_2",
+              "monster_id": "crystal_slime",
+              "position": { "x": 14, "y": 5 },
+              "quantity": 1,
+              "spawn_group": "cc_mouth_wave",
+              "required": true
+            },
+            {
+              "id": "cc_slime_3",
+              "monster_id": "crystal_slime",
+              "position": { "x": 10, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "cc_mouth_wave",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["cc_crystal_vein"],
+          "reward": {
+            "exp_reward": 20,
+            "gold_reward": 7
+          }
+        },
+        {
+          "id": "cc_crystal_vein",
+          "name": "Crystal Vein",
+          "type": "normal",
+          "map_ref": "ancient_path_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 20, "y": 5 },
+          "spawns": [
+            {
+              "id": "cc_vein_slime_1",
+              "monster_id": "crystal_slime",
+              "position": { "x": 9, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "cc_vein_patrol",
+              "required": true
+            },
+            {
+              "id": "cc_vein_slime_2",
+              "monster_id": "crystal_slime",
+              "position": { "x": 9, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "cc_vein_patrol",
+              "required": true
+            },
+            {
+              "id": "cc_stalker_1",
+              "monster_id": "cavern_stalker",
+              "position": { "x": 15, "y": 4 },
+              "quantity": 1,
+              "spawn_group": "cc_vein_pack",
+              "required": true
+            },
+            {
+              "id": "cc_stalker_2",
+              "monster_id": "cavern_stalker",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "cc_vein_pack",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["cc_prism_hall"],
+          "reward": {
+            "exp_reward": 28,
+            "gold_reward": 11
+          }
+        },
+        {
+          "id": "cc_prism_hall",
+          "name": "Prism Hall",
+          "type": "normal",
+          "map_ref": "ruined_shrine_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "cc_hall_stalker_1",
+              "monster_id": "cavern_stalker",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "cc_hall_guards",
+              "required": true
+            },
+            {
+              "id": "cc_hall_stalker_2",
+              "monster_id": "cavern_stalker",
+              "position": { "x": 10, "y": 9 },
+              "quantity": 1,
+              "spawn_group": "cc_hall_guards",
+              "required": true
+            },
+            {
+              "id": "cc_golem_1",
+              "monster_id": "quartz_golem",
+              "position": { "x": 16, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "cc_hall_guards",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["cc_warden_grotto"],
+          "reward": {
+            "exp_reward": 35,
+            "gold_reward": 16
+          }
+        },
+        {
+          "id": "cc_warden_grotto",
+          "name": "Warden Grotto",
+          "type": "elite",
+          "map_ref": "hidden_chamber_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "cc_elite_warden",
+              "monster_id": "crystal_warden",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "cc_elite",
+              "is_elite": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_elite",
+            "required_spawn_group": "cc_elite"
+          },
+          "next_room_ids": ["cc_prismatic_core"],
+          "reward": {
+            "exp_reward": 55,
+            "gold_reward": 26
+          }
+        },
+        {
+          "id": "cc_prismatic_core",
+          "name": "Prismatic Core",
+          "type": "boss",
+          "map_ref": "ancient_heart_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 22, "y": 6 },
+          "spawns": [
+            {
+              "id": "cc_boss_colossus",
+              "monster_id": "prism_colossus",
+              "position": { "x": 17, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "cc_boss",
+              "is_boss": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_boss",
+            "required_spawn_group": "cc_boss"
+          },
+          "next_room_ids": []
+        }
+      ]
+    },
+    {
+      "id": "ancient_crypt",
+      "name": "Ancient Crypt",
+      "biome": "ancient_crypt",
+      "kind": "normal",
+      "order": 3,
+      "recommended_level": 16,
+      "unlock_requires_dungeon_id": "crystal_cavern",
+      "start_room_id": "ac_crypt_gate",
+      "difficulty_scale": 2.25,
+      "completion_reward": {
+        "exp_reward": 210,
+        "gold_reward": 95,
+        "loot_table_id": "crypt_clear_loot"
+      },
+      "rooms": [
+        {
+          "id": "ac_crypt_gate",
+          "name": "Crypt Gate",
+          "type": "normal",
+          "map_ref": "forest_entrance_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 18, "y": 5 },
+          "spawns": [
+            {
+              "id": "ac_ooze_1",
+              "monster_id": "crypt_ooze",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "ac_gate_wave",
+              "required": true
+            },
+            {
+              "id": "ac_ooze_2",
+              "monster_id": "crypt_ooze",
+              "position": { "x": 14, "y": 5 },
+              "quantity": 1,
+              "spawn_group": "ac_gate_wave",
+              "required": true
+            },
+            {
+              "id": "ac_ooze_3",
+              "monster_id": "crypt_ooze",
+              "position": { "x": 10, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "ac_gate_wave",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["ac_catacomb_walk"],
+          "reward": {
+            "exp_reward": 26,
+            "gold_reward": 10
+          }
+        },
+        {
+          "id": "ac_catacomb_walk",
+          "name": "Catacomb Walk",
+          "type": "normal",
+          "map_ref": "ancient_path_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 20, "y": 5 },
+          "spawns": [
+            {
+              "id": "ac_walk_ooze_1",
+              "monster_id": "crypt_ooze",
+              "position": { "x": 9, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "ac_walk_patrol",
+              "required": true
+            },
+            {
+              "id": "ac_walk_ooze_2",
+              "monster_id": "crypt_ooze",
+              "position": { "x": 9, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "ac_walk_patrol",
+              "required": true
+            },
+            {
+              "id": "ac_hound_1",
+              "monster_id": "bone_hound",
+              "position": { "x": 15, "y": 4 },
+              "quantity": 1,
+              "spawn_group": "ac_walk_pack",
+              "required": true
+            },
+            {
+              "id": "ac_hound_2",
+              "monster_id": "bone_hound",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "ac_walk_pack",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["ac_ossuary_altar"],
+          "reward": {
+            "exp_reward": 36,
+            "gold_reward": 15
+          }
+        },
+        {
+          "id": "ac_ossuary_altar",
+          "name": "Ossuary Altar",
+          "type": "normal",
+          "map_ref": "ruined_shrine_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "ac_altar_hound_1",
+              "monster_id": "bone_hound",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "ac_altar_guards",
+              "required": true
+            },
+            {
+              "id": "ac_altar_hound_2",
+              "monster_id": "bone_hound",
+              "position": { "x": 10, "y": 9 },
+              "quantity": 1,
+              "spawn_group": "ac_altar_guards",
+              "required": true
+            },
+            {
+              "id": "ac_keeper_1",
+              "monster_id": "tomb_keeper",
+              "position": { "x": 16, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "ac_altar_guards",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["ac_knight_vault"],
+          "reward": {
+            "exp_reward": 45,
+            "gold_reward": 22
+          }
+        },
+        {
+          "id": "ac_knight_vault",
+          "name": "Knight Vault",
+          "type": "elite",
+          "map_ref": "hidden_chamber_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "ac_elite_knight",
+              "monster_id": "crypt_knight",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "ac_elite",
+              "is_elite": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_elite",
+            "required_spawn_group": "ac_elite"
+          },
+          "next_room_ids": ["ac_lord_sepulcher"],
+          "reward": {
+            "exp_reward": 70,
+            "gold_reward": 34
+          }
+        },
+        {
+          "id": "ac_lord_sepulcher",
+          "name": "Lord's Sepulcher",
+          "type": "boss",
+          "map_ref": "ancient_heart_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 22, "y": 6 },
+          "spawns": [
+            {
+              "id": "ac_boss_lord",
+              "monster_id": "crypt_lord",
+              "position": { "x": 17, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "ac_boss",
+              "is_boss": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_boss",
+            "required_spawn_group": "ac_boss"
+          },
+          "next_room_ids": []
+        }
+      ]
+    },
+    {
+      "id": "ashen_wasteland",
+      "name": "Ashen Wasteland",
+      "biome": "ashen_wasteland",
+      "kind": "normal",
+      "order": 4,
+      "recommended_level": 25,
+      "unlock_requires_dungeon_id": "ancient_crypt",
+      "start_room_id": "aw_charred_edge",
+      "difficulty_scale": 3.375,
+      "completion_reward": {
+        "exp_reward": 270,
+        "gold_reward": 125,
+        "loot_table_id": "ashen_clear_loot"
+      },
+      "rooms": [
+        {
+          "id": "aw_charred_edge",
+          "name": "Charred Edge",
+          "type": "normal",
+          "map_ref": "forest_entrance_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 18, "y": 5 },
+          "spawns": [
+            {
+              "id": "aw_slime_1",
+              "monster_id": "cinder_slime",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "aw_edge_wave",
+              "required": true
+            },
+            {
+              "id": "aw_slime_2",
+              "monster_id": "cinder_slime",
+              "position": { "x": 14, "y": 5 },
+              "quantity": 1,
+              "spawn_group": "aw_edge_wave",
+              "required": true
+            },
+            {
+              "id": "aw_slime_3",
+              "monster_id": "cinder_slime",
+              "position": { "x": 10, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "aw_edge_wave",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["aw_cinder_road"],
+          "reward": {
+            "exp_reward": 34,
+            "gold_reward": 14
+          }
+        },
+        {
+          "id": "aw_cinder_road",
+          "name": "Cinder Road",
+          "type": "normal",
+          "map_ref": "ancient_path_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 20, "y": 5 },
+          "spawns": [
+            {
+              "id": "aw_road_slime_1",
+              "monster_id": "cinder_slime",
+              "position": { "x": 9, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "aw_road_patrol",
+              "required": true
+            },
+            {
+              "id": "aw_road_slime_2",
+              "monster_id": "cinder_slime",
+              "position": { "x": 9, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "aw_road_patrol",
+              "required": true
+            },
+            {
+              "id": "aw_prowler_1",
+              "monster_id": "ember_prowler",
+              "position": { "x": 15, "y": 4 },
+              "quantity": 1,
+              "spawn_group": "aw_road_pack",
+              "required": true
+            },
+            {
+              "id": "aw_prowler_2",
+              "monster_id": "ember_prowler",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "aw_road_pack",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["aw_scorched_altar"],
+          "reward": {
+            "exp_reward": 46,
+            "gold_reward": 20
+          }
+        },
+        {
+          "id": "aw_scorched_altar",
+          "name": "Scorched Altar",
+          "type": "normal",
+          "map_ref": "ruined_shrine_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "aw_altar_prowler_1",
+              "monster_id": "ember_prowler",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "aw_altar_guards",
+              "required": true
+            },
+            {
+              "id": "aw_altar_prowler_2",
+              "monster_id": "ember_prowler",
+              "position": { "x": 10, "y": 9 },
+              "quantity": 1,
+              "spawn_group": "aw_altar_guards",
+              "required": true
+            },
+            {
+              "id": "aw_colossus_1",
+              "monster_id": "slag_colossus",
+              "position": { "x": 16, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "aw_altar_guards",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["aw_sentinel_ridge"],
+          "reward": {
+            "exp_reward": 58,
+            "gold_reward": 28
+          }
+        },
+        {
+          "id": "aw_sentinel_ridge",
+          "name": "Sentinel Ridge",
+          "type": "elite",
+          "map_ref": "hidden_chamber_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "aw_elite_sentinel",
+              "monster_id": "ashen_sentinel",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "aw_elite",
+              "is_elite": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_elite",
+            "required_spawn_group": "aw_elite"
+          },
+          "next_room_ids": ["aw_ash_caldera"],
+          "reward": {
+            "exp_reward": 90,
+            "gold_reward": 44
+          }
+        },
+        {
+          "id": "aw_ash_caldera",
+          "name": "Ash Caldera",
+          "type": "boss",
+          "map_ref": "ancient_heart_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 22, "y": 6 },
+          "spawns": [
+            {
+              "id": "aw_boss_tyrant",
+              "monster_id": "ash_tyrant",
+              "position": { "x": 17, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "aw_boss",
+              "is_boss": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_boss",
+            "required_spawn_group": "aw_boss"
+          },
+          "next_room_ids": []
+        }
+      ]
+    },
+    {
+      "id": "aether_sanctum",
+      "name": "Aether Sanctum",
+      "biome": "aether_sanctum",
+      "kind": "normal",
+      "order": 5,
+      "recommended_level": 35,
+      "unlock_requires_dungeon_id": "ashen_wasteland",
+      "start_room_id": "as_outer_sanctum",
+      "difficulty_scale": 5.0625,
+      "completion_reward": {
+        "exp_reward": 350,
+        "gold_reward": 165,
+        "loot_table_id": "sanctum_clear_loot"
+      },
+      "rooms": [
+        {
+          "id": "as_outer_sanctum",
+          "name": "Outer Sanctum",
+          "type": "normal",
+          "map_ref": "forest_entrance_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 18, "y": 5 },
+          "spawns": [
+            {
+              "id": "as_wisp_1",
+              "monster_id": "sanctum_wisp",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "as_outer_wave",
+              "required": true
+            },
+            {
+              "id": "as_wisp_2",
+              "monster_id": "sanctum_wisp",
+              "position": { "x": 14, "y": 5 },
+              "quantity": 1,
+              "spawn_group": "as_outer_wave",
+              "required": true
+            },
+            {
+              "id": "as_wisp_3",
+              "monster_id": "sanctum_wisp",
+              "position": { "x": 10, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "as_outer_wave",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["as_arcane_bridge"],
+          "reward": {
+            "exp_reward": 45,
+            "gold_reward": 18
+          }
+        },
+        {
+          "id": "as_arcane_bridge",
+          "name": "Arcane Bridge",
+          "type": "normal",
+          "map_ref": "ancient_path_map",
+          "entry_position": { "x": 1, "y": 5 },
+          "exit_position": { "x": 20, "y": 5 },
+          "spawns": [
+            {
+              "id": "as_bridge_wisp_1",
+              "monster_id": "sanctum_wisp",
+              "position": { "x": 9, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "as_bridge_patrol",
+              "required": true
+            },
+            {
+              "id": "as_bridge_wisp_2",
+              "monster_id": "sanctum_wisp",
+              "position": { "x": 9, "y": 7 },
+              "quantity": 1,
+              "spawn_group": "as_bridge_patrol",
+              "required": true
+            },
+            {
+              "id": "as_stalker_1",
+              "monster_id": "aether_stalker",
+              "position": { "x": 15, "y": 4 },
+              "quantity": 1,
+              "spawn_group": "as_bridge_pack",
+              "required": true
+            },
+            {
+              "id": "as_stalker_2",
+              "monster_id": "aether_stalker",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "as_bridge_pack",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["as_sanctum_nave"],
+          "reward": {
+            "exp_reward": 60,
+            "gold_reward": 26
+          }
+        },
+        {
+          "id": "as_sanctum_nave",
+          "name": "Sanctum Nave",
+          "type": "normal",
+          "map_ref": "ruined_shrine_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "as_nave_stalker_1",
+              "monster_id": "aether_stalker",
+              "position": { "x": 10, "y": 3 },
+              "quantity": 1,
+              "spawn_group": "as_nave_guards",
+              "required": true
+            },
+            {
+              "id": "as_nave_stalker_2",
+              "monster_id": "aether_stalker",
+              "position": { "x": 10, "y": 9 },
+              "quantity": 1,
+              "spawn_group": "as_nave_guards",
+              "required": true
+            },
+            {
+              "id": "as_warden_1",
+              "monster_id": "sanctum_warden",
+              "position": { "x": 16, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "as_nave_guards",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies"
+          },
+          "next_room_ids": ["as_guardian_hall"],
+          "reward": {
+            "exp_reward": 75,
+            "gold_reward": 36
+          }
+        },
+        {
+          "id": "as_guardian_hall",
+          "name": "Guardian Hall",
+          "type": "elite",
+          "map_ref": "hidden_chamber_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 20, "y": 6 },
+          "spawns": [
+            {
+              "id": "as_elite_guardian",
+              "monster_id": "sanctum_guardian",
+              "position": { "x": 15, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "as_elite",
+              "is_elite": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_elite",
+            "required_spawn_group": "as_elite"
+          },
+          "next_room_ids": ["as_sovereign_throne"],
+          "reward": {
+            "exp_reward": 115,
+            "gold_reward": 55
+          }
+        },
+        {
+          "id": "as_sovereign_throne",
+          "name": "Sovereign Throne",
+          "type": "boss",
+          "map_ref": "ancient_heart_map",
+          "entry_position": { "x": 1, "y": 6 },
+          "exit_position": { "x": 22, "y": 6 },
+          "spawns": [
+            {
+              "id": "as_boss_sovereign",
+              "monster_id": "aether_sovereign",
+              "position": { "x": 17, "y": 6 },
+              "quantity": 1,
+              "spawn_group": "as_boss",
+              "is_boss": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_boss",
+            "required_spawn_group": "as_boss"
+          },
+          "next_room_ids": []
+        }
+      ]
+    },
+    {
+      "id": "ascension_sanctum",
+      "name": "Ascension: Aether Sanctum",
+      "kind": "ascension",
+      "order": 6,
+      "base_dungeon_id": "aether_sanctum",
+      "unlock_requires_dungeon_id": "aether_sanctum",
+      "recommended_level": 49,
+      "completion_reward": {
+        "exp_reward": 800,
+        "gold_reward": 400,
+        "loot_table_id": "ascension_clear_loot"
+      }
+    }
+  ]
+}
+

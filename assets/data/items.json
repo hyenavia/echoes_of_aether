@@ -1,0 +1,271 @@
+{
+  "items": [
+    {
+      "id": "slime_gel",
+      "name": "Slime Gel",
+      "category": "material",
+      "rarity": "common",
+      "max_stack": 999,
+      "sell_value": 2
+    },
+    {
+      "id": "goblin_ear",
+      "name": "Goblin Ear",
+      "category": "material",
+      "rarity": "common",
+      "max_stack": 999,
+      "sell_value": 4
+    },
+    {
+      "id": "forest_herb",
+      "name": "Forest Herb",
+      "category": "material",
+      "rarity": "common",
+      "max_stack": 999,
+      "sell_value": 1
+    },
+    {
+      "id": "wolf_fang",
+      "name": "Wolf Fang",
+      "category": "material",
+      "rarity": "common",
+      "max_stack": 999,
+      "sell_value": 5
+    },
+    {
+      "id": "corrupted_bark",
+      "name": "Corrupted Bark",
+      "category": "material",
+      "rarity": "uncommon",
+      "max_stack": 999,
+      "sell_value": 8
+    },
+    {
+      "id": "small_potion",
+      "name": "Small Potion",
+      "category": "consumable",
+      "rarity": "common",
+      "max_stack": 99,
+      "sell_value": 5
+    },
+    {
+      "id": "ancient_fragment",
+      "name": "Ancient Fragment",
+      "category": "material",
+      "rarity": "uncommon",
+      "max_stack": 999,
+      "sell_value": 20
+    },
+    {
+      "id": "rusty_sword",
+      "name": "Rusty Sword",
+      "category": "equipment",
+      "rarity": "common",
+      "sell_value": 3,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "stats": {
+          "atk": 4
+        }
+      }
+    },
+    {
+      "id": "hunters_bow",
+      "name": "Hunter's Bow",
+      "category": "equipment",
+      "rarity": "uncommon",
+      "sell_value": 12,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "bow",
+        "stats": {
+          "atk": 6,
+          "attack_speed": 0.1
+        }
+      }
+    },
+    {
+      "id": "apprentice_staff",
+      "name": "Apprentice Staff",
+      "category": "equipment",
+      "rarity": "uncommon",
+      "sell_value": 12,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "staff",
+        "stats": {
+          "atk": 5,
+          "crit_rate": 0.03
+        }
+      }
+    },
+    {
+      "id": "ranger_blade",
+      "name": "Ranger Blade",
+      "category": "equipment",
+      "rarity": "rare",
+      "sell_value": 40,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "stats": {
+          "atk": 9,
+          "crit_damage": 0.15
+        }
+      }
+    },
+    {
+      "id": "leather_cap",
+      "name": "Leather Cap",
+      "category": "equipment",
+      "rarity": "common",
+      "sell_value": 3,
+      "equipment": {
+        "slot": "head",
+        "stats": {
+          "def": 1,
+          "hp": 10
+        }
+      }
+    },
+    {
+      "id": "iron_helm",
+      "name": "Iron Helm",
+      "category": "equipment",
+      "rarity": "uncommon",
+      "sell_value": 12,
+      "equipment": {
+        "slot": "head",
+        "stats": {
+          "def": 2,
+          "hp": 20
+        }
+      }
+    },
+    {
+      "id": "padded_vest",
+      "name": "Padded Vest",
+      "category": "equipment",
+      "rarity": "common",
+      "sell_value": 4,
+      "equipment": {
+        "slot": "body",
+        "stats": {
+          "def": 2,
+          "hp": 20
+        }
+      }
+    },
+    {
+      "id": "forest_mail",
+      "name": "Forest Mail",
+      "category": "equipment",
+      "rarity": "uncommon",
+      "sell_value": 14,
+      "equipment": {
+        "slot": "body",
+        "stats": {
+          "def": 4,
+          "hp": 35
+        }
+      }
+    },
+    {
+      "id": "copper_ring",
+      "name": "Copper Ring",
+      "category": "equipment",
+      "rarity": "common",
+      "sell_value": 4,
+      "equipment": {
+        "slot": "accessory",
+        "stats": {
+          "crit_rate": 0.02
+        }
+      }
+    },
+    {
+      "id": "mossy_charm",
+      "name": "Mossy Charm",
+      "category": "equipment",
+      "rarity": "uncommon",
+      "sell_value": 12,
+      "equipment": {
+        "slot": "accessory",
+        "stats": {
+          "hp": 25,
+          "crit_damage": 0.1
+        }
+      }
+    },
+    {
+      "id": "guardian_amulet",
+      "name": "Guardian Amulet",
+      "category": "equipment",
+      "rarity": "rare",
+      "sell_value": 40,
+      "equipment": {
+        "slot": "accessory",
+        "stats": {
+          "def": 2,
+          "hp": 40,
+          "crit_rate": 0.02
+        }
+      }
+    },
+    {
+      "id": "swift_charm",
+      "name": "Swift Charm",
+      "category": "equipment",
+      "rarity": "uncommon",
+      "sell_value": 12,
+      "equipment": {
+        "slot": "accessory",
+        "stats": {
+          "skill_haste": 0.05,
+          "crit_rate": 0.01
+        }
+      }
+    },
+    {
+      "id": "aether_blade",
+      "name": "Aether Blade",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 120,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "stats": {
+          "atk": 15,
+          "crit_rate": 0.05,
+          "crit_damage": 0.25
+        }
+      }
+    },
+    {
+      "id": "heart_of_aether",
+      "name": "Heart of Aether",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 300,
+      "equipment": {
+        "slot": "accessory",
+        "stats": {
+          "hp": 80,
+          "atk": 6,
+          "def": 4,
+          "skill_haste": 0.1
+        }
+      }
+    },
+    {
+      "id": "aether_sigil",
+      "name": "Aether Sigil",
+      "category": "quest_item",
+      "rarity": "rare",
+      "max_stack": 1,
+      "sell_value": 0
+    }
+  ]
+}

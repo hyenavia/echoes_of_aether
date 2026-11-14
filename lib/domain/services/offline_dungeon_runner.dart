@@ -1,0 +1,1567 @@
+import 'dart:math' as math;
+
+import '../entities/combatant.dart';
+import '../entities/dungeon_definition.dart';
+import '../entities/dungeon_session.dart';
+import '../entities/enemy_definition.dart';
+import '../entities/equipment.dart';
+import '../entities/game_config.dart';
+import '../entities/grid_point.dart';
+import '../entities/inventory.dart';
+import '../entities/offline_activity.dart';
+import '../entities/player_character.dart';
+import '../entities/player_save_snapshot.dart';
+import '../entities/player_status.dart';
+import '../entities/skill_definition.dart';
+import '../entities/skill_runtime_state.dart';
+import 'astar_pathfinder.dart';
+import 'attack_position_finder.dart';
+import 'combat_simulation.dart';
+import 'damage_calculator.dart';
+import 'difficulty_service.dart';
+import 'dungeon_manager.dart';
+import 'dungeon_reward_settlement_service.dart';
+import 'encounter_tracker.dart';
+import 'navigation_grid.dart';
+import 'offline_time_calculator.dart';
+import 'reward_processor.dart';
+import 'room_completion_evaluator.dart';
+import 'skill_selector.dart';
+import 'target_selector.dart';
+
+/// Alasan berhentinya satu batch eksekusi [OfflineDungeonRunner].
+enum OfflineDungeonStopReason {
+  timeBudgetExhausted,
+  dungeonCompleted,
+  playerDefeated,
+  iterationLimitReached,
+  invalidSetup,
+}
+
+/// Request eksekusi simulasi dungeon headless (bebas Flutter/Flame).
+class OfflineDungeonRunRequest {
+  const OfflineDungeonRunRequest({
+    required this.mode,
+    required this.character,
+    required this.inventory,
+    required this.config,
+    required this.rewardProcessor,
+    required this.dungeonId,
+    required this.dungeonProgress,
+    required this.timeWindow,
+    required this.simulationSeed,
+    this.activeDungeonSession,
+    this.maxIterations = defaultMaxIterations,
+    this.autoSkillEnabled = true,
+    this.initialHp,
+    this.initialReviveCooldownTicks = 0,
+    this.initialSkillCooldownTicks = const {},
+    this.startingAttemptIndex = 1,
+    this.cycleRank = 0,
+  });
+
+  static const int defaultMaxIterations = 50000;
+
+  final OfflineActivityMode mode;
+  final PlayerCharacter character;
+  final Inventory inventory;
+  final GameConfig config;
+  final RewardProcessor rewardProcessor;
+  final String dungeonId;
+  final DungeonProgressSnapshot dungeonProgress;
+  final ActiveDungeonSessionSnapshot? activeDungeonSession;
+  final OfflineTimeWindow timeWindow;
+  final int simulationSeed;
+  final int maxIterations;
+  final bool autoSkillEnabled;
+  final int? initialHp;
+  final int initialReviveCooldownTicks;
+  final Map<String, int> initialSkillCooldownTicks;
+  final int startingAttemptIndex;
+  final int cycleRank;
+}
+
+/// Hasil satu batch simulasi dari [OfflineDungeonRunner].
+class OfflineDungeonRunOutcome {
+  const OfflineDungeonRunOutcome({
+    required this.stopReason,
+    required this.updatedDungeonProgress,
+    required this.remainingSkillCooldownTicks,
+    required this.remainingReviveCooldownTicks,
+    required this.nextAttemptIndex,
+    this.runsAttempted = 0,
+    this.runsCompleted = 0,
+    this.runsFailed = 0,
+    this.roomsCleared = 0,
+    this.encountersCleared = 0,
+    this.expGained = 0,
+    this.goldGained = 0,
+    this.levelsGained = 0,
+    this.addedStacks = const {},
+    this.overflowStacks = const {},
+    this.addedEquipment = const [],
+    this.droppedEquipment = const [],
+    this.ticksSimulated = 0,
+    this.budgetTicks = 0,
+    this.processedDurationMs = 0,
+    this.iterationsUsed = 0,
+    this.updatedActiveDungeonSession,
+    this.remainingHp,
+    this.finalPlayerHp,
+    this.finalPlayerMaxHp,
+    this.failureReason,
+  });
+
+  final OfflineDungeonStopReason stopReason;
+  final int runsAttempted;
+  final int runsCompleted;
+  final int runsFailed;
+  final int roomsCleared;
+  final int encountersCleared;
+  final int expGained;
+  final int goldGained;
+  final int levelsGained;
+  final Map<String, int> addedStacks;
+  final Map<String, int> overflowStacks;
+  final List<EquipmentInstance> addedEquipment;
+  final List<EquipmentInstance> droppedEquipment;
+  final int ticksSimulated;
+  final int budgetTicks;
+  final int processedDurationMs;
+  final int iterationsUsed;
+  final DungeonProgressSnapshot updatedDungeonProgress;
+  final ActiveDungeonSessionSnapshot? updatedActiveDungeonSession;
+  final int? remainingHp;
+
+  /// HP aktual pemain pada akhir batch (termasuk saat selesai atau run ended),
+  /// berguna untuk telemetri/simulator tanpa mengubah aturan pemulihan [remainingHp].
+  final int? finalPlayerHp;
+
+  /// Max HP efektif pemain pada akhir batch.
+  final int? finalPlayerMaxHp;
+  final Map<String, int> remainingSkillCooldownTicks;
+  final int remainingReviveCooldownTicks;
+  final int nextAttemptIndex;
+  final String? failureReason;
+
+  bool get isInterrupted =>
+      stopReason == OfflineDungeonStopReason.iterationLimitReached;
+
+  bool get isTerminalForActivity =>
+      stopReason == OfflineDungeonStopReason.timeBudgetExhausted ||
+      stopReason == OfflineDungeonStopReason.dungeonCompleted ||
+      stopReason == OfflineDungeonStopReason.playerDefeated;
+
+  bool get hasRewards =>
+      expGained > 0 ||
+      goldGained > 0 ||
+      addedStacks.isNotEmpty ||
+      addedEquipment.isNotEmpty;
+}
+
+/// Mesin simulasi dungeon offline berbasis event-step / coarse-jump yang
+/// independen dari Flutter dan Flame.
+///
+/// Menggunakan ulang aturan domain resmi: [DungeonManager], [EncounterTracker],
+/// [RoomCompletionEvaluator], [DamageCalculator], [SkillSelector],
+/// [TargetSelector], [AStarPathfinder], [AttackPositionFinder], [ReviveConfig],
+/// [RewardProcessor], dan [DungeonRewardSettlementService].
+class OfflineDungeonRunner {
+  const OfflineDungeonRunner({
+    this.pathfinder = const AStarPathfinder(),
+    this.damageCalculator = const DamageCalculator(),
+    this.targetSelector = const TargetSelector(),
+    this.skillSelector = const SkillSelector(),
+    this.attackPositionFinder = const AttackPositionFinder(),
+    this.completionEvaluator = const RoomCompletionEvaluator(),
+    this.settlementService = const DungeonRewardSettlementService(),
+  });
+
+  static const int tickDurationMs = 50; // 20 TPS timeline resolution
+
+  final AStarPathfinder pathfinder;
+  final DamageCalculator damageCalculator;
+  final TargetSelector targetSelector;
+  final SkillSelector skillSelector;
+  final AttackPositionFinder attackPositionFinder;
+  final RoomCompletionEvaluator completionEvaluator;
+  final DungeonRewardSettlementService settlementService;
+
+  OfflineDungeonRunner copyWith({DamageCalculator? damageCalculator}) =>
+      OfflineDungeonRunner(
+        pathfinder: pathfinder,
+        damageCalculator: damageCalculator ?? this.damageCalculator,
+        targetSelector: targetSelector,
+        skillSelector: skillSelector,
+        attackPositionFinder: attackPositionFinder,
+        completionEvaluator: completionEvaluator,
+        settlementService: settlementService,
+      );
+
+  OfflineDungeonRunOutcome runBatch(OfflineDungeonRunRequest request) =>
+      _executeBatch(request, allowManualAscension: false);
+
+  /// Mensimulasikan satu kali eksekusi dungeon secara manual (termasuk dungeon
+  /// bertipe ascension) dengan aturan tempur identik untuk kebutuhan simulator/QA
+  /// tanpa membuka jalur progresi offline [runBatch].
+  OfflineDungeonRunOutcome simulateManualRun(OfflineDungeonRunRequest request) {
+    if (request.mode != OfflineActivityMode.continueDungeon ||
+        request.activeDungeonSession == null) {
+      return OfflineDungeonRunOutcome(
+        stopReason: OfflineDungeonStopReason.invalidSetup,
+        updatedDungeonProgress: request.dungeonProgress,
+        remainingSkillCooldownTicks: request.initialSkillCooldownTicks,
+        remainingReviveCooldownTicks: request.initialReviveCooldownTicks,
+        nextAttemptIndex: request.startingAttemptIndex,
+        updatedActiveDungeonSession: request.activeDungeonSession,
+        remainingHp: request.initialHp,
+        failureReason: 'simulateManualRun membutuhkan mode continueDungeon dan activeDungeonSession valid.',
+      );
+    }
+    return _executeBatch(request, allowManualAscension: true);
+  }
+
+  OfflineDungeonRunOutcome _executeBatch(
+    OfflineDungeonRunRequest request, {
+    required bool allowManualAscension,
+  }) {
+    final dungeonDef = request.config.dungeons[request.dungeonId];
+    if (dungeonDef == null) {
+      return OfflineDungeonRunOutcome(
+        stopReason: OfflineDungeonStopReason.invalidSetup,
+        updatedDungeonProgress: request.dungeonProgress,
+        remainingSkillCooldownTicks: request.initialSkillCooldownTicks,
+        remainingReviveCooldownTicks: request.initialReviveCooldownTicks,
+        nextAttemptIndex: request.startingAttemptIndex,
+        updatedActiveDungeonSession: request.activeDungeonSession,
+        remainingHp: request.initialHp,
+        failureReason:
+            'Definisi dungeon "${request.dungeonId}" tidak ditemukan.',
+      );
+    }
+
+    if (request.mode == OfflineActivityMode.pauseProgression) {
+      return OfflineDungeonRunOutcome(
+        stopReason: OfflineDungeonStopReason.invalidSetup,
+        updatedDungeonProgress: request.dungeonProgress,
+        remainingSkillCooldownTicks: request.initialSkillCooldownTicks,
+        remainingReviveCooldownTicks: request.initialReviveCooldownTicks,
+        nextAttemptIndex: request.startingAttemptIndex,
+        updatedActiveDungeonSession: request.activeDungeonSession,
+        remainingHp: request.initialHp,
+        failureReason: 'Pause Progression tidak menjalankan runner dungeon.',
+      );
+    }
+
+    if (request.mode == OfflineActivityMode.continueDungeon &&
+        !dungeonDef.isNormal &&
+        !allowManualAscension) {
+      return OfflineDungeonRunOutcome(
+        stopReason: OfflineDungeonStopReason.invalidSetup,
+        updatedDungeonProgress: request.dungeonProgress,
+        remainingSkillCooldownTicks: request.initialSkillCooldownTicks,
+        remainingReviveCooldownTicks: request.initialReviveCooldownTicks,
+        nextAttemptIndex: request.startingAttemptIndex,
+        updatedActiveDungeonSession: request.activeDungeonSession,
+        remainingHp: request.initialHp,
+        failureReason:
+            'Ascension Dungeon ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
+      );
+    }
+
+    if (request.mode == OfflineActivityMode.autoFarming &&
+        (!dungeonDef.isNormal ||
+            request.dungeonProgress.clearedInCycleRank != request.cycleRank)) {
+      return OfflineDungeonRunOutcome(
+        stopReason: OfflineDungeonStopReason.invalidSetup,
+        updatedDungeonProgress: request.dungeonProgress,
+        remainingSkillCooldownTicks: const {},
+        remainingReviveCooldownTicks: 0,
+        nextAttemptIndex: request.startingAttemptIndex,
+        failureReason: !dungeonDef.isNormal
+            ? 'Auto Farming hanya mendukung dungeon normal ("${request.dungeonId}").'
+            : 'Dungeon "${request.dungeonId}" belum diselesaikan pada siklus saat ini '
+                  '(syarat clearedInCycleRank == ${request.cycleRank} untuk Auto Farming).',
+      );
+    }
+
+    final budgetTicks =
+        request.timeWindow.effectiveElapsed.inMilliseconds ~/ tickDurationMs;
+    if (budgetTicks <= 0) {
+      return OfflineDungeonRunOutcome(
+        stopReason: OfflineDungeonStopReason.timeBudgetExhausted,
+        updatedDungeonProgress: request.dungeonProgress,
+        remainingSkillCooldownTicks: request.initialSkillCooldownTicks,
+        remainingReviveCooldownTicks: request.initialReviveCooldownTicks,
+        nextAttemptIndex: request.startingAttemptIndex,
+        updatedActiveDungeonSession: request.activeDungeonSession,
+        remainingHp: request.initialHp,
+        budgetTicks: 0,
+      );
+    }
+
+    final safeMaxIterations = math.max(1, request.maxIterations);
+    final rng = math.Random(request.simulationSeed);
+    final difficultyService = DifficultyService(request.config.difficulty);
+    final difficultyProfile = difficultyService.profileFor(
+      dungeonDef,
+      request.cycleRank,
+    );
+    final tracker = EncounterTracker(
+      monsterCatalog: request.config.monsters,
+      difficultyProfile: difficultyProfile,
+      difficultyService: difficultyService,
+    );
+    final manager = DungeonManager(
+      dungeons: request.config.dungeons,
+      encounterTracker: tracker,
+      completionEvaluator: completionEvaluator,
+      difficultyService: difficultyService,
+    );
+
+    final stats = _RunAccumulators();
+    var progress = request.dungeonProgress;
+    var remainingTicks = budgetTicks;
+    var iterations = 0;
+    var attemptIndex = math.max(1, request.startingAttemptIndex);
+    var firstRunNeedsRestore = _shouldRestoreInitialSession(request);
+
+    var stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+    String? failureReason;
+
+    Combatant? playerCombatant;
+    _OfflineCombatRuntime? combatRuntime;
+    ActiveDungeonSessionSnapshot? finalSessionSnapshot;
+
+    while (remainingTicks > 0 && iterations < safeMaxIterations) {
+      final isRestoringThisRun =
+          firstRunNeedsRestore && request.activeDungeonSession != null;
+      firstRunNeedsRestore = false;
+
+      DungeonSession? session;
+      int? runInitialHp;
+      int runReviveTicks = 0;
+      Map<String, int> runSkillCooldowns = const {};
+
+      if (isRestoringThisRun) {
+        final saved = request.activeDungeonSession!;
+        if (!saved.isRecoverable || saved.dungeonId != request.dungeonId) {
+          stopReason = OfflineDungeonStopReason.invalidSetup;
+          failureReason =
+              'ActiveDungeonSession tidak dapat dipulihkan untuk ${request.dungeonId}.';
+          break;
+        }
+        session = manager.restoreSession(saved);
+        if (session == null) {
+          stopReason = OfflineDungeonStopReason.invalidSetup;
+          failureReason =
+              'Sesi "${saved.runId}" sudah tidak memiliki room tersisa.';
+          break;
+        }
+
+        // Tangani bila aplikasi sebelumnya tersimpan saat Downed:
+        final reviveConfig = request.config.revive;
+        final maxHp = request.character.stats.maxHp;
+        var restoredHp = request.initialHp;
+        runReviveTicks = math.max(0, saved.reviveCooldownTicks);
+        if (saved.playerStatus == PlayerStatus.downed ||
+            (restoredHp != null && restoredHp <= 0)) {
+          restoredHp = math.max(1, (maxHp * reviveConfig.hpPercent).round());
+          if (runReviveTicks == 0) {
+            runReviveTicks = math.max(
+              1,
+              (reviveConfig.cooldownSeconds * CombatSimulation.ticksPerSecond)
+                  .round(),
+            );
+          }
+        }
+        runInitialHp = restoredHp;
+        runSkillCooldowns = request.initialSkillCooldownTicks;
+        // Mode A hanya menghitung run attempt saat benar-benar mulai mengeksekusi
+        // sisa sesi pada cycle offline ini.
+        stats.runsAttempted++;
+      } else {
+        if (request.mode == OfflineActivityMode.continueDungeon) {
+          if (stats.runsAttempted > 0) {
+            // Mode A tidak boleh memulai dungeon baru setelah 1 run selesai/gagal.
+            break;
+          }
+          stopReason = OfflineDungeonStopReason.invalidSetup;
+          failureReason = 'Mode Continue Dungeon wajib memiliki activeDungeonSession valid.';
+          break;
+        }
+
+        final nextRunId = _generateFarmRunId(
+          dungeonId: request.dungeonId,
+          anchorMs: request.timeWindow.anchorTimestampMs,
+          seed: request.simulationSeed,
+          attemptIndex: attemptIndex,
+        );
+        attemptIndex++;
+        session = manager.startDungeon(
+          request.dungeonId,
+          runId: nextRunId,
+          cycleRank: request.cycleRank,
+        );
+        stats.runsAttempted++;
+        runInitialHp = null;
+        runReviveTicks = 0;
+        runSkillCooldowns = const {};
+      }
+
+      var appliedLevel = request.character.level;
+      playerCombatant = Combatant(
+        id: 'player',
+        team: Team.player,
+        stats: request.character.stats,
+        cell: manager.activeRoom!.entryPosition,
+      );
+      if (runInitialHp != null) {
+        playerCombatant.hp = runInitialHp.clamp(
+          1,
+          request.character.stats.maxHp,
+        );
+      }
+
+      combatRuntime = _OfflineCombatRuntime(
+        player: playerCombatant,
+        character: request.character,
+        config: request.config,
+        autoSkillEnabled: request.autoSkillEnabled,
+        reviveCooldownTicks: runReviveTicks,
+        initialSkillCooldownTicks: runSkillCooldowns,
+        random: rng,
+        damageCalculator: damageCalculator,
+        targetSelector: targetSelector,
+        skillSelector: skillSelector,
+        pathfinder: pathfinder,
+        attackPositionFinder: attackPositionFinder,
+      );
+
+      // Jalankan seluruh room secara berurutan pada satu run.
+      while (manager.hasActiveSession &&
+          remainingTicks > 0 &&
+          iterations < safeMaxIterations) {
+        final room = manager.activeRoom!;
+        final grid = manager.activeGrid!;
+
+        combatRuntime.prepareForRoom(grid: grid, entryCell: room.entryPosition);
+        manager.activateRoom();
+        final spawnShell = _createTrackerShell(
+          grid: grid,
+          player: playerCombatant,
+        );
+        tracker.onRoomLoaded(spawnShell, grid: grid);
+        tracker.onRoomActivated(spawnShell, grid: grid);
+        combatRuntime.attachEnemies(spawnShell.enemies, spawnShell);
+
+        // Simulasi combat room + travel hingga syarat combat terpenuhi,
+        // budget habis, maxIterations tercapai, atau karakter runEnded.
+        while (remainingTicks > 0 &&
+            iterations < safeMaxIterations &&
+            combatRuntime.playerStatus != PlayerStatus.runEnded &&
+            !completionEvaluator.areCombatRequirementsSatisfied(
+              room,
+              tracker.encounters,
+            )) {
+          iterations++;
+          final tickResult = combatRuntime.stepOneTick();
+          remainingTicks--;
+          stats.ticksSimulated++;
+
+          if (tickResult.defeatedEnemies.isNotEmpty) {
+            for (final killed in tickResult.defeatedEnemies) {
+              final killKey =
+                  'offline_kill:${manager.session!.runId}:${killed.enemyId}';
+              final reward = request.rewardProcessor.processEnemyDefeated(
+                eventId: killKey,
+                definition: killed.definition,
+                random: rng,
+                difficultyProfile: manager.activeDifficultyProfile,
+                difficultyService: difficultyService,
+              );
+              if (!reward.alreadyClaimed) {
+                stats.encountersCleared++;
+                stats.recordReward(reward);
+              }
+              tracker.onEnemyDefeated(
+                killed.enemyId,
+                simulation: spawnShell,
+                grid: grid,
+              );
+            }
+            combatRuntime.syncEnemyRosterFromShell();
+          }
+
+          if (request.character.level != appliedLevel) {
+            appliedLevel = request.character.level;
+            combatRuntime.syncPlayerBuild();
+          }
+
+          if (combatRuntime.playerStatus == PlayerStatus.runEnded) {
+            break;
+          }
+          if (completionEvaluator.areCombatRequirementsSatisfied(
+            room,
+            tracker.encounters,
+          )) {
+            break;
+          }
+
+          // Coarse event-jump atas fase tunggu / perjalanan murni.
+          if (remainingTicks > 0) {
+            final gap = combatRuntime.computeSafeJumpTicks(
+              remainingBudgetTicks: remainingTicks,
+              room: room,
+            );
+            if (gap > 0) {
+              combatRuntime.jumpTicks(gap);
+              remainingTicks -= gap;
+              stats.ticksSimulated += gap;
+            }
+          }
+        }
+
+        if (combatRuntime.playerStatus == PlayerStatus.runEnded) {
+          tracker.onRunFailed();
+          manager.endRun(
+            finalStatus: DungeonSessionStatus.failed,
+            reason: DungeonEndReason.defeated,
+          );
+          stats.runsFailed++;
+          failureReason = 'Karakter kalah saat revive sedang cooldown.';
+          stopReason = OfflineDungeonStopReason.playerDefeated;
+          break;
+        }
+
+        // Jika syarat combat sudah terpenuhi tetapi masih wajib menuju exit:
+        if (completionEvaluator.areCombatRequirementsSatisfied(
+              room,
+              tracker.encounters,
+            ) &&
+            room.completionCondition.requiresExit &&
+            playerCombatant.follower.currentCell != room.exitPosition) {
+          if (remainingTicks <= 0) {
+            stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+            break;
+          }
+          if (iterations >= safeMaxIterations) {
+            stopReason = OfflineDungeonStopReason.iterationLimitReached;
+            break;
+          }
+          iterations++;
+          final exitResult = combatRuntime.walkTowardExit(
+            exitCell: room.exitPosition,
+            maxTicks: remainingTicks,
+          );
+          remainingTicks -= exitResult.ticksUsed;
+          stats.ticksSimulated += exitResult.ticksUsed;
+          if (!exitResult.arrived) {
+            stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+            break;
+          }
+        }
+
+        if (!completionEvaluator.areCombatRequirementsSatisfied(
+          room,
+          tracker.encounters,
+        )) {
+          if (iterations >= safeMaxIterations && remainingTicks > 0) {
+            stopReason = OfflineDungeonStopReason.iterationLimitReached;
+          } else {
+            stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+          }
+          break;
+        }
+
+        final playerCell = room.completionCondition.requiresExit
+            ? playerCombatant.follower.currentCell
+            : room.exitPosition;
+        final eval = manager.evaluateCurrentRoom(playerCell: playerCell);
+        if (!eval.isCompleted) {
+          if (iterations >= safeMaxIterations && remainingTicks > 0) {
+            stopReason = OfflineDungeonStopReason.iterationLimitReached;
+          } else {
+            stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+          }
+          break;
+        }
+
+        final currentRunId = manager.session!.runId;
+        final didCompleteRoom = manager.tryCompleteActiveRoom(
+          playerCell: playerCell,
+          expectedRunId: currentRunId,
+          expectedRoomId: room.id,
+        );
+        if (!didCompleteRoom) break;
+
+        stats.roomsCleared++;
+        final roomIndex = dungeonDef.indexOfRoom(room.id);
+        final roomReward = settlementService.settleRoomCompleted(
+          session: manager.session!,
+          room: room,
+          rewardProcessor: request.rewardProcessor,
+          random: rng,
+          difficultyProfile: manager.activeDifficultyProfile,
+          difficultyService: difficultyService,
+        );
+        if (roomReward != null && !roomReward.alreadyClaimed) {
+          stats.recordReward(roomReward);
+        }
+        if (request.character.level != appliedLevel) {
+          appliedLevel = request.character.level;
+          combatRuntime.syncPlayerBuild();
+        }
+
+        final nextHighest = math.max(
+          progress.highestClearedRoomIndex,
+          roomIndex,
+        );
+        final updatedRoomClaims = Set<String>.unmodifiable({
+          ...progress.rewardState.claimedRoomRewardIds,
+          if (room.reward != null && !room.reward!.isEmpty) room.id,
+        });
+        progress = DungeonProgressSnapshot(
+          currentDungeonId: request.dungeonId,
+          currentRoomId: manager.session!.currentRoomId,
+          currentRoomIndex: manager.session!.currentRoomIndex,
+          highestClearedRoomIndex: nextHighest,
+          clearsCount: progress.clearsCount,
+          clearedInCycleRank: progress.clearedInCycleRank,
+          rewardState: DungeonRewardStateSnapshot(
+            lastRunId: currentRunId,
+            completionRewardClaimed:
+                progress.rewardState.completionRewardClaimed &&
+                progress.rewardState.lastRunId == currentRunId,
+            claimedRoomRewardIds: updatedRoomClaims,
+          ),
+        );
+
+        final curSession = manager.session!;
+        if (curSession.status == DungeonSessionStatus.completed) {
+          final endedEvent = DungeonEndedEvent(
+            curSession,
+            DungeonSessionStatus.completed,
+            reason: DungeonEndReason.completed,
+            dungeon: dungeonDef,
+          );
+          final settled = settlementService.settleDungeonCompleted(
+            event: endedEvent,
+            config: request.config,
+            rewardProcessor: request.rewardProcessor,
+            random: rng,
+            dungeonManager: manager,
+            difficultyProfile: manager.activeDifficultyProfile,
+            difficultyService: difficultyService,
+          );
+          if (settled.granted != null && !settled.granted!.alreadyClaimed) {
+            stats.recordReward(settled.granted!);
+          }
+          if (request.character.level != appliedLevel) {
+            appliedLevel = request.character.level;
+            combatRuntime.syncPlayerBuild();
+          }
+
+          stats.runsCompleted++;
+          progress = DungeonProgressSnapshot(
+            currentDungeonId: request.dungeonId,
+            currentRoomId: curSession.currentRoomId,
+            currentRoomIndex: curSession.currentRoomIndex,
+            highestClearedRoomIndex: math.max(
+              progress.highestClearedRoomIndex,
+              dungeonDef.roomOrder.length - 1,
+            ),
+            clearsCount: progress.clearsCount + 1,
+            clearedInCycleRank: dungeonDef.isNormal
+                ? math.max(progress.clearedInCycleRank, request.cycleRank)
+                : progress.clearedInCycleRank,
+            rewardState: DungeonRewardStateSnapshot(
+              lastRunId: curSession.runId,
+              completionRewardClaimed: true,
+              claimedRoomRewardIds: updatedRoomClaims,
+            ),
+          );
+          break;
+        }
+
+        // Masih ada room selanjutnya -> transisi room berikutnya.
+        if (!manager.transitionToNextRoom()) {
+          stopReason = OfflineDungeonStopReason.invalidSetup;
+          failureReason =
+              'Transisi room gagal pada dungeon ${request.dungeonId}.';
+          stats.runsFailed++;
+          break;
+        }
+        progress = DungeonProgressSnapshot(
+          currentDungeonId: request.dungeonId,
+          currentRoomId: manager.session!.currentRoomId,
+          currentRoomIndex: manager.session!.currentRoomIndex,
+          highestClearedRoomIndex: progress.highestClearedRoomIndex,
+          clearsCount: progress.clearsCount,
+          clearedInCycleRank: progress.clearedInCycleRank,
+          rewardState: progress.rewardState,
+        );
+      }
+
+      // Evaluasi status akhir run ini.
+      final endSession = manager.session;
+      finalSessionSnapshot = manager.toActiveSessionSnapshot(
+        reviveCooldownTicks: combatRuntime.reviveCooldownTicks,
+        playerStatus: combatRuntime.playerStatus,
+      );
+
+      if (stopReason == OfflineDungeonStopReason.playerDefeated ||
+          stopReason == OfflineDungeonStopReason.invalidSetup) {
+        manager.dispose();
+        break;
+      }
+
+      if (endSession != null &&
+          endSession.status == DungeonSessionStatus.completed) {
+        if (request.mode == OfflineActivityMode.continueDungeon) {
+          stopReason = OfflineDungeonStopReason.dungeonCompleted;
+          manager.dispose();
+          break;
+        }
+        // Mode B (Auto Farming): siap memulai attempt berikutnya jika masih ada waktu.
+        manager.exitToTown();
+        if (remainingTicks <= 0) {
+          stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+          finalSessionSnapshot = null;
+          break;
+        }
+        if (iterations >= safeMaxIterations) {
+          stopReason = OfflineDungeonStopReason.iterationLimitReached;
+          finalSessionSnapshot = null;
+          break;
+        }
+        continue;
+      }
+
+      // Run terhenti di tengah room sebelum selesai:
+      if (iterations >= safeMaxIterations && remainingTicks > 0) {
+        stopReason = OfflineDungeonStopReason.iterationLimitReached;
+      } else {
+        stopReason = OfflineDungeonStopReason.timeBudgetExhausted;
+      }
+      break;
+    }
+
+    // Jika Mode B selesai tanpa interupsi (budget habis / defeated), sesi aktif
+    // tidak mengarahkan pemain kembali ke dungeon acak saat membuka app.
+    if (request.mode == OfflineActivityMode.autoFarming &&
+        stopReason != OfflineDungeonStopReason.iterationLimitReached) {
+      finalSessionSnapshot = null;
+    }
+
+    final processedMs =
+        stopReason == OfflineDungeonStopReason.timeBudgetExhausted
+        ? request.timeWindow.effectiveElapsed.inMilliseconds
+        : math.min(
+            request.timeWindow.effectiveElapsed.inMilliseconds,
+            stats.ticksSimulated * tickDurationMs,
+          );
+
+    return OfflineDungeonRunOutcome(
+      stopReason: stopReason,
+      runsAttempted: stats.runsAttempted,
+      runsCompleted: stats.runsCompleted,
+      runsFailed: stats.runsFailed,
+      roomsCleared: stats.roomsCleared,
+      encountersCleared: stats.encountersCleared,
+      expGained: stats.expGained,
+      goldGained: stats.goldGained,
+      levelsGained: stats.levelsGained,
+      addedStacks: Map.unmodifiable(stats.addedStacks),
+      overflowStacks: Map.unmodifiable(stats.overflowStacks),
+      addedEquipment: List.unmodifiable(stats.addedEquipment),
+      droppedEquipment: List.unmodifiable(stats.droppedEquipment),
+      ticksSimulated: stats.ticksSimulated,
+      budgetTicks: budgetTicks,
+      processedDurationMs: processedMs,
+      iterationsUsed: iterations,
+      updatedDungeonProgress: progress,
+      updatedActiveDungeonSession: finalSessionSnapshot,
+      remainingHp:
+          finalSessionSnapshot != null && finalSessionSnapshot.isRecoverable
+          ? playerCombatant?.hp
+          : null,
+      finalPlayerHp: playerCombatant?.hp,
+      finalPlayerMaxHp: playerCombatant?.stats.maxHp,
+      remainingSkillCooldownTicks:
+          finalSessionSnapshot != null &&
+              finalSessionSnapshot.isRecoverable &&
+              combatRuntime != null
+          ? combatRuntime.exportSkillCooldowns()
+          : const {},
+      remainingReviveCooldownTicks:
+          finalSessionSnapshot != null &&
+              finalSessionSnapshot.isRecoverable &&
+              combatRuntime != null
+          ? combatRuntime.reviveCooldownTicks
+          : 0,
+      nextAttemptIndex: attemptIndex,
+      failureReason: failureReason,
+    );
+  }
+
+  static bool _shouldRestoreInitialSession(OfflineDungeonRunRequest request) {
+    final active = request.activeDungeonSession;
+    if (active == null || !active.isRecoverable) return false;
+    if (request.mode == OfflineActivityMode.continueDungeon) return true;
+    // Mode B hanya memulihkan sesi apabila sedang melanjutkan batch Auto Farming
+    // yang terinterupsi (runId berasal dari offline farm batch sebelumnya).
+    return request.mode == OfflineActivityMode.autoFarming &&
+        active.dungeonId == request.dungeonId &&
+        active.runId.startsWith('offline_farm_');
+  }
+
+  static String _generateFarmRunId({
+    required String dungeonId,
+    required int anchorMs,
+    required int seed,
+    required int attemptIndex,
+  }) => 'offline_farm_${dungeonId}_${anchorMs}_${seed}_$attemptIndex';
+
+  CombatSimulation _createTrackerShell({
+    required NavigationGrid grid,
+    required Combatant player,
+  }) {
+    final shellPlayer = Combatant(
+      id: player.id,
+      team: Team.player,
+      stats: player.stats,
+      cell: player.follower.currentCell,
+    );
+    return CombatSimulation(
+      grid: grid,
+      pathfinder: pathfinder,
+      player: shellPlayer,
+      damageCalculator: damageCalculator,
+    );
+  }
+}
+
+class _DefeatedEnemyRecord {
+  const _DefeatedEnemyRecord(this.enemyId, this.definition);
+
+  final String enemyId;
+  final EnemyDefinition definition;
+}
+
+class _RunAccumulators {
+  int runsAttempted = 0;
+  int runsCompleted = 0;
+  int runsFailed = 0;
+  int roomsCleared = 0;
+  int encountersCleared = 0;
+  int expGained = 0;
+  int goldGained = 0;
+  int levelsGained = 0;
+  int ticksSimulated = 0;
+
+  final Map<String, int> addedStacks = {};
+  final Map<String, int> overflowStacks = {};
+  final List<EquipmentInstance> addedEquipment = [];
+  final List<EquipmentInstance> droppedEquipment = [];
+
+  void recordReward(GrantedReward reward) {
+    expGained += reward.expGranted;
+    goldGained += reward.goldGranted;
+    levelsGained += reward.levelsGained;
+    for (final entry in reward.addedStacks.entries) {
+      addedStacks[entry.key] = (addedStacks[entry.key] ?? 0) + entry.value;
+    }
+    for (final entry in reward.overflowStacks.entries) {
+      overflowStacks[entry.key] =
+          (overflowStacks[entry.key] ?? 0) + entry.value;
+    }
+    addedEquipment.addAll(reward.addedEquipment);
+    droppedEquipment.addAll(reward.droppedEquipment);
+  }
+}
+
+class _OfflineCombatRuntime {
+  _OfflineCombatRuntime({
+    required this.player,
+    required this.character,
+    required this.config,
+    required this.autoSkillEnabled,
+    required this.reviveCooldownTicks,
+    required Map<String, int> initialSkillCooldownTicks,
+    required this.random,
+    required this.damageCalculator,
+    required this.targetSelector,
+    required this.skillSelector,
+    required this.pathfinder,
+    required this.attackPositionFinder,
+  }) {
+    _syncSkills(initialCooldowns: initialSkillCooldownTicks);
+  }
+
+  final Combatant player;
+  final PlayerCharacter character;
+  final GameConfig config;
+  final bool autoSkillEnabled;
+  final math.Random random;
+  final DamageCalculator damageCalculator;
+  final TargetSelector targetSelector;
+  final SkillSelector skillSelector;
+  final AStarPathfinder pathfinder;
+  final AttackPositionFinder attackPositionFinder;
+
+  int reviveCooldownTicks;
+  int _downedTicksLeft = 0;
+  PlayerStatus playerStatus = PlayerStatus.alive;
+
+  NavigationGrid? _grid;
+  CombatSimulation? _spawnShell;
+  final List<Combatant> _enemies = [];
+  final Map<String, EnemyDefinition> _definitions = {};
+  final Set<String> _processedDeaths = {};
+
+  List<SkillDefinition> _skills = const [];
+  final Map<String, SkillRuntimeState> _skillStates = {};
+  Map<String, double> _skillAffinities = const {};
+
+  void prepareForRoom({
+    required NavigationGrid grid,
+    required GridPoint entryCell,
+  }) {
+    _grid = grid;
+    _enemies.clear();
+    _definitions.clear();
+    _processedDeaths.clear();
+    player.resetNavigation(entryCell);
+  }
+
+  void attachEnemies(List<Combatant> spawned, CombatSimulation shell) {
+    _spawnShell = shell;
+    syncEnemyRosterFromShell();
+  }
+
+  void syncEnemyRosterFromShell() {
+    final shell = _spawnShell;
+    if (shell == null) return;
+    final known = {for (final e in _enemies) e.id};
+    for (final enemy in shell.enemies) {
+      if (known.add(enemy.id)) {
+        _enemies.add(enemy);
+        final monsterId = _resolveMonsterIdFromEnemyId(enemy.id, enemy);
+        if (monsterId != null && config.monsters.containsKey(monsterId)) {
+          _definitions[enemy.id] = config.monsters[monsterId]!;
+        }
+      }
+    }
+  }
+
+  String? _resolveMonsterIdFromEnemyId(String enemyId, Combatant enemy) {
+    // EncounterTracker membentuk id "${room.id}__${config.id}__$i"; lookup
+    // definisi monster melalui catalog room spawns atau fallback stats/level.
+    for (final d in config.dungeons.values) {
+      for (final room in d.rooms.values) {
+        final prefix = '${room.id}__';
+        if (!enemyId.startsWith(prefix)) continue;
+        for (final sp in room.spawns) {
+          if (enemyId.startsWith('${room.id}__${sp.id}__')) {
+            return sp.monsterId;
+          }
+        }
+      }
+    }
+    for (final def in config.monsters.values) {
+      if (def.isBoss == enemy.isBoss &&
+          def.isElite == enemy.isElite &&
+          def.stats.maxHp == enemy.stats.maxHp) {
+        return def.id;
+      }
+    }
+    return null;
+  }
+
+  void syncPlayerBuild() {
+    player.applyStats(character.stats);
+    _syncSkills();
+  }
+
+  void _syncSkills({Map<String, int>? initialCooldowns}) {
+    _skills = character.activeSkills.toList(growable: false);
+    _skillAffinities = character.activeSkillAffinities;
+    final ids = _skills.map((s) => s.id).toSet();
+    _skillStates.removeWhere((id, _) => !ids.contains(id));
+    for (final skill in _skills) {
+      final previous = _skillStates[skill.id];
+      final incoming = character.skillRuntimeState(skill.id);
+      final savedCd = initialCooldowns?[skill.id] ?? 0;
+      _skillStates[skill.id] = SkillRuntimeState(
+        skillId: skill.id,
+        level: incoming.level,
+        unlocked: incoming.unlocked,
+        cooldownTicksRemaining:
+            previous?.cooldownTicksRemaining ??
+            (savedCd > 0 ? savedCd : incoming.cooldownTicksRemaining),
+      );
+    }
+  }
+
+  Map<String, int> exportSkillCooldowns() => Map.unmodifiable({
+    for (final entry in _skillStates.entries)
+      if (entry.value.cooldownTicksRemaining > 0)
+        entry.key: entry.value.cooldownTicksRemaining,
+  });
+
+  ({List<_DefeatedEnemyRecord> defeatedEnemies}) stepOneTick() {
+    final defeated = <_DefeatedEnemyRecord>[];
+    if (playerStatus == PlayerStatus.runEnded) {
+      return (defeatedEnemies: defeated);
+    }
+
+    if (playerStatus == PlayerStatus.downed) {
+      _tickDowned();
+      for (final enemy in _enemies) {
+        if (enemy.isAlive && enemy.aiState == MonsterAiState.returning) {
+          _returnToSpawn(enemy);
+        }
+      }
+      return (defeatedEnemies: defeated);
+    }
+
+    if (reviveCooldownTicks > 0) reviveCooldownTicks--;
+    if (player.invulnerableTicks > 0) player.invulnerableTicks--;
+    for (final id in _skillStates.keys.toList()) {
+      _skillStates[id] = _skillStates[id]!.decrementCooldown();
+    }
+
+    _updatePlayer(defeated);
+    for (final enemy in _enemies) {
+      if (playerStatus != PlayerStatus.alive) break;
+      if (enemy.isAlive) _updateEnemy(enemy);
+    }
+    return (defeatedEnemies: defeated);
+  }
+
+  void jumpTicks(int gap) {
+    if (gap <= 0 || playerStatus == PlayerStatus.runEnded) return;
+    if (playerStatus == PlayerStatus.downed) {
+      _downedTicksLeft = math.max(1, _downedTicksLeft - gap);
+      return;
+    }
+
+    reviveCooldownTicks = math.max(0, reviveCooldownTicks - gap);
+    player.invulnerableTicks = math.max(0, player.invulnerableTicks - gap);
+    if (player.cooldownTicks > 0) {
+      player.cooldownTicks = math.max(0, player.cooldownTicks - gap);
+    }
+    for (final id in _skillStates.keys.toList()) {
+      final st = _skillStates[id]!;
+      if (st.cooldownTicksRemaining > 0) {
+        _skillStates[id] = st.copyWith(
+          cooldownTicksRemaining: math.max(0, st.cooldownTicksRemaining - gap),
+        );
+      }
+    }
+
+    // Majukan gerakan player bila masih berjalan menuju target.
+    final target = targetSelector.select(
+      seeker: player,
+      candidates: _aliveEnemies,
+    );
+    if (target != null &&
+        player.distanceTo(target) > player.stats.attackRange &&
+        player.follower.isMoving) {
+      player.follower.advance(
+        player.stats.moveSpeed * CombatSimulation.tickSeconds * gap,
+      );
+    }
+
+    for (final enemy in _enemies) {
+      if (!enemy.isAlive) continue;
+      if (enemy.cooldownTicks > 0) {
+        enemy.cooldownTicks = math.max(0, enemy.cooldownTicks - gap);
+      }
+      if (enemy.aggroed &&
+          enemy.distanceTo(player) > enemy.stats.attackRange &&
+          enemy.follower.isMoving) {
+        enemy.follower.advance(
+          enemy.stats.moveSpeed * CombatSimulation.tickSeconds * gap,
+        );
+      }
+    }
+  }
+
+  int computeSafeJumpTicks({
+    required int remainingBudgetTicks,
+    required RoomDefinition room,
+  }) {
+    if (remainingBudgetTicks <= 0) return 0;
+    if (playerStatus == PlayerStatus.downed) {
+      return math.min(math.max(0, _downedTicksLeft - 1), remainingBudgetTicks);
+    }
+
+    var gap = remainingBudgetTicks;
+    final target = targetSelector.select(
+      seeker: player,
+      candidates: _aliveEnemies,
+    );
+    final playerInRange =
+        target != null && player.distanceTo(target) <= player.stats.attackRange;
+
+    if (playerInRange) {
+      if (player.cooldownTicks == 0) return 0;
+      gap = math.min(gap, player.cooldownTicks - 1);
+    } else if (target != null) {
+      final distLeft = math.max(
+        0.0,
+        player.distanceTo(target) - player.stats.attackRange,
+      );
+      final closingSpeed =
+          (player.stats.moveSpeed +
+              (target.aggroed ? target.stats.moveSpeed : 0.0)) *
+          CombatSimulation.tickSeconds;
+      if (closingSpeed > 0) {
+        final ticksToContact = (distLeft / closingSpeed).floor();
+        // Batasi chunk perjalanan agar pathfinding/tujuan A* tetap akurat saat belok.
+        final pathHorizon = math.min(12, math.max(0, ticksToContact - 1));
+        gap = math.min(gap, pathHorizon);
+      } else {
+        gap = 0;
+      }
+    }
+
+    if (autoSkillEnabled && _skills.isNotEmpty) {
+      final maxHp = player.stats.maxHp;
+      final hpRatio = maxHp <= 0 ? 1.0 : player.hp / maxHp;
+      for (final skill in _skills) {
+        final st = _skillStates[skill.id];
+        if (!skill.isActive ||
+            skill.effect == SkillEffectType.statModifier ||
+            st == null ||
+            st.level < 1 ||
+            !st.unlocked) {
+          continue;
+        }
+        if (skill.effect == SkillEffectType.healing) {
+          final threshold =
+              skill.useWhenHpBelow ?? skillSelector.defaultHealThreshold;
+          if (hpRatio < threshold && player.hp < maxHp) {
+            if (st.cooldownTicksRemaining == 0) return 0;
+            gap = math.min(gap, st.cooldownTicksRemaining - 1);
+          }
+        } else if (target != null &&
+            player.distanceTo(target) <=
+                (skill.range ?? player.stats.attackRange)) {
+          if (skill.targetType == SkillTarget.area) {
+            final nearby = _aliveEnemies
+                .where((e) => e.distanceTo(target) <= skill.radius)
+                .length;
+            if (nearby >= skill.minEnemies) {
+              if (st.cooldownTicksRemaining == 0) return 0;
+              gap = math.min(gap, st.cooldownTicksRemaining - 1);
+            }
+          } else {
+            if (st.cooldownTicksRemaining == 0) return 0;
+            gap = math.min(gap, st.cooldownTicksRemaining - 1);
+          }
+        }
+      }
+    }
+
+    final playerWalking = target != null && !playerInRange;
+    for (final enemy in _enemies) {
+      if (!enemy.isAlive) continue;
+      if (!enemy.aggroed) {
+        final distAggro = math.max(
+          0.0,
+          player.distanceTo(enemy) - enemy.detectionRange,
+        );
+        if (distAggro <= 0) return 0;
+        if (playerWalking) {
+          final pStep = player.stats.moveSpeed * CombatSimulation.tickSeconds;
+          if (pStep > 0) {
+            final tAggro = (distAggro / pStep).floor();
+            gap = math.min(gap, math.max(0, tAggro - 1));
+          }
+        }
+        continue;
+      }
+
+      if (enemy.distanceTo(player) <= enemy.stats.attackRange) {
+        if (enemy.cooldownTicks == 0) return 0;
+        gap = math.min(gap, enemy.cooldownTicks - 1);
+      } else {
+        final distHit = math.max(
+          0.0,
+          enemy.distanceTo(player) - enemy.stats.attackRange,
+        );
+        final closing =
+            (enemy.stats.moveSpeed +
+                (playerWalking ? player.stats.moveSpeed : 0.0)) *
+            CombatSimulation.tickSeconds;
+        if (closing > 0) {
+          final tHit = (distHit / closing).floor();
+          gap = math.min(gap, math.max(0, math.min(12, tHit - 1)));
+        }
+      }
+    }
+
+    return math.max(0, gap);
+  }
+
+  ({bool arrived, int ticksUsed}) walkTowardExit({
+    required GridPoint exitCell,
+    required int maxTicks,
+  }) {
+    final grid = _grid;
+    if (grid == null || player.follower.currentCell == exitCell) {
+      return (arrived: true, ticksUsed: 0);
+    }
+    final path = pathfinder.findPath(
+      grid,
+      player.follower.currentCell,
+      exitCell,
+    );
+    if (path == null || path.isEmpty) {
+      return (arrived: false, ticksUsed: 0);
+    }
+    var dist = 0.0;
+    var px = player.x;
+    var py = player.y;
+    for (var i = 0; i < path.length; i++) {
+      final wp = path[i];
+      if (i == 0 && wp == player.follower.currentCell) continue;
+      final wx = wp.x + 0.5;
+      final wy = wp.y + 0.5;
+      dist += math.sqrt((wx - px) * (wx - px) + (wy - py) * (wy - py));
+      px = wx;
+      py = wy;
+    }
+    final step = player.stats.moveSpeed * CombatSimulation.tickSeconds;
+    final neededTicks = step <= 0 ? maxTicks : (dist / step).ceil();
+    final dt = math.min(maxTicks, math.max(0, neededTicks));
+
+    reviveCooldownTicks = math.max(0, reviveCooldownTicks - dt);
+    player.invulnerableTicks = math.max(0, player.invulnerableTicks - dt);
+    if (player.cooldownTicks > 0) {
+      player.cooldownTicks = math.max(0, player.cooldownTicks - dt);
+    }
+    for (final id in _skillStates.keys.toList()) {
+      final st = _skillStates[id]!;
+      if (st.cooldownTicksRemaining > 0) {
+        _skillStates[id] = st.copyWith(
+          cooldownTicksRemaining: math.max(0, st.cooldownTicksRemaining - dt),
+        );
+      }
+    }
+
+    player.follower.setPath(path);
+    player.follower.advance(step * dt);
+    if (dt >= neededTicks) {
+      player.follower.resetTo(exitCell);
+      return (arrived: true, ticksUsed: dt);
+    }
+    return (arrived: false, ticksUsed: dt);
+  }
+
+  Iterable<Combatant> get _aliveEnemies => _enemies.where((e) => e.isAlive);
+
+  void _updatePlayer(List<_DefeatedEnemyRecord> defeated) {
+    if (player.cooldownTicks > 0) player.cooldownTicks--;
+    final target = targetSelector.select(
+      seeker: player,
+      candidates: _aliveEnemies,
+    );
+    player.targetId = target?.id;
+
+    if (_tryCastSkill(target, defeated)) return;
+    if (target == null) return;
+    if (player.distanceTo(target) <= player.stats.attackRange) {
+      if (player.cooldownTicks == 0) {
+        player.cooldownTicks = _intervalTicks(player.stats.attackSpeed);
+        _strike(player, target, defeated: defeated);
+      }
+      return;
+    }
+    _chase(player, target);
+  }
+
+  void _updateEnemy(Combatant enemy) {
+    if (enemy.cooldownTicks > 0) enemy.cooldownTicks--;
+    if (!enemy.isAlive) {
+      enemy.aiState = MonsterAiState.dead;
+      return;
+    }
+    if (enemy.aiState == MonsterAiState.returning) {
+      _returnToSpawn(enemy);
+      return;
+    }
+    if (!enemy.aggroed) {
+      if (!player.isAlive || playerStatus != PlayerStatus.alive) return;
+      if (enemy.distanceTo(player) > enemy.detectionRange) return;
+      enemy.aggroed = true;
+      enemy.aiState = MonsterAiState.chase;
+    }
+
+    final outOfLeash =
+        enemy.leashRange > 0 &&
+        (enemy.distanceToSpawn > enemy.leashRange ||
+            enemy.distanceTo(player) > enemy.leashRange);
+    if (!player.isAlive || playerStatus != PlayerStatus.alive || outOfLeash) {
+      _startReturning(enemy);
+      return;
+    }
+
+    enemy.targetId = player.id;
+    if (enemy.distanceTo(player) <= enemy.stats.attackRange) {
+      enemy.aiState = MonsterAiState.attack;
+      if (enemy.cooldownTicks == 0) {
+        enemy.cooldownTicks = _intervalTicks(enemy.stats.attackSpeed);
+        _strike(enemy, player);
+      }
+      return;
+    }
+
+    enemy.aiState = MonsterAiState.chase;
+    if (!_chase(enemy, player)) {
+      _startReturning(enemy);
+    }
+  }
+
+  bool _tryCastSkill(Combatant? target, List<_DefeatedEnemyRecord> defeated) {
+    if (playerStatus != PlayerStatus.alive || !player.isAlive) return false;
+    if (!autoSkillEnabled || _skills.isEmpty) return false;
+    final skill = skillSelector.select(
+      skills: _skills,
+      isReady: (s) {
+        final state = _skillStates[s.id];
+        return state != null && state.isReady && state.level >= 1;
+      },
+      caster: player,
+      target: target,
+      enemies: _aliveEnemies,
+    );
+    if (skill == null) return false;
+    _castSkill(skill, target, defeated);
+    return true;
+  }
+
+  void _castSkill(
+    SkillDefinition skill,
+    Combatant? target,
+    List<_DefeatedEnemyRecord> defeated,
+  ) {
+    final state = _skillStates[skill.id];
+    if (state == null || !state.isReady || state.level < 1) return;
+    final affinityBonus = _skillAffinities[skill.id] ?? 0.0;
+
+    if (skill.effect == SkillEffectType.healing) {
+      if (player.hp >= player.stats.maxHp) return;
+      _skillStates[skill.id] = state.triggerCooldown(
+        _skillCooldownTicks(skill),
+      );
+      final effectiveHealPercent =
+          (skill.healPercentAt(state.level) * (1.0 + affinityBonus)).clamp(
+            0.0,
+            1.0,
+          );
+      player.heal((player.stats.maxHp * effectiveHealPercent).round());
+      return;
+    }
+
+    if (skill.effect != SkillEffectType.damage) return;
+    if (target == null || !target.isAlive || target.team == player.team) {
+      return;
+    }
+    final range = skill.range ?? player.stats.attackRange;
+    if (player.distanceTo(target) > range) return;
+
+    _skillStates[skill.id] = state.triggerCooldown(_skillCooldownTicks(skill));
+
+    final victims = skill.targetType == SkillTarget.area
+        ? _aliveEnemies
+              .where((e) => e.distanceTo(target) <= skill.radius)
+              .toList()
+        : [target];
+    final multiplier =
+        skill.damageMultiplierAt(state.level) * (1.0 + affinityBonus);
+    final damageType = skill.damageType ?? SkillDamageType.physical;
+    for (final victim in victims) {
+      if (!player.isAlive || playerStatus != PlayerStatus.alive) break;
+      if (!victim.isAlive) continue;
+      _strike(
+        player,
+        victim,
+        multiplier: multiplier,
+        damageType: damageType,
+        defeated: defeated,
+      );
+    }
+  }
+
+  void _strike(
+    Combatant attacker,
+    Combatant target, {
+    double multiplier = 1.0,
+    SkillDamageType damageType = SkillDamageType.physical,
+    List<_DefeatedEnemyRecord>? defeated,
+  }) {
+    if (playerStatus != PlayerStatus.alive ||
+        !attacker.isAlive ||
+        !target.isAlive) {
+      return;
+    }
+    if (target.invulnerableTicks > 0) return;
+
+    final result = damageCalculator.roll(
+      attacker: attacker.stats,
+      defenderDef: target.stats.def,
+      random: random,
+      multiplier: multiplier,
+      damageType: damageType,
+    );
+    target.hp = math.max(0, target.hp - result.amount);
+
+    if (!target.isAlive) {
+      if (identical(target, player)) {
+        _onPlayerDefeated();
+      } else {
+        target.aiState = MonsterAiState.dead;
+        target.aggroed = false;
+        target.targetId = null;
+        target.plannedGoal = null;
+        final def = _definitions[target.id];
+        if (def != null && _processedDeaths.add(target.id)) {
+          defeated?.add(_DefeatedEnemyRecord(target.id, def));
+        }
+      }
+    }
+  }
+
+  void _onPlayerDefeated() {
+    for (final enemy in _enemies) {
+      if (!enemy.isAlive) continue;
+      enemy.aggroed = false;
+      enemy.targetId = null;
+      enemy.plannedGoal = null;
+      enemy.aiState = enemy.isAtSpawn
+          ? MonsterAiState.idle
+          : MonsterAiState.returning;
+    }
+    if (reviveCooldownTicks == 0) {
+      playerStatus = PlayerStatus.downed;
+      _downedTicksLeft = math.max(
+        1,
+        _secondsToTicks(config.revive.delaySeconds),
+      );
+    } else {
+      playerStatus = PlayerStatus.runEnded;
+    }
+  }
+
+  void _tickDowned() {
+    _downedTicksLeft--;
+    if (_downedTicksLeft > 0) return;
+
+    player.hp = math.max(
+      1,
+      (player.stats.maxHp * config.revive.hpPercent).round(),
+    );
+    player.invulnerableTicks = _secondsToTicks(
+      config.revive.invulnerabilitySeconds,
+    );
+    player.cooldownTicks = 0;
+    player.targetId = null;
+    player.plannedGoal = null;
+    reviveCooldownTicks = _secondsToTicks(config.revive.cooldownSeconds);
+    playerStatus = PlayerStatus.alive;
+  }
+
+  bool _chase(Combatant mover, Combatant target) {
+    final grid = _grid;
+    if (grid == null) return false;
+    final cachedGoal = mover.plannedGoal;
+    final cacheValid =
+        cachedGoal != null &&
+        grid.isWalkable(cachedGoal.x, cachedGoal.y) &&
+        mover.follower.isMoving &&
+        (cachedGoal == target.follower.currentCell ||
+            AttackPositionFinder.isCellInAttackRange(
+              cachedGoal,
+              target,
+              mover.stats.attackRange,
+            ));
+    if (!cacheValid) {
+      final path = attackPositionFinder.findPath(
+        grid: grid,
+        pathfinder: pathfinder,
+        attacker: mover,
+        target: target,
+      );
+      if (path == null) return false;
+      mover.plannedGoal = path.last;
+      if (path.length == 1 && mover.follower.currentCell == path.last) {
+        mover.follower.walkToCenterOf(path.last);
+      } else {
+        mover.follower.setPath(path);
+      }
+    }
+    mover.follower.advance(
+      mover.stats.moveSpeed * CombatSimulation.tickSeconds,
+    );
+    return true;
+  }
+
+  void _startReturning(Combatant enemy) {
+    enemy.aggroed = false;
+    enemy.targetId = null;
+    enemy.plannedGoal = null;
+    enemy.aiState = enemy.isAtSpawn
+        ? MonsterAiState.idle
+        : MonsterAiState.returning;
+    if (enemy.aiState == MonsterAiState.returning) {
+      _returnToSpawn(enemy);
+    }
+  }
+
+  void _returnToSpawn(Combatant enemy) {
+    if (enemy.isAtSpawn) {
+      enemy.aiState = MonsterAiState.idle;
+      enemy.plannedGoal = null;
+      return;
+    }
+    final grid = _grid;
+    if (grid == null) return;
+    if (enemy.plannedGoal != enemy.spawnCell || !enemy.follower.isMoving) {
+      enemy.plannedGoal = enemy.spawnCell;
+      final from = enemy.follower.currentCell;
+      if (from == enemy.spawnCell) {
+        enemy.follower.walkToCenterOf(enemy.spawnCell);
+      } else {
+        final path = pathfinder.findPath(grid, from, enemy.spawnCell);
+        if (path == null) return;
+        enemy.follower.setPath(path);
+      }
+    }
+    enemy.follower.advance(
+      enemy.stats.moveSpeed * CombatSimulation.tickSeconds,
+    );
+    if (enemy.isAtSpawn) {
+      enemy.aiState = MonsterAiState.idle;
+      enemy.plannedGoal = null;
+    }
+  }
+
+  int _skillCooldownTicks(SkillDefinition skill) {
+    final haste = math.min(
+      EquipmentStats.maxSkillHaste,
+      math.max(0.0, player.stats.skillHaste),
+    );
+    final seconds = skill.cooldownSeconds * (1 - haste);
+    return SkillRuntimeState.secondsToTicks(seconds);
+  }
+
+  int _secondsToTicks(double seconds) =>
+      math.max(0, (seconds * CombatSimulation.ticksPerSecond).round());
+
+  int _intervalTicks(double attackSpeed) =>
+      math.max(1, (CombatSimulation.ticksPerSecond / attackSpeed).round());
+}

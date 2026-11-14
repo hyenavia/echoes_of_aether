@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "212487664616",
+    "project_id": "echoes-of-aether",
+    "storage_bucket": "echoes-of-aether.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:212487664616:android:d113e2533e07ecef6bea5d",
+        "android_client_info": {
+          "package_name": "com.hyenavia.echoesofaether"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuBQZe51cchW8f5gKGKUARWNL4G7isWs0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
