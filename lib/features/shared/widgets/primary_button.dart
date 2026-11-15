@@ -44,8 +44,8 @@ class PrimaryButton extends StatelessWidget {
           child: FilledButton(
             onPressed: onPressed,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.warmGold,
-              foregroundColor: AppColors.backgroundDark,
+              backgroundColor: AppColors.antiqueGold,
+              foregroundColor: AppColors.midnightForest,
               disabledBackgroundColor: AppColors.panelInnerBorder,
               disabledForegroundColor: AppColors.textMuted,
               textStyle: const TextStyle(

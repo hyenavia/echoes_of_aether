@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../entities/cycle_progress.dart';
+import '../entities/dungeon_definition.dart';
 import '../entities/equipment.dart';
 import '../entities/game_config.dart';
 import '../entities/inventory.dart';
@@ -350,7 +351,12 @@ class OfflineProgressionService {
           (offlineActivity.activeRunId != null &&
               offlineActivity.activeRunId != active.runId);
       final missingDungeon =
-          active == null || !config.dungeons.containsKey(active.dungeonId);
+          active == null ||
+          (!active.isBossEvent &&
+              !config.dungeons.containsKey(active.dungeonId)) ||
+          (active.isBossEvent &&
+              config.bossEvents?.findBossById(active.bossEventId ?? '') ==
+                  null);
       if (runMismatch || missingDungeon) {
         const reason = 'Sesi Continue Dungeon tidak valid atau sudah berakhir.';
         final pending = _advanceToPending(offlineActivity);
@@ -381,10 +387,15 @@ class OfflineProgressionService {
       }
 
       final targetDungeonId = active.dungeonId;
-      final activeDungeonDef = config.dungeons[targetDungeonId]!;
-      if (activeDungeonDef.isAscension) {
-        const reason =
-            'Ascension Dungeon hanya dapat dimainkan secara manual; aktivitas offline dialihkan ke Pause Progression.';
+      final activeDungeonDef = config.dungeons[targetDungeonId];
+      final isBossRun =
+          active.isBossEvent || (activeDungeonDef?.isBossEvent ?? false);
+      final isManualOnly =
+          isBossRun || (activeDungeonDef?.isAscension ?? false);
+      if (isManualOnly) {
+        final reason = isBossRun
+            ? 'Boss Event hanya dapat dimainkan secara manual; aktivitas offline dialihkan ke Pause Progression.'
+            : 'Ascension Dungeon hanya dapat dimainkan secara manual; aktivitas offline dialihkan ke Pause Progression.';
         final pending = _advanceToPending(offlineActivity);
         final forcedSummary = OfflineSummarySnapshot(
           eventId: timeWindow.eventId,
@@ -481,9 +492,14 @@ class OfflineProgressionService {
     if (dungeonDef == null || !dungeonDef.isNormal || !isCycleCleared) {
       final reason = dungeonDef == null
           ? 'Auto Farming ditolak: dungeon "$targetDungeonId" tidak ditemukan.'
-          : (!dungeonDef.isNormal
-                ? 'Auto Farming ditolak: Ascension Dungeon ("$targetDungeonId") hanya dimainkan manual.'
-                : 'Auto Farming ditolak: dungeon "$targetDungeonId" belum diselesaikan pada siklus saat ini (rank ${cycleProgress.ascensionRank}).');
+          : switch (dungeonDef.kind) {
+              DungeonKind.bossDaily || DungeonKind.bossWeekly =>
+                'Auto Farming ditolak: Boss Event ("$targetDungeonId") hanya dimainkan manual.',
+              DungeonKind.ascension =>
+                'Auto Farming ditolak: Ascension Dungeon ("$targetDungeonId") hanya dimainkan manual.',
+              DungeonKind.normal =>
+                'Auto Farming ditolak: dungeon "$targetDungeonId" belum diselesaikan pada siklus saat ini (rank ${cycleProgress.ascensionRank}).',
+            };
       final pending = _advanceToPending(offlineActivity);
       final resetActivity = pending.transitionTo(
         OfflineActivityState.inactive,

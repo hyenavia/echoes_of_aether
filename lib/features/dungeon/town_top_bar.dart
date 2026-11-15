@@ -14,6 +14,7 @@ class TownTopBar extends StatelessWidget {
     required this.currentExp,
     required this.expToNext,
     required this.gold,
+    this.aetherShard = 0,
     required this.ascensionRank,
     this.specializationName,
     this.maxHp,
@@ -23,6 +24,7 @@ class TownTopBar extends StatelessWidget {
   final int currentExp;
   final int expToNext;
   final int gold;
+  final int aetherShard;
   final int ascensionRank;
   final String? specializationName;
   final int? maxHp;
@@ -41,6 +43,7 @@ class TownTopBar extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       backgroundColor: AppColors.surfaceDark,
+      borderColor: ext.gold.withValues(alpha: 0.42),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -57,7 +60,8 @@ class TownTopBar extends StatelessWidget {
                       '$specLabel • Lv ${NumberFormatter.format(level)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
+                      style: AppTypography.numeric(
+                        theme.textTheme.titleSmall,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -78,9 +82,9 @@ class TownTopBar extends StatelessWidget {
                           'HP ${NumberFormatter.format(maxHp!)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
+                          style: AppTypography.numeric(
+                            theme.textTheme.labelSmall,
                             color: ext.hpBar,
-                            fontWeight: FontWeight.w700,
                             fontSize: 10,
                           ),
                         ),
@@ -96,6 +100,10 @@ class TownTopBar extends StatelessWidget {
                   alignment: WrapAlignment.end,
                   children: [
                     ResourceChip.gold(gold, key: const Key('top_bar_gold')),
+                    ResourceChip.aetherShard(
+                      aetherShard,
+                      key: const Key('top_bar_aether_shard'),
+                    ),
                     ResourceChip.rank(
                       ascensionRank,
                       key: const Key('top_bar_rank'),

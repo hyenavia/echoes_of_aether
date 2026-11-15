@@ -73,6 +73,12 @@ class DungeonConfigParser {
 
   static const _rewardKeys = {'exp_reward', 'gold_reward', 'loot_table_id'};
 
+  /// Mengekstrak peta layout bernama dari section `maps` di `dungeons.json`.
+  Map<String, List<String>> parseMaps(String source) {
+    final root = _r.decodeRoot(source);
+    return Map.unmodifiable(_parseMaps(root['maps']));
+  }
+
   Map<String, DungeonDefinition> parse(
     String source, {
     double ascensionMultiplier = 1.35,

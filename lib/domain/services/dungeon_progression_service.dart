@@ -72,6 +72,7 @@ class DungeonProgressionService {
     Iterable<DungeonDefinition>? allDungeons,
     int? playerLevel,
   }) {
+    if (dungeon.isBossEvent) return false;
     if (playerLevel != null &&
         !meetsLevelRequirement(dungeon, cycle.ascensionRank, playerLevel)) {
       return false;
@@ -80,19 +81,24 @@ class DungeonProgressionService {
     if (reqId != null) {
       return isClearedInCurrentCycle(reqId, cycle, progresses);
     }
-    if (dungeon.isAscension) {
-      if (allDungeons != null) {
-        final normalDungeons = allDungeons.where((d) => d.isNormal).toList();
-        if (normalDungeons.isEmpty) return false;
-        return normalDungeons.every(
-          (d) => isClearedInCurrentCycle(d.id, cycle, progresses),
-        );
-      }
-      final baseId = dungeon.baseDungeonId;
-      if (baseId == null) return false;
-      return isClearedInCurrentCycle(baseId, cycle, progresses);
+    switch (dungeon.kind) {
+      case DungeonKind.normal:
+        return true;
+      case DungeonKind.ascension:
+        if (allDungeons != null) {
+          final normalDungeons = allDungeons.where((d) => d.isNormal).toList();
+          if (normalDungeons.isEmpty) return false;
+          return normalDungeons.every(
+            (d) => isClearedInCurrentCycle(d.id, cycle, progresses),
+          );
+        }
+        final baseId = dungeon.baseDungeonId;
+        if (baseId == null) return false;
+        return isClearedInCurrentCycle(baseId, cycle, progresses);
+      case DungeonKind.bossDaily:
+      case DungeonKind.bossWeekly:
+        return false;
     }
-    return true;
   }
 
   /// Memilih dungeon normal untuk offline Auto Farming:

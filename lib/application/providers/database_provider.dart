@@ -6,6 +6,7 @@ import '../../domain/repositories/game_settings_repository.dart';
 import '../../domain/repositories/player_progress_repository.dart';
 import '../../domain/services/offline_dungeon_runner.dart';
 import '../../domain/services/offline_progression_service.dart';
+import 'game_clock_provider.dart';
 import 'game_config_provider.dart';
 
 /// Menyediakan instance [AppDatabase] dan menutup koneksi saat provider di-dispose.
@@ -30,8 +31,9 @@ final playerSaveRepositoryProvider = FutureProvider<PlayerSaveRepository>((
 ) async {
   final db = ref.watch(appDatabaseProvider);
   final config = await ref.watch(gameConfigProvider.future);
+  final clock = ref.watch(gameClockProvider);
   await db.initialize();
-  return DriftPlayerSaveRepository(db: db, config: config);
+  return DriftPlayerSaveRepository(db: db, config: config, clock: clock);
 });
 
 /// Repository pengaturan aplikasi & audio berbasis tabel `GameSettings`.
@@ -40,6 +42,7 @@ final gameSettingsRepositoryProvider = FutureProvider<GameSettingsRepository>((
 ) async {
   final db = ref.watch(appDatabaseProvider);
   final config = await ref.watch(gameConfigProvider.future);
+  final clock = ref.watch(gameClockProvider);
   await db.initialize();
-  return DriftPlayerSaveRepository(db: db, config: config);
+  return DriftPlayerSaveRepository(db: db, config: config, clock: clock);
 });

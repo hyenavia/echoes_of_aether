@@ -1,18 +1,33 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import '../../domain/entities/boss_event.dart';
+import '../../domain/entities/clock_state.dart';
 import '../../domain/entities/cycle_progress.dart';
+import '../../domain/entities/dungeon_definition.dart';
+import '../../domain/entities/enemy_definition.dart';
 import '../../domain/entities/equipment.dart';
+import '../../domain/entities/event_shop_purchase.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/offline_activity.dart';
+import '../../domain/entities/periodic_quest_state.dart';
 import '../../domain/entities/player_character.dart';
 import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/entities/player_status.dart';
 import '../../domain/repositories/player_progress_repository.dart';
+import '../../domain/services/boss_event_service.dart';
+import '../../domain/services/boss_quest_service.dart';
+import '../../domain/services/clock_guard.dart';
 import '../../domain/services/combat_simulation.dart';
+import '../../domain/services/currency_service.dart';
+import '../../domain/services/derived_stats_calculator.dart';
+import '../../domain/services/difficulty_service.dart';
+import '../../domain/services/dungeon_manager.dart';
 import '../../domain/services/equipment_factory.dart';
+import '../../domain/services/game_clock.dart';
 import '../../domain/services/offline_progression_service.dart';
+import '../../domain/services/period_service.dart';
 import '../../domain/services/reward_processor.dart';
 
 class LoadedGameSession {
@@ -33,6 +48,10 @@ class LoadedGameSession {
     this.isFirstLaunch = false,
     this.loadError,
     this.shopPurchases = const {},
+    this.eventShopPurchases = const [],
+    this.currencies = const {},
+    this.clockState = const ClockState(),
+    this.periodicQuestStates = const [],
   });
 
   final PlayerCharacter character;
@@ -51,6 +70,10 @@ class LoadedGameSession {
   final bool isFirstLaunch;
   final Object? loadError;
   final Map<String, int> shopPurchases;
+  final List<EventShopPurchaseRecord> eventShopPurchases;
+  final Map<String, int> currencies;
+  final ClockState clockState;
+  final List<PeriodicQuestState> periodicQuestStates;
 
   bool get hasRecoverableDungeonSession =>
       activeDungeonSession?.isRecoverable ?? false;
@@ -69,8 +92,10 @@ class GameSessionCoordinator {
     required this.config,
     this.offlineService = const OfflineProgressionService(),
     this.checkpointIterationsPerBatch = defaultCheckpointIterationsPerBatch,
+    GameClock? clock,
     int Function()? nowMs,
-  }) : _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+  }) : _nowMs = nowMs ?? (() => (clock ?? const SystemGameClock()).nowMs),
+       _clockGuard = ClockGuard(timeConfig: config.time);
 
   static const int defaultCheckpointIterationsPerBatch = 2500;
   static const int _maxCheckpointBatches = 256;
@@ -80,17 +105,30 @@ class GameSessionCoordinator {
   final OfflineProgressionService offlineService;
   final int checkpointIterationsPerBatch;
   final int Function() _nowMs;
+  final ClockGuard _clockGuard;
 
   Future<void> _saveQueue = Future<void>.value();
   Future<void> _offlineQueue = Future<void>.value();
   int _highWaterTimestampMs = 0;
+  ClockState _clockState = const ClockState();
   Object? lastSaveError;
 
-  /// Menjalankan boot load dan memproses aktivitas offline secara eksklusif.
+  ClockState get clockState => _clockState;
+
+  /// Waktu efektif saat ini yang dijaga [ClockGuard] (jam mundur ditahan ke
+  /// `lastSeenAtMs`) tanpa memutasi `_clockState`.
+  int get effectiveClockMs => _clockGuard
+      .resolve(current: _clockState, rawNowMs: math.max(0, _nowMs()))
+      .effectiveMs;
+
+  /// Menjalankan boot load, memproses aktivitas offline secara eksklusif,
+  /// lalu memangkas `ClaimedRewards` yang sudah kedaluwarsa secara aman.
   Future<LoadedGameSession> loadAndProcessOffline({int? maxBatches}) =>
-      _runOfflineExclusive(
-        () => _processFromRepository(maxBatches: maxBatches),
-      );
+      _runOfflineExclusive(() async {
+        final session = await _processFromRepository(maxBatches: maxBatches);
+        await _pruneExpiredClaimsIfSupported(session);
+        return session;
+      });
 
   /// Memproses aktivitas offline saat `AppLifecycleState.resumed`.
   /// Menunggu seluruh antrean save sebelum membaca snapshot agar pause save
@@ -126,6 +164,9 @@ class GameSessionCoordinator {
           activeDungeonSession: existing.activeDungeonSession,
           offlineActivity: existing.offlineActivity,
           shopPurchases: existing.shopPurchases,
+          eventShopPurchases: existing.eventShopPurchases,
+          currencies: existing.currencies,
+          clockState: existing.clockState,
         ),
       );
     });
@@ -177,6 +218,9 @@ class GameSessionCoordinator {
           activeDungeonSession: existing.activeDungeonSession,
           offlineActivity: existing.offlineActivity,
           shopPurchases: existing.shopPurchases,
+          eventShopPurchases: existing.eventShopPurchases,
+          currencies: existing.currencies,
+          clockState: existing.clockState,
         ),
       );
     });
@@ -238,6 +282,86 @@ class GameSessionCoordinator {
           activeDungeonSession: existing.activeDungeonSession,
           offlineActivity: existing.offlineActivity,
           shopPurchases: Map<String, int>.unmodifiable(shopPurchases),
+          eventShopPurchases: existing.eventShopPurchases,
+          currencies: existing.currencies,
+          clockState: existing.clockState,
+        ),
+      );
+    });
+  }
+
+  /// Menyimpan transaksi Event Shop (perubahan shard, inventory/equipment, dan
+  /// [EventShopPurchases] untuk periode mingguan) secara atomik melalui `_saveQueue`.
+  Future<void> saveEventShopTransaction({
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required CurrencyService currencyService,
+    required EventShopPurchaseRecord purchase,
+    String? actionId,
+    int? updatedAtMs,
+  }) {
+    return _runQueuedSave(() async {
+      final repo = repository;
+      final resolvedAtMs = math.max(0, updatedAtMs ?? _nowMs());
+      final charSnap = character.toSnapshot();
+      final invSnap = inventory.toSnapshot();
+      final currencySnapshot = currencyService.toSnapshot();
+      if (repo is EventShopPurchaseRepository) {
+        await (repo as EventShopPurchaseRepository).saveEventShopTransaction(
+          progress: charSnap.progress,
+          inventory: invSnap,
+          equipped: charSnap.equipped,
+          currencies: currencySnapshot,
+          purchase: purchase,
+          actionId: actionId,
+          updatedAtMs: resolvedAtMs,
+        );
+        return;
+      }
+      final existing = await repo.loadSnapshot();
+      if (existing == null) return;
+      final normalizedActionId = actionId?.trim();
+      final claimKey =
+          (normalizedActionId != null && normalizedActionId.isNotEmpty)
+          ? 'eventshop:$normalizedActionId:${purchase.periodKey}'
+          : null;
+      if (claimKey != null && existing.claimedEventIds.contains(claimKey)) {
+        return;
+      }
+      final nextClaimed = <String>{...existing.claimedEventIds, ?claimKey};
+      final mergedPurchases = <EventShopPurchaseRecord>[
+        for (final p in existing.eventShopPurchases)
+          if (!(p.entryId == purchase.entryId &&
+              p.periodKey == purchase.periodKey))
+            p,
+        purchase,
+      ];
+      await repo.saveSnapshot(
+        PlayerSaveSnapshot(
+          playerId: existing.playerId,
+          character: PlayerCharacterSnapshot(
+            progress: charSnap.progress,
+            specializationId: charSnap.specializationId,
+            skillLevels: charSnap.skillLevels,
+            skillCooldownTicks: charSnap.skillCooldownTicks,
+            equipped: charSnap.equipped,
+            currentHp: existing.character.currentHp,
+          ),
+          inventory: invSnap,
+          dungeon: existing.dungeon,
+          dungeonProgresses: existing.dungeonProgresses,
+          cycleProgress: existing.cycleProgress,
+          session: existing.session,
+          claimedEventIds: Set<String>.unmodifiable(nextClaimed),
+          activeDungeonSession: existing.activeDungeonSession,
+          offlineActivity: existing.offlineActivity,
+          shopPurchases: existing.shopPurchases,
+          eventShopPurchases: List<EventShopPurchaseRecord>.unmodifiable(
+            mergedPurchases,
+          ),
+          currencies: currencySnapshot,
+          clockState: existing.clockState,
+          periodicQuestStates: existing.periodicQuestStates,
         ),
       );
     });
@@ -275,6 +399,9 @@ class GameSessionCoordinator {
       config: config.progression,
       skillCatalog: config.skills,
       specializationConfig: config.specializations,
+      statsCalculator: DerivedStatsCalculator(
+        pctCaps: config.equipment.pctCaps,
+      ),
     );
     final inventory = Inventory(definitions: config.items);
 
@@ -289,6 +416,9 @@ class GameSessionCoordinator {
     final now = math.max(0, _nowMs());
     if (loaded == null) {
       _highWaterTimestampMs = math.max(_highWaterTimestampMs, now);
+      _clockState = _clockGuard
+          .resolve(current: _clockState, rawNowMs: now)
+          .state;
       final initialSession = GameSessionSnapshot(
         lastActiveAtMs: now,
         lastSavedAtMs: now,
@@ -334,8 +464,15 @@ class GameSessionCoordinator {
         offlineActivity: const OfflineActivitySnapshot.paused(),
         isFirstLaunch: loadError == null,
         loadError: loadError,
+        clockState: _clockState,
       );
     }
+
+    final clockReading = _clockGuard.resolve(
+      current: loaded.clockState,
+      rawNowMs: now,
+    );
+    _clockState = clockReading.state;
 
     character.restoreSnapshot(loaded.character);
     inventory.restore(loaded.inventory);
@@ -483,6 +620,10 @@ class GameSessionCoordinator {
             claimedEventIds: claimedIds,
             activeDungeonSession: workingActiveSession,
             offlineActivity: workingActivity,
+            shopPurchases: loaded.shopPurchases,
+            eventShopPurchases: loaded.eventShopPurchases,
+            currencies: loaded.currencies,
+            clockState: _clockState,
           ),
         );
 
@@ -571,9 +712,17 @@ class GameSessionCoordinator {
             claimedEventIds: claimedIds,
             activeDungeonSession: workingActiveSession,
             offlineActivity: workingActivity,
+            shopPurchases: loaded.shopPurchases,
+            eventShopPurchases: loaded.eventShopPurchases,
+            currencies: loaded.currencies,
+            clockState: _clockState,
           ),
         );
       }
+    }
+    if (_clockState != loaded.clockState &&
+        repository is ClockStateRepository) {
+      await (repository as ClockStateRepository).saveClockState(_clockState);
     }
 
     final finalRecoverable = workingActiveSession?.isRecoverable == true;
@@ -594,6 +743,37 @@ class GameSessionCoordinator {
           ? Map.unmodifiable(simSkillCooldowns)
           : const {},
       shopPurchases: loaded.shopPurchases,
+      eventShopPurchases: loaded.eventShopPurchases,
+      currencies: loaded.currencies,
+      clockState: _clockState,
+      periodicQuestStates: loaded.periodicQuestStates,
+    );
+  }
+
+  Future<void> _pruneExpiredClaimsIfSupported(LoadedGameSession session) async {
+    if (session.isFirstLaunch || session.loadError != null) return;
+    if (repository is! ClaimedRewardsPruningRepository) return;
+
+    final effectiveNowMs = math.max(
+      _clockState.lastSeenAtMs,
+      math.max(0, _nowMs()),
+    );
+    final cutoffMs = effectiveNowMs - config.claimedRewards.retentionMs;
+    if (cutoffMs <= 0) return;
+
+    final periodService = PeriodService(config: config.time);
+    final activePeriodKeys = <String>{
+      periodService.keyFor(Period.daily, effectiveNowMs),
+      periodService.keyFor(Period.weekly, effectiveNowMs),
+    };
+    final activeRunId = session.activeDungeonSession?.isRecoverable == true
+        ? session.activeDungeonSession!.runId
+        : null;
+
+    await (repository as ClaimedRewardsPruningRepository).pruneClaimedRewards(
+      cutoffMs: cutoffMs,
+      activeRunId: activeRunId,
+      activePeriodKeys: activePeriodKeys,
     );
   }
 
@@ -707,6 +887,8 @@ class GameSessionCoordinator {
         reviveCooldownTicks: reviveTicks,
         playerStatus: PlayerStatus.alive,
         cycleRank: active.cycleRank,
+        bossEventId: active.bossEventId,
+        periodKeyAtStart: active.periodKeyAtStart,
       ),
       recoveredHp: recoveredHp,
       normalized: normalized,
@@ -752,8 +934,15 @@ class GameSessionCoordinator {
     OfflineActivitySnapshot? offlineActivity,
     Map<String, int> consecutiveDefeats = const {},
     String? lastFailedDungeonId,
+    CurrencyService? currencyService,
+    List<PeriodicQuestState> periodicQuestStates = const [],
+    List<EventShopPurchaseRecord> eventShopPurchases = const [],
+    Set<String> extraClaimedEventIds = const {},
   }) {
     final now = math.max(0, _nowMs());
+    _clockState = _clockGuard
+        .resolve(current: _clockState, rawNowMs: now)
+        .state;
     final monotonicSavedAtMs = math.max(now, _highWaterTimestampMs);
     final charSnap = character.toSnapshot();
     final updatedCharSnap = PlayerCharacterSnapshot(
@@ -773,8 +962,11 @@ class GameSessionCoordinator {
             id.startsWith('offline_kill:') ||
             id.startsWith('dungeon_clear:') ||
             id.startsWith('room_clear:') ||
-            id.startsWith('ascension:'))
+            id.startsWith('ascension:') ||
+            id.startsWith('bossquest:'))
           id,
+      if (currencyService != null) ...currencyService.claimedIds,
+      ...extraClaimedEventIds,
     };
 
     final mergedProgresses = <String, DungeonProgressSnapshot>{
@@ -807,7 +999,309 @@ class GameSessionCoordinator {
         activeDungeonSession: activeDungeonSession,
         offlineActivity:
             offlineActivity ?? const OfflineActivitySnapshot.paused(),
+        currencies: currencyService?.toSnapshot() ?? const {},
+        clockState: _clockState,
+        periodicQuestStates: periodicQuestStates,
+        eventShopPurchases: eventShopPurchases,
       ),
     );
   }
+
+  /// Menyiapkan definisi dungeon, monster boss, dan profil kesulitan untuk
+  /// run Boss Event (Daily/Weekly) berdasarkan waktu efektif & progres siklus.
+  PreparedBossRun prepareBossRun({
+    required Period period,
+    required CycleProgress cycleProgress,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+  }) {
+    final bossEvents = config.bossEvents;
+    if (bossEvents == null) {
+      throw StateError('Konfigurasi boss_events.json tidak tersedia.');
+    }
+    final arenaLayout = BossEventService.resolveArenaLayout(config);
+    if (arenaLayout == null || arenaLayout.isEmpty) {
+      throw StateError(
+        'Layout arena boss "${bossEvents.arenaMapRef}" tidak ditemukan.',
+      );
+    }
+
+    final rawNow = math.max(0, _nowMs());
+    final effectiveNow = _clockGuard
+        .resolve(current: _clockState, rawNowMs: rawNow)
+        .effectiveMs;
+    final periodService = PeriodService(config: config.time);
+    final periodKey = periodService.keyFor(period, effectiveNow);
+    final periodIndex = period == Period.daily
+        ? periodService.dayIndex(effectiveNow)
+        : periodService.weekIndex(effectiveNow);
+
+    final bossService = BossEventService(bossEvents);
+    final boss = bossService.bossFor(period, periodIndex);
+    final reference = bossService.resolveReference(
+      cycleProgress,
+      dungeonProgresses,
+      config.dungeons,
+    );
+    final powerFactor = bossEvents.tierFor(period).powerFactor;
+    final difficultyProfile = DifficultyService(config.difficulty)
+        .profileForBoss(reference, powerFactor);
+    final bossDungeon = bossService.buildBossDungeon(
+      boss: boss,
+      period: period,
+      reference: reference,
+      arenaLayout: arenaLayout,
+    );
+    final bossMonster = boss.toEnemyDefinition(
+      level: reference.dungeon.recommendedLevel,
+      spriteTemplate: config.monsters[boss.spriteRef],
+    );
+
+    return PreparedBossRun(
+      period: period,
+      periodKey: periodKey,
+      boss: boss,
+      reference: reference,
+      difficultyProfile: difficultyProfile,
+      bossDungeon: bossDungeon,
+      bossMonster: bossMonster,
+    );
+  }
+
+  /// Membangun ulang context runtime untuk recovery sesi Boss Event yang
+  /// tersimpan di [ActiveDungeonSessionSnapshot].
+  PreparedBossRun? prepareBossRecovery(
+    ActiveDungeonSessionSnapshot saved, {
+    required CycleProgress cycleProgress,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+  }) {
+    final bossEventId = saved.bossEventId;
+    final bossEvents = config.bossEvents;
+    if (!saved.isBossEvent || bossEventId == null || bossEvents == null) {
+      return null;
+    }
+    final boss = bossEvents.findBossById(bossEventId);
+    final arenaLayout = BossEventService.resolveArenaLayout(config);
+    if (boss == null || arenaLayout == null || arenaLayout.isEmpty) {
+      return null;
+    }
+
+    final period = bossEvents.periodForSession(
+      bossEventId: bossEventId,
+      dungeonId: saved.dungeonId,
+    );
+    if (period == null) {
+      return null;
+    }
+    final bossService = BossEventService(bossEvents);
+    final recoveryCycle = CycleProgress(
+      ascensionRank: math.max(0, saved.cycleRank),
+      highestAscensionRank: cycleProgress.highestAscensionRank,
+      lastNormalDungeonId: cycleProgress.lastNormalDungeonId,
+    );
+    final reference = bossService.resolveReference(
+      recoveryCycle,
+      dungeonProgresses,
+      config.dungeons,
+    );
+    final powerFactor = bossEvents.tierFor(period).powerFactor;
+    final difficultyProfile = DifficultyService(config.difficulty)
+        .profileForBoss(reference, powerFactor);
+    final bossDungeon = bossService.buildBossDungeon(
+      boss: boss,
+      period: period,
+      reference: reference,
+      arenaLayout: arenaLayout,
+      dungeonId: saved.dungeonId,
+    );
+    final bossMonster = boss.toEnemyDefinition(
+      level: reference.dungeon.recommendedLevel,
+      spriteTemplate: config.monsters[boss.spriteRef],
+    );
+
+    return PreparedBossRun(
+      period: period,
+      periodKey: saved.periodKeyAtStart ?? '',
+      boss: boss,
+      reference: reference,
+      difficultyProfile: difficultyProfile,
+      bossDungeon: bossDungeon,
+      bossMonster: bossMonster,
+    );
+  }
+
+  /// Memulai run Boss Event melalui [dungeonManager] dan langsung
+  /// mempersistensikan `bossEventId` serta `periodKeyAtStart` ke snapshot sesi.
+  Future<PreparedBossRun> startBossRun({
+    required Period period,
+    required DungeonManager dungeonManager,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    CurrencyService? currencyService,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+    String? runId,
+    List<PeriodicQuestState> periodicQuestStates = const [],
+  }) async {
+    final prepared = prepareBossRun(
+      period: period,
+      cycleProgress: cycleProgress,
+      dungeonProgresses: dungeonProgresses,
+    );
+    dungeonManager.startBossDungeon(
+      bossDungeon: prepared.bossDungeon,
+      bossMonster: prepared.bossMonster,
+      difficultyProfile: prepared.difficultyProfile,
+      bossEventId: prepared.boss.id,
+      periodKeyAtStart: prepared.periodKey,
+      cycleRank: prepared.reference.cycleRank,
+      runId: runId,
+    );
+    await saveFromRuntime(
+      character: character,
+      inventory: inventory,
+      dungeon: dungeon,
+      dungeonProgresses: dungeonProgresses,
+      cycleProgress: cycleProgress,
+      rewardProcessor: rewardProcessor,
+      autoSkillEnabled: autoSkillEnabled,
+      lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+      currentHp: currentHp,
+      skillCooldownTicks: skillCooldownTicks,
+      activeDungeonSession: dungeonManager.toActiveSessionSnapshot(),
+      offlineActivity: offlineActivity,
+      consecutiveDefeats: consecutiveDefeats,
+      lastFailedDungeonId: lastFailedDungeonId,
+      currencyService: currencyService,
+      periodicQuestStates: periodicQuestStates,
+    );
+    return prepared;
+  }
+
+  /// Menyelesaikan klaim hadiah Boss Quest (Daily/Weekly) secara atomik:
+  /// - Waktu efektif diselesaikan lewat [ClockGuard] (jam mundur tidak membuka ulang quest).
+  /// - Hadiah hanya diberikan jika `periodKeyAtStart == currentPeriodKey` & belum selesai.
+  /// - Persistensi dilakukan dalam satu transaksi [saveSnapshot]; jika gagal,
+  ///   seluruh mutasi in-memory di-rollback tanpa efek samping parsial.
+  Future<BossQuestSettlementResult> settleBossQuestVictory({
+    required Period period,
+    required String periodKeyAtStart,
+    required DifficultyProfile difficultyProfile,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required CurrencyService currencyService,
+    required BossQuestService bossQuestService,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    ActiveDungeonSessionSnapshot? activeDungeonSession,
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+  }) async {
+    final bossEvents = config.bossEvents;
+    if (bossEvents == null) {
+      throw StateError('Konfigurasi boss_events belum dimuat.');
+    }
+    final tier = bossEvents.tierFor(period);
+    final rawNow = math.max(0, _nowMs());
+    final resolved = _clockGuard.resolve(
+      current: _clockState,
+      rawNowMs: rawNow,
+    );
+    final prevClockState = _clockState;
+    _clockState = resolved.state;
+
+    final periodService = PeriodService(config: config.time);
+    final currentPeriodKey = periodService.keyFor(period, resolved.effectiveMs);
+
+    final prevCharSnap = character.toSnapshot();
+    final prevBalances = currencyService.toSnapshot();
+    final prevCurrencyClaims = currencyService.claimedIds;
+    final prevQuestStates = bossQuestService.toSnapshot();
+    final workingClaimedIds = Set<String>.of(rewardProcessor.claimedEventIds);
+
+    final result = bossQuestService.onBossDefeated(
+      questId: tier.questId,
+      periodKeyAtStart: periodKeyAtStart,
+      currentPeriodKey: currentPeriodKey,
+      reward: tier.reward,
+      difficultyProfile: difficultyProfile,
+      completedAtMs: resolved.effectiveMs,
+      character: character,
+      currencyService: currencyService,
+      claimedEventIds: workingClaimedIds,
+    );
+
+    if (!result.rewardGranted) {
+      return result;
+    }
+
+    try {
+      await saveFromRuntime(
+        character: character,
+        inventory: inventory,
+        dungeon: dungeon,
+        dungeonProgresses: dungeonProgresses,
+        cycleProgress: cycleProgress,
+        rewardProcessor: rewardProcessor,
+        autoSkillEnabled: autoSkillEnabled,
+        lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+        currentHp: currentHp,
+        skillCooldownTicks: skillCooldownTicks,
+        activeDungeonSession: activeDungeonSession,
+        offlineActivity: offlineActivity,
+        consecutiveDefeats: consecutiveDefeats,
+        lastFailedDungeonId: lastFailedDungeonId,
+        currencyService: currencyService,
+        periodicQuestStates: bossQuestService.toSnapshot(),
+        extraClaimedEventIds: {result.claimId},
+      );
+      rewardProcessor.markClaimed(result.claimId);
+      return result;
+    } catch (_) {
+      _clockState = prevClockState;
+      character.restoreSnapshot(prevCharSnap);
+      currencyService.restoreState(
+        balances: prevBalances,
+        claimedIds: prevCurrencyClaims,
+      );
+      bossQuestService.replaceStates(prevQuestStates);
+      rethrow;
+    }
+  }
+}
+
+/// Paket data siap-pakai untuk memulai atau memulihkan satu run Boss Event.
+class PreparedBossRun {
+  const PreparedBossRun({
+    required this.period,
+    required this.periodKey,
+    required this.boss,
+    required this.reference,
+    required this.difficultyProfile,
+    required this.bossDungeon,
+    required this.bossMonster,
+  });
+
+  final Period period;
+  final String periodKey;
+  final BossEvent boss;
+  final BossReference reference;
+  final DifficultyProfile difficultyProfile;
+  final DungeonDefinition bossDungeon;
+  final EnemyDefinition bossMonster;
 }

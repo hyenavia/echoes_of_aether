@@ -240,4 +240,277 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'Komponen Stage 1 baru (Navigation, Cards, Slots, Dialog, Sheet, Notif, Loader, Artwork) aman di 320dp @ 1.5x',
+    (tester) async {
+      var selectedTab = 0;
+      var enteredDungeon = false;
+      var tappedIcon = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: EchoesTheme.dark(),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 600),
+              textScaler: TextScaler.linear(1.5),
+            ),
+            child: StatefulBuilder(
+              builder: (context, setState) => Scaffold(
+                bottomNavigationBar: EchoesBottomNavigation(
+                  currentIndex: selectedTab,
+                  onSelected: (index) => setState(() => selectedTab = index),
+                  items: const [
+                    EchoesNavItem(
+                      label: 'Adventure',
+                      icon: Icons.explore_outlined,
+                    ),
+                    EchoesNavItem(label: 'Hero', icon: Icons.person_outline),
+                    EchoesNavItem(
+                      label: 'Bag',
+                      icon: Icons.inventory_2_outlined,
+                    ),
+                    EchoesNavItem(
+                      label: 'Shop',
+                      icon: Icons.storefront_outlined,
+                    ),
+                    EchoesNavItem(
+                      label: 'Settings',
+                      icon: Icons.settings_outlined,
+                    ),
+                  ],
+                ),
+                body: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      CampBackdrop(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              for (final cls in const [
+                                'base',
+                                'vanguard',
+                                'arcanist',
+                                'ranger',
+                              ])
+                                Flexible(
+                                  child: CharacterIllustration(
+                                    specializationId: cls,
+                                    width: 64,
+                                    height: 82,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          AppIconButton(
+                            icon: Icons.shield_outlined,
+                            semanticLabel: 'Equipment',
+                            onPressed: () => tappedIcon = true,
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: InformationCard(
+                              title: 'Aether Output',
+                              value: '1.2K',
+                              subtitle: 'Camp aktif',
+                              icon: Icons.auto_awesome,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      DungeonCard(
+                        name: 'Forgotten Forest',
+                        biomeId: 'forgotten_forest',
+                        recommendedLevel: 1,
+                        clearedRooms: 3,
+                        totalRooms: 5,
+                        isSelected: true,
+                        areaLabel: 'Room 3/5',
+                        primaryActionLabel: 'Enter Dungeon',
+                        onPrimaryAction: () => enteredDungeon = true,
+                        secondaryActionLabel: 'Switch',
+                        onSecondaryAction: () {},
+                      ),
+                      const SizedBox(height: 8),
+                      const Wrap(
+                        spacing: 8,
+                        children: [
+                          ItemSlot(
+                            rarity: ItemRarity.epic,
+                            slot: EquipmentSlot.weapon,
+                            quantity: 2,
+                            isSelected: true,
+                          ),
+                          ItemSlot(
+                            rarity: ItemRarity.rare,
+                            category: ItemCategory.consumable,
+                            isLocked: true,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const EquipmentSlotTile(
+                        slot: EquipmentSlot.weapon,
+                        slotLabel: 'Weapon',
+                        itemName: 'Aetherblade',
+                        rarity: ItemRarity.legendary,
+                        statsSummary: 'ATK +42',
+                      ),
+                      const SizedBox(height: 8),
+                      const ProgressBar(
+                        value: 0.6,
+                        label: 'Dungeon Mastery',
+                        trailingText: '60%',
+                      ),
+                      const SizedBox(height: 8),
+                      const AppNotificationBanner(
+                        title: 'Drop Langka',
+                        message: 'Menemukan Aether Shard x3.',
+                        kind: AppNotificationKind.success,
+                      ),
+                      const SizedBox(height: 8),
+                      const Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          BiomeArtwork(
+                            biomeId: 'crystal_cavern',
+                            width: 72,
+                            height: 40,
+                          ),
+                          BiomeArtwork(
+                            biomeId: 'ancient_crypt',
+                            width: 72,
+                            height: 40,
+                          ),
+                          BiomeArtwork(
+                            biomeId: 'ashen_wasteland',
+                            width: 72,
+                            height: 40,
+                          ),
+                          BiomeArtwork(
+                            biomeId: 'aether_sanctum',
+                            width: 72,
+                            height: 40,
+                          ),
+                          BiomeArtwork(
+                            biomeId: 'aether_sanctum',
+                            isAscension: true,
+                            width: 72,
+                            height: 40,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const LoadingState(compact: true),
+                      Builder(
+                        builder: (btnCtx) => Wrap(
+                          spacing: 8,
+                          children: [
+                            PrimaryButton(
+                              label: 'Dialog',
+                              onPressed: () => showEchoesDialog<void>(
+                                context: btnCtx,
+                                title: 'Konfirmasi Camp',
+                                primaryLabel: 'Lanjut',
+                                secondaryLabel: 'Batal',
+                                child: const Text('Masuk ke dungeon sekarang?'),
+                              ),
+                            ),
+                            SecondaryButton(
+                              label: 'Sheet',
+                              onPressed: () => showEchoesBottomSheet<void>(
+                                context: btnCtx,
+                                title: 'Detail Biome',
+                                subtitle: 'Forgotten Forest',
+                                child: const Text('Monster: Slime & Wolf'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Verify character illustrations & camp backdrop
+      expect(find.byKey(const ValueKey('camp_backdrop')), findsOneWidget);
+      for (final cls in const ['base', 'vanguard', 'arcanist', 'ranger']) {
+        expect(
+          find.byKey(ValueKey('character_illustration_$cls')),
+          findsOneWidget,
+        );
+      }
+
+      // Verify icon button >= 44dp touch target
+      final iconBox = tester.getSize(find.byType(AppIconButton));
+      expect(iconBox.width, greaterThanOrEqualTo(44));
+      expect(iconBox.height, greaterThanOrEqualTo(44));
+
+      await tester.tap(find.byType(AppIconButton));
+      expect(tappedIcon, isTrue);
+
+      await tester.tap(find.text('Enter Dungeon'));
+      expect(enteredDungeon, isTrue);
+
+      await tester.tap(find.text('Hero'));
+      await tester.pump();
+      expect(selectedTab, 1);
+
+      // Verify all 6 biome artwork keys can render cleanly
+      for (final biome in const [
+        'forgotten_forest',
+        'crystal_cavern',
+        'ancient_crypt',
+        'ashen_wasteland',
+        'aether_sanctum',
+      ]) {
+        expect(
+          BiomeVisualSpec.resolve(biome).assetPath,
+          startsWith(GameAssetDirectories.biomes),
+        );
+      }
+
+      // Open & dismiss dialog (pump twice so route animation completes cleanly)
+      await tester.ensureVisible(find.text('Dialog'));
+      await tester.pump();
+      await tester.tap(find.text('Dialog'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Konfirmasi Camp'), findsOneWidget);
+      await tester.tap(find.text('Batal'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Konfirmasi Camp'), findsNothing);
+
+      // Open & dismiss bottom sheet
+      await tester.ensureVisible(find.text('Sheet'));
+      await tester.pump();
+      await tester.tap(find.text('Sheet'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Detail Biome'), findsOneWidget);
+      await tester.tap(find.byTooltip('Tutup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Detail Biome'), findsNothing);
+
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

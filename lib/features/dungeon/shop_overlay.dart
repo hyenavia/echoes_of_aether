@@ -10,10 +10,12 @@ import '../../domain/entities/equipment.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/shop_config.dart';
+import '../../domain/services/event_shop_service.dart';
 import '../../domain/services/shop_service.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'equipment_text.dart';
+import 'event_shop_view.dart';
 import 'item_filter_widgets.dart';
 
 /// Overlay Toko di Town Hub (M10 Stage 3).
@@ -33,6 +35,8 @@ class ShopOverlay extends StatefulWidget {
     required this.onSellEquipment,
     required this.onSellMaterialBulk,
     this.onSellBatch,
+    this.eventShopData,
+    this.onBuyEventItem,
     required this.onClose,
   });
 
@@ -52,6 +56,8 @@ class ShopOverlay extends StatefulWidget {
     Map<String, int> materialQuantities,
   )?
   onSellBatch;
+  final EventShopViewData? eventShopData;
+  final Future<EventShopBuyResult> Function(String entryId)? onBuyEventItem;
   final VoidCallback onClose;
 
   @override
@@ -199,20 +205,21 @@ class _ShopOverlayState extends State<ShopOverlay> {
             if (epicPlusNames.isNotEmpty) ...[
               const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(AppSpacing.sm + 2),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade400),
+                  color: AppColors.emberRed.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(
+                    color: AppColors.emberRed.withValues(alpha: 0.65),
+                  ),
                 ),
                 child: Text(
                   'PERINGATAN Epic+: Termasuk ${epicPlusNames.length} item '
                   'Epic/Legendary (${epicPlusNames.take(5).join(', ')}'
                   '${epicPlusNames.length > 5 ? ', ...' : ''}).',
-                  style: TextStyle(
-                    color: Colors.red.shade800,
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    color: AppColors.emberRed,
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
                   ),
                 ),
               ),
@@ -405,7 +412,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
                         '$qty / $maxQuantity',
-                        style: Theme.of(ctx).textTheme.titleMedium,
+                        style: AppTypography.numeric(
+                          Theme.of(ctx).textTheme.titleMedium,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -484,45 +493,71 @@ class _ShopOverlayState extends State<ShopOverlay> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ext = EchoesTheme.of(context);
+    final hasEventTab =
+        widget.eventShopData != null && widget.onBuyEventItem != null;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460, maxHeight: 560),
           child: PanelFrame(
+            showCornerOrnaments: true,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              AppSpacing.sm,
               AppSpacing.md,
+              AppSpacing.lg,
               AppSpacing.md,
             ),
             child: DefaultTabController(
-              length: 2,
+              length: hasEventTab ? 3 : 2,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      Text('Toko', style: theme.textTheme.titleMedium),
-                      const SizedBox(width: AppSpacing.md),
+                      const Icon(
+                        Icons.storefront_outlined,
+                        size: 20,
+                        color: AppColors.antiqueGold,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: ResourceChip.gold(widget.playerGold),
+                        child: Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.xs,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'Toko',
+                              style: AppTypography.headingSerif(
+                                theme.textTheme.titleLarge,
+                                color: ext.gold,
+                              ),
+                            ),
+                            ResourceChip.gold(widget.playerGold),
+                          ],
                         ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
-                      IconButton(
-                        onPressed: widget.onClose,
-                        icon: const Icon(Icons.close),
+                      AppIconButton(
+                        icon: Icons.close,
+                        semanticLabel: 'Tutup Toko',
                         tooltip: 'Tutup',
+                        size: 36,
+                        iconSize: 18,
+                        onPressed: widget.onClose,
                       ),
                     ],
                   ),
-                  const TabBar(
+                  TabBar(
+                    indicatorColor: ext.gold,
+                    labelColor: ext.gold,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    dividerColor: AppColors.panelBorder,
                     tabs: [
-                      Tab(text: 'Beli'),
-                      Tab(text: 'Jual'),
+                      const Tab(text: 'Beli'),
+                      const Tab(text: 'Jual'),
+                      if (hasEventTab) const Tab(text: 'Event'),
                     ],
                   ),
                   if (_feedbackMessage != null) ...[
@@ -564,6 +599,12 @@ class _ShopOverlayState extends State<ShopOverlay> {
                       children: [
                         _buildBuyTab(theme, ext),
                         _buildSellTab(theme),
+                        if (hasEventTab)
+                          EventShopView(
+                            data: widget.eventShopData!,
+                            dungeons: widget.dungeons,
+                            onBuy: widget.onBuyEventItem!,
+                          ),
                       ],
                     ),
                   ),
@@ -601,7 +642,14 @@ class _ShopOverlayState extends State<ShopOverlay> {
   Widget _buildBuyTab(ThemeData theme, EchoesThemeExtension ext) {
     final entries = widget.catalog.entries;
     if (entries.isEmpty) {
-      return const Center(child: Text('Toko belum memiliki barang.'));
+      return const Center(
+        child: SingleChildScrollView(
+          child: EmptyState(
+            icon: Icons.storefront_outlined,
+            title: 'Toko belum memiliki barang.',
+          ),
+        ),
+      );
     }
     final filtered = [
       for (final entry in entries)
@@ -624,7 +672,12 @@ class _ShopOverlayState extends State<ShopOverlay> {
         Expanded(
           child: filtered.isEmpty
               ? const Center(
-                  child: Text('Tidak ada barang yang sesuai filter.'),
+                  child: SingleChildScrollView(
+                    child: EmptyState(
+                      icon: Icons.filter_list_off,
+                      title: 'Tidak ada barang yang sesuai filter.',
+                    ),
+                  ),
                 )
               : ListView.separated(
                   itemCount: filtered.length,
@@ -684,7 +737,11 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                 Text(
                                   'Harga: ${NumberFormatter.format(entry.price)} Gold'
                                   '${entry.purchaseLimit != null ? ' • Batas: $purchasedCount/${entry.purchaseLimit}' : ''}',
-                                  style: theme.textTheme.labelMedium,
+                                  style: AppTypography.numeric(
+                                    theme.textTheme.labelMedium?.copyWith(
+                                      color: ext.gold,
+                                    ),
+                                  ),
                                 ),
                                 if (!reqCheck.isMet)
                                   Padding(
@@ -732,12 +789,21 @@ class _ShopOverlayState extends State<ShopOverlay> {
             final sellableBagEquipment = [
               for (final instance in equipSnap.bag)
                 if (widget.items[instance.definitionId] case final def?)
-                  if (widget.shopService.effectiveSellUnitPrice(def) > 0)
+                  if (def.sellable &&
+                      widget.shopService.effectiveSellUnitPrice(def) > 0)
+                    instance,
+            ];
+            final nonSellableBagEquipment = [
+              for (final instance in equipSnap.bag)
+                if (widget.items[instance.definitionId] case final def?)
+                  if (!def.sellable ||
+                      widget.shopService.effectiveSellUnitPrice(def) <= 0)
                     instance,
             ];
             final sellableStacks = [
               for (final s in stackEntries)
-                if (widget.catalog.sell.sellableCategories.contains(
+                if (s.definition.sellable &&
+                    widget.catalog.sell.sellableCategories.contains(
                       s.definition.category,
                     ) &&
                     widget.shopService.effectiveSellUnitPrice(s.definition) > 0)
@@ -747,11 +813,27 @@ class _ShopOverlayState extends State<ShopOverlay> {
             if (equipSnap.bag.isEmpty &&
                 sellableStacks.isEmpty &&
                 equippedList.isEmpty) {
-              return const Center(child: Text('Belum ada item untuk dijual.'));
+              return const Center(
+                child: SingleChildScrollView(
+                  child: EmptyState(
+                    icon: Icons.sell_outlined,
+                    title: 'Belum ada item untuk dijual.',
+                  ),
+                ),
+              );
             }
 
             final filteredEquipment = [
               for (final instance in sellableBagEquipment)
+                if (_matchesFilters(
+                  widget.items[instance.definitionId]!,
+                  _sellCategoryFilter,
+                  _sellRarityFilter,
+                ))
+                  instance,
+            ];
+            final filteredNonSellableEquipment = [
+              for (final instance in nonSellableBagEquipment)
                 if (_matchesFilters(
                   widget.items[instance.definitionId]!,
                   _sellCategoryFilter,
@@ -812,49 +894,49 @@ class _ShopOverlayState extends State<ShopOverlay> {
                 ),
                 const SizedBox(height: 6),
                 Expanded(
-                  child: (!hasVisibleSellables && equippedList.isEmpty)
+                  child:
+                      (!hasVisibleSellables &&
+                          filteredNonSellableEquipment.isEmpty &&
+                          equippedList.isEmpty)
                       ? const Center(
-                          child: Text('Tidak ada item yang sesuai filter.'),
+                          child: SingleChildScrollView(
+                            child: EmptyState(
+                              icon: Icons.filter_list_off,
+                              title: 'Tidak ada item yang sesuai filter.',
+                            ),
+                          ),
                         )
                       : ListView(
                           children: [
                             if (filteredEquipment.isNotEmpty) ...[
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                ),
-                                child: Text(
-                                  'Equipment di Tas',
-                                  style: theme.textTheme.labelLarge,
-                                ),
+                              const SectionHeader(
+                                title: 'Equipment di Tas',
+                                useSerif: true,
                               ),
                               for (final instance in filteredEquipment)
                                 _buildBagEquipmentTile(theme, instance),
                             ],
                             if (filteredMaterials.isNotEmpty) ...[
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                ),
-                                child: Text(
-                                  'Material',
-                                  style: theme.textTheme.labelLarge,
-                                ),
+                              const SectionHeader(
+                                title: 'Material',
+                                useSerif: true,
                               ),
                               for (final entry in filteredMaterials)
                                 _buildMaterialTile(theme, entry),
                             ],
+                            if (filteredNonSellableEquipment.isNotEmpty) ...[
+                              const SectionHeader(
+                                title: 'Tidak Dapat Dijual',
+                                useSerif: true,
+                              ),
+                              for (final instance
+                                  in filteredNonSellableEquipment)
+                                _buildNonSellableBagTile(theme, instance),
+                            ],
                             if (equippedList.isNotEmpty) ...[
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                ),
-                                child: Text(
-                                  'Sedang Dipakai (Tidak Bisa Dijual)',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: theme.colorScheme.outline,
-                                  ),
-                                ),
+                              const SectionHeader(
+                                title: 'Sedang Dipakai (Tidak Bisa Dijual)',
+                                useSerif: true,
                               ),
                               for (final instance in equippedList)
                                 _buildEquippedReadOnlyTile(theme, instance),
@@ -960,81 +1042,111 @@ class _ShopOverlayState extends State<ShopOverlay> {
   Widget _buildBagEquipmentTile(ThemeData theme, EquipmentInstance instance) {
     final def = widget.items[instance.definitionId];
     if (def == null) return const SizedBox.shrink();
+    final ext = EchoesTheme.of(context);
     final sellPrice = widget.shopService.effectiveSellUnitPrice(def);
     final selected = _selectedEquipmentIds.contains(instance.id);
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: Checkbox(
-        value: selected,
-        onChanged: _busy
-            ? null
-            : (val) => setState(() {
-                if (val == true) {
-                  _selectedEquipmentIds.add(instance.id);
-                } else {
-                  _selectedEquipmentIds.remove(instance.id);
-                }
-              }),
-      ),
-      title: Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(def.name),
-          _buildCategoryBadge(theme, def),
-          _buildRarityBadge(theme, def.rarity),
-        ],
-      ),
-      subtitle: Text(
-        '${describeEquipmentStats(instance.rolledStats)}\n'
-        'Jual: ${NumberFormatter.format(sellPrice)} Gold',
-      ),
-      isThreeLine: true,
-      trailing: OutlinedButton(
-        onPressed: !_busy && sellPrice > 0
-            ? () => _handleSellEquipment(instance, def, sellPrice)
-            : null,
-        child: const Text('Jual'),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: PanelFrame(
+        backgroundColor: AppColors.surfaceDark,
+        borderColor: ext.colorForRarity(def.rarity).withValues(alpha: 0.45),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: 2,
+        ),
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: Checkbox(
+            value: selected,
+            onChanged: _busy
+                ? null
+                : (val) => setState(() {
+                    if (val == true) {
+                      _selectedEquipmentIds.add(instance.id);
+                    } else {
+                      _selectedEquipmentIds.remove(instance.id);
+                    }
+                  }),
+          ),
+          title: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(def.name),
+              _buildCategoryBadge(theme, def),
+              _buildRarityBadge(theme, def.rarity),
+            ],
+          ),
+          subtitle: Text(
+            '${describeEquipmentStats(instance.rolledStats)}\n'
+            'Jual: ${NumberFormatter.format(sellPrice)} Gold',
+            style: AppTypography.numeric(theme.textTheme.bodySmall),
+          ),
+          isThreeLine: true,
+          trailing: OutlinedButton(
+            onPressed: !_busy && sellPrice > 0
+                ? () => _handleSellEquipment(instance, def, sellPrice)
+                : null,
+            child: const Text('Jual'),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildMaterialTile(ThemeData theme, InventoryEntry entry) {
+    final ext = EchoesTheme.of(context);
     final unitPrice = widget.shopService.effectiveSellUnitPrice(
       entry.definition,
     );
     final selected = _selectedMaterialIds.contains(entry.definition.id);
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: Checkbox(
-        value: selected,
-        onChanged: _busy
-            ? null
-            : (val) => setState(() {
-                if (val == true) {
-                  _selectedMaterialIds.add(entry.definition.id);
-                } else {
-                  _selectedMaterialIds.remove(entry.definition.id);
-                }
-              }),
-      ),
-      title: Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('${entry.definition.name} (x${entry.quantity})'),
-          _buildCategoryBadge(theme, entry.definition),
-          _buildRarityBadge(theme, entry.definition.rarity),
-        ],
-      ),
-      subtitle: Text('${NumberFormatter.format(unitPrice)} Gold / item'),
-      trailing: OutlinedButton(
-        onPressed: !_busy ? () => _handleSellMaterialBulk(entry) : null,
-        child: const Text('Jual...'),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: PanelFrame(
+        backgroundColor: AppColors.surfaceDark,
+        borderColor: ext
+            .colorForRarity(entry.definition.rarity)
+            .withValues(alpha: 0.45),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: 2,
+        ),
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: Checkbox(
+            value: selected,
+            onChanged: _busy
+                ? null
+                : (val) => setState(() {
+                    if (val == true) {
+                      _selectedMaterialIds.add(entry.definition.id);
+                    } else {
+                      _selectedMaterialIds.remove(entry.definition.id);
+                    }
+                  }),
+          ),
+          title: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('${entry.definition.name} (x${entry.quantity})'),
+              _buildCategoryBadge(theme, entry.definition),
+              _buildRarityBadge(theme, entry.definition.rarity),
+            ],
+          ),
+          subtitle: Text(
+            '${NumberFormatter.format(unitPrice)} Gold / item',
+            style: AppTypography.numeric(theme.textTheme.bodySmall),
+          ),
+          trailing: OutlinedButton(
+            onPressed: !_busy ? () => _handleSellMaterialBulk(entry) : null,
+            child: const Text('Jual...'),
+          ),
+        ),
       ),
     );
   }
@@ -1054,15 +1166,50 @@ class _ShopOverlayState extends State<ShopOverlay> {
   Widget _buildEquippedReadOnlyTile(
     ThemeData theme,
     EquipmentInstance instance,
-  ) {
+  ) => _buildReadOnlySellTile(
+    theme: theme,
+    instance: instance,
+    reason: 'Sedang dipakai — tidak bisa dijual',
+    buttonLabel: 'Dipakai',
+  );
+
+  Widget _buildNonSellableBagTile(ThemeData theme, EquipmentInstance instance) {
+    final def = widget.items[instance.definitionId];
+    final reason = (def != null && !def.sellable)
+        ? 'Item tidak dapat dijual.'
+        : 'Item tidak memiliki nilai jual.';
+    return _buildReadOnlySellTile(
+      theme: theme,
+      instance: instance,
+      reason: reason,
+      buttonLabel: 'Tidak Dijual',
+    );
+  }
+
+  Widget _buildReadOnlySellTile({
+    required ThemeData theme,
+    required EquipmentInstance instance,
+    required String reason,
+    required String buttonLabel,
+  }) {
     final def = widget.items[instance.definitionId];
     final name = def?.name ?? instance.definitionId;
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      title: Text(name, style: TextStyle(color: theme.colorScheme.outline)),
-      subtitle: const Text('Sedang dipakai — tidak bisa dijual'),
-      trailing: const OutlinedButton(onPressed: null, child: Text('Dipakai')),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: PanelFrame(
+        backgroundColor: AppColors.surfaceDark.withValues(alpha: 0.65),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: 2,
+        ),
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text(name, style: TextStyle(color: theme.colorScheme.outline)),
+          subtitle: Text(reason),
+          trailing: OutlinedButton(onPressed: null, child: Text(buttonLabel)),
+        ),
+      ),
     );
   }
 }

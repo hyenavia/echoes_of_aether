@@ -14,6 +14,9 @@ class EquipmentStats {
     this.hp = 0,
     this.atk = 0,
     this.def = 0,
+    this.hpPct = 0,
+    this.atkPct = 0,
+    this.defPct = 0,
     this.critRate = 0,
     this.critDamage = 0,
     this.attackSpeed = 0,
@@ -30,6 +33,9 @@ class EquipmentStats {
   final double hp;
   final double atk;
   final double def;
+  final double hpPct;
+  final double atkPct;
+  final double defPct;
   final double critRate;
   final double critDamage;
   final double attackSpeed;
@@ -41,6 +47,9 @@ class EquipmentStats {
       hp == 0 &&
       atk == 0 &&
       def == 0 &&
+      hpPct == 0 &&
+      atkPct == 0 &&
+      defPct == 0 &&
       critRate == 0 &&
       critDamage == 0 &&
       attackSpeed == 0 &&
@@ -52,6 +61,9 @@ class EquipmentStats {
     hp: hp + o.hp,
     atk: atk + o.atk,
     def: def + o.def,
+    hpPct: hpPct + o.hpPct,
+    atkPct: atkPct + o.atkPct,
+    defPct: defPct + o.defPct,
     critRate: critRate + o.critRate,
     critDamage: critDamage + o.critDamage,
     attackSpeed: attackSpeed + o.attackSpeed,
@@ -66,6 +78,9 @@ class EquipmentStats {
           hp: hp * factor,
           atk: atk * factor,
           def: def * factor,
+          hpPct: hpPct * factor,
+          atkPct: atkPct * factor,
+          defPct: defPct * factor,
           critRate: critRate * factor,
           critDamage: critDamage * factor,
           attackSpeed: attackSpeed * factor,
@@ -94,6 +109,9 @@ class EquipmentStats {
       hp: r(hp),
       atk: r(atk),
       def: r(def),
+      hpPct: r(hpPct),
+      atkPct: r(atkPct),
+      defPct: r(defPct),
       critRate: r(critRate),
       critDamage: r(critDamage),
       attackSpeed: r(attackSpeed),
@@ -127,6 +145,7 @@ class EquipmentData {
     required this.slot,
     required this.baseStats,
     this.weaponType,
+    this.fixedStats = false,
   });
 
   final EquipmentSlot slot;
@@ -134,6 +153,9 @@ class EquipmentData {
 
   /// sword / staff / bow; hanya untuk slot weapon.
   final String? weaponType;
+
+  /// Jika `true`, item tidak di-roll saat dibuat oleh [EquipmentFactory].
+  final bool fixedStats;
 }
 
 /// Satu item equipment milik player dengan hasil roll tersendiri (GDD 13).

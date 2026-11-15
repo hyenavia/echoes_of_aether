@@ -78,4 +78,30 @@ void main() {
     expect(slotLabel(EquipmentSlot.weapon), 'Senjata');
     expect(slotLabel(EquipmentSlot.accessory), 'Aksesori');
   });
+
+  test('describeEquipmentStats menampilkan stat persentase', () {
+    expect(
+      describeEquipmentStats(
+        const EquipmentStats(hpPct: 0.1, atkPct: 0.155, defPct: 0.05),
+      ),
+      'HP +10%, ATK +15.5%, DEF +5%',
+    );
+    expect(
+      describeEquipmentStats(const EquipmentStats(atk: 12, atkPct: 0.1)),
+      'ATK +12, ATK +10%',
+    );
+  });
+
+  test('computeEquipmentStatDeltas menghitung delta stat persentase', () {
+    final deltas = computeEquipmentStatDeltas(
+      const EquipmentStats(atk: 10, hpPct: 0.15, atkPct: 0.1, defPct: 0.05),
+      const EquipmentStats(atk: 10, hpPct: 0.05, defPct: 0.1),
+    );
+    expect(
+      deltas.map(
+        (d) => '${d.label} ${formatStatDelta(d.delta, isPercent: d.isPercent)}',
+      ),
+      ['HP +10%', 'ATK +10%', 'DEF -5%'],
+    );
+  });
 }

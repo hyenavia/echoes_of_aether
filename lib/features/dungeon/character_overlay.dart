@@ -11,7 +11,8 @@ import '../shared/widgets/shared_widgets.dart';
 import 'equipment_text.dart';
 import 'skill_text.dart';
 
-/// Layar karakter: ringkasan stat tempur, pilihan specialization, dan daftar/upgrade skill.
+/// Layar karakter: profil hero berilustrasi, stat tempur, pilihan
+/// specialization, dan daftar/upgrade skill.
 class CharacterOverlay extends StatelessWidget {
   const CharacterOverlay({
     super.key,
@@ -29,17 +30,22 @@ class CharacterOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440, maxHeight: 580),
+          constraints: const BoxConstraints(maxWidth: 440, maxHeight: 640),
           child: PanelFrame(
+            showCornerOrnaments: true,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.sm,
+              AppSpacing.xs + 2,
               AppSpacing.md,
+              AppSpacing.xs + 2,
             ),
             child: ValueListenableBuilder<CharacterSnapshot>(
               valueListenable: snapshot,
@@ -57,16 +63,20 @@ class CharacterOverlay extends StatelessWidget {
                           children: [
                             Text(
                               'Karakter - Lv ${NumberFormatter.format(s.level)}',
-                              style: theme.textTheme.titleMedium,
+                              style: AppTypography.headingSerif(
+                                theme.textTheme.titleMedium,
+                                color: ext.gold,
+                              ),
                             ),
                             ResourceChip.gold(s.gold),
                           ],
                         ),
                       ),
-                      IconButton(
-                        onPressed: onClose,
-                        icon: const Icon(Icons.close),
+                      AppIconButton(
+                        icon: Icons.close,
+                        semanticLabel: 'Tutup',
                         tooltip: 'Tutup',
+                        onPressed: onClose,
                       ),
                     ],
                   ),
@@ -76,17 +86,21 @@ class CharacterOverlay extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          _HeroProfileBanner(snapshot: s),
                           if (s.stats != null) ...[
-                            const SectionHeader(title: 'Stat Tempur'),
+                            const SectionHeader(
+                              title: 'Stat Tempur',
+                              useSerif: true,
+                            ),
                             _CombatStatGrid(stats: s.stats!),
-                            const SizedBox(height: AppSpacing.sm),
                           ],
-                          const SectionHeader(title: 'Spesialisasi'),
+                          const SectionHeader(
+                            title: 'Spesialisasi',
+                            useSerif: true,
+                          ),
                           if (!s.canChooseSpecialization)
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.xs,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 2),
                               child: LockedBadge(
                                 label:
                                     'Terbuka di level ${s.specializationUnlockLevel}.',
@@ -99,8 +113,7 @@ class CharacterOverlay extends StatelessWidget {
                               ),
                               child: _specTile(context, s, spec),
                             ),
-                          const SizedBox(height: AppSpacing.sm),
-                          const SectionHeader(title: 'Skill'),
+                          const SectionHeader(title: 'Skill', useSerif: true),
                           for (final e in s.skills)
                             Padding(
                               padding: const EdgeInsets.only(
@@ -153,25 +166,36 @@ class CharacterOverlay extends StatelessWidget {
         child: Text('Upgrade (${NumberFormatter.format(e.nextUpgradeCost)}G)'),
       );
     } else {
-      trailing = Text('Lv ${e.level}/${e.definition.maxLevel}');
+      trailing = Text(
+        'Lv ${e.level}/${e.definition.maxLevel}',
+        style: AppTypography.numeric(theme.textTheme.labelMedium),
+      );
     }
 
     return PanelFrame(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: 2,
+        horizontal: AppSpacing.sm + 2,
+        vertical: AppSpacing.xs + 2,
       ),
       backgroundColor: AppColors.surfaceDark,
-      child: ListTile(
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        enabled: e.unlocked,
+      borderColor: e.unlocked
+          ? ext.panelBorder.withValues(alpha: 0.72)
+          : ext.panelInnerBorder,
+      child: _AdaptiveOverlayTile(
         title: Text(
           e.unlocked
               ? '${e.definition.name} • Lv ${e.level}/${e.definition.maxLevel}'
               : '${e.definition.name} (Lv ${e.definition.unlockLevel})',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: e.unlocked ? AppColors.textPrimary : AppColors.textMuted,
+          ),
         ),
-        subtitle: Text(describeSkill(e.definition, level: e.level)),
+        subtitle: Text(
+          describeSkill(e.definition, level: e.level),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: e.unlocked ? AppColors.textSecondary : AppColors.textMuted,
+          ),
+        ),
         trailing: trailing,
       ),
     );
@@ -182,6 +206,7 @@ class CharacterOverlay extends StatelessWidget {
     CharacterSnapshot s,
     SpecializationDefinition spec,
   ) {
+    final theme = Theme.of(context);
     final ext = EchoesTheme.of(context);
     final selected = s.specializationId == spec.id;
     final requiredLevel = spec.unlockLevel ?? s.specializationUnlockLevel;
@@ -199,29 +224,203 @@ class CharacterOverlay extends StatelessWidget {
     return PanelFrame(
       showCornerOrnaments: selected,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: 2,
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
       backgroundColor: AppColors.surfaceDark,
       borderColor: selected ? ext.gold : null,
-      child: ListTile(
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        selected: selected,
-        title: Text(selected ? '${spec.name} (dipilih)' : spec.name),
+      child: _AdaptiveOverlayTile(
+        title: Text(
+          selected ? '${spec.name} (dipilih)' : spec.name,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: selected ? ext.gold : AppColors.textPrimary,
+          ),
+        ),
         subtitle: Text(
           '${spec.description}\n'
           '${describeEquipmentStats(spec.bonus)}$range$affinityLine',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
-        isThreeLine: true,
         trailing: selected
-            ? Icon(Icons.check, color: ext.gold)
+            ? Icon(Icons.check_circle, color: ext.gold)
             : FilledButton.tonal(
                 onPressed: unlocked
                     ? () => onChooseSpecialization(spec.id)
                     : null,
                 child: const Text('Pilih'),
               ),
+      ),
+    );
+  }
+}
+
+class _AdaptiveOverlayTile extends StatelessWidget {
+  const _AdaptiveOverlayTile({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+
+  final Widget title;
+  final Widget subtitle;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactWidth = constraints.maxWidth < 260 * textScale;
+        if (compactWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              title,
+              const SizedBox(height: 2),
+              subtitle,
+              const SizedBox(height: AppSpacing.xs),
+              Align(alignment: Alignment.centerRight, child: trailing),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [title, const SizedBox(height: 2), subtitle],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            trailing,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HeroProfileBanner extends StatelessWidget {
+  const _HeroProfileBanner({required this.snapshot});
+
+  final CharacterSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
+    final specId = snapshot.specializationId ?? 'base';
+    final specVisual = CharacterVisualSpec.resolve(specId);
+    final specDef = snapshot.specializations
+        .where((sp) => sp.id == snapshot.specializationId)
+        .firstOrNull;
+    final classTitle = specDef?.name ?? specVisual.title;
+    final cp = snapshot.stats != null
+        ? HeroShowcaseCard.computeCombatPower(snapshot.stats!)
+        : null;
+
+    return Container(
+      key: const Key('character_profile_banner'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: specVisual.auraColor.withValues(alpha: 0.55),
+          width: 1.25,
+        ),
+      ),
+      child: CampBackdrop(
+        borderRadius: AppRadius.md,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                AppColors.midnightForest.withValues(alpha: 0.45),
+                AppColors.midnightForest.withValues(alpha: 0.88),
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: 4,
+            ),
+            child: Row(
+              children: [
+                CharacterIllustration(
+                  specializationId: specId,
+                  width: 36,
+                  height: 40,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Wrap(
+                        spacing: AppSpacing.xs + 2,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            classTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.headingSerif(
+                              theme.textTheme.titleSmall,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (cp != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs + 2,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: ext.gold.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm,
+                                ),
+                                border: Border.all(
+                                  color: ext.gold.withValues(alpha: 0.45),
+                                ),
+                              ),
+                              child: Text(
+                                'Combat Power: ${NumberFormatter.format(cp)}',
+                                style: AppTypography.numeric(
+                                  theme.textTheme.labelSmall,
+                                  color: ext.gold,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Text(
+                        specVisual.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: specVisual.auraColor,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -235,7 +434,7 @@ class _CombatStatGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ext = EchoesTheme.of(context);
-    final entries = <({String label, String value, Color color})>[
+    final primary = <({String label, String value, Color color})>[
       (
         label: 'HP',
         value: NumberFormatter.format(stats.maxHp),
@@ -248,104 +447,70 @@ class _CombatStatGrid extends StatelessWidget {
         color: ext.expBar,
       ),
       (
-        label: 'ASPD',
-        value: '${stats.attackSpeed.toStringAsFixed(2)}/s',
-        color: AppColors.textPrimary,
-      ),
-      (
         label: 'CRIT',
         value: '${(stats.critRate * 100).round()}%',
         color: ext.warning,
-      ),
-      (
-        label: 'CRIT DMG',
-        value: '${(stats.critDamage * 100).round()}%',
-        color: ext.warning,
-      ),
-      (
-        label: 'HASTE',
-        value: '${(stats.skillHaste * 100).round()}%',
-        color: ext.rank,
-      ),
-      (
-        label: 'RNG',
-        value: stats.attackRange.toStringAsFixed(1),
-        color: AppColors.textSecondary,
       ),
     ];
 
     return PanelFrame(
       showCornerOrnaments: true,
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
       backgroundColor: AppColors.surfaceDark,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final cols = constraints.maxWidth >= 320 ? 4 : 2;
-              const spacing = AppSpacing.xs + 2;
-              final cellWidth =
-                  (constraints.maxWidth - spacing * (cols - 1)) / cols;
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  for (final e in entries)
-                    SizedBox(
-                      width: cellWidth,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs + 2,
-                          vertical: AppSpacing.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.backgroundDark.withValues(
-                            alpha: 0.7,
-                          ),
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                          border: Border.all(color: AppColors.panelInnerBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              e.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textMuted,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              e.value,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: e.color,
-                              ),
-                            ),
-                          ],
+          Wrap(
+            spacing: AppSpacing.xs + 2,
+            runSpacing: 2,
+            children: [
+              for (final e in primary)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs + 2,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: e.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(color: e.color.withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${e.label} ',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: e.color,
                         ),
                       ),
-                    ),
-                ],
-              );
-            },
+                      Text(
+                        e.value,
+                        style: AppTypography.numeric(
+                          const TextStyle(fontSize: 10),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs + 2),
+          const SizedBox(height: 3),
           Text(
             describeCombatStats(stats),
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: AppColors.textMuted),
+            style: AppTypography.numeric(
+              Theme.of(context).textTheme.bodySmall,
+              color: AppColors.textMuted,
+              fontSize: 10,
+            ),
           ),
         ],
       ),

@@ -106,29 +106,116 @@ void main() {
         throwsA(isA<ConfigException>()),
       );
     });
+
+    test('hp_pct, atk_pct, def_pct, fixed_stats, dan sellable diparse', () {
+      final parsed = parser.parse('''
+{
+  "items": [
+    {
+      "id": "event_blade",
+      "name": "Event Blade",
+      "category": "equipment",
+      "rarity": "rare",
+      "sellable": false,
+      "equipment": {
+        "slot": "weapon",
+        "fixed_stats": true,
+        "stats": {
+          "atk": 12,
+          "hp_pct": 0.1,
+          "atk_pct": 0.15,
+          "def_pct": 0.05
+        }
+      }
+    }
+  ]
+}
+''');
+      final def = parsed['event_blade']!;
+      expect(def.sellable, isFalse);
+      expect(def.equipment!.fixedStats, isTrue);
+      expect(def.equipment!.baseStats.atk, 12);
+      expect(def.equipment!.baseStats.hpPct, 0.1);
+      expect(def.equipment!.baseStats.atkPct, 0.15);
+      expect(def.equipment!.baseStats.defPct, 0.05);
+    });
+
+    test('hp_pct/atk_pct/def_pct negatif atau > 1.0 ditolak', () {
+      for (final stats in [
+        '{"hp_pct":-0.01}',
+        '{"atk_pct":-0.1}',
+        '{"def_pct":-1}',
+        '{"hp_pct":1.01}',
+        '{"atk_pct":1.5}',
+        '{"def_pct":2.0}',
+      ]) {
+        expect(
+          () => parser.parse(
+            itemJson(',"equipment":{"slot":"weapon","stats":$stats}'),
+          ),
+          throwsA(isA<ConfigException>()),
+          reason: stats,
+        );
+      }
+    });
+
+    test('fixed_stats dan sellable bukan boolean ditolak', () {
+      expect(
+        () => parser.parse(
+          itemJson(
+            ',"equipment":{"slot":"weapon","fixed_stats":"yes","stats":{"atk":1}}',
+          ),
+        ),
+        throwsA(isA<ConfigException>()),
+      );
+      expect(
+        () => parser.parse(
+          itemJson(
+            ',"sellable":0,"equipment":{"slot":"weapon","stats":{"atk":1}}',
+          ),
+        ),
+        throwsA(isA<ConfigException>()),
+      );
+    });
   });
 
   group('GameConfigParser.parseEquipment', () {
     const config = GameConfigParser();
 
-    test('membaca roll_variance dari game_config.json', () {
-      expect(
-        config.parseEquipment(asset('game_config.json')).rollVariance,
-        0.15,
-      );
+    test('membaca roll_variance dan pct_caps dari game_config.json', () {
+      final parsed = config.parseEquipment(asset('game_config.json'));
+      expect(parsed.rollVariance, 0.15);
+      expect(parsed.pctCaps.hpPct, 0.6);
+      expect(parsed.pctCaps.atkPct, 0.5);
+      expect(parsed.pctCaps.defPct, 0.5);
     });
 
     test('section opsional: default jika tidak ada', () {
-      expect(config.parseEquipment('{}').rollVariance, 0.15);
+      final parsed = config.parseEquipment('{}');
+      expect(parsed.rollVariance, 0.15);
+      expect(parsed.pctCaps.hpPct, 0.6);
+      expect(parsed.pctCaps.atkPct, 0.5);
+      expect(parsed.pctCaps.defPct, 0.5);
     });
 
-    test('roll_variance di luar 0..0.5 ditolak', () {
+    test('roll_variance dan pct_caps tidak valid ditolak', () {
       expect(
         () => config.parseEquipment('{"equipment":{"roll_variance":0.9}}'),
         throwsA(isA<ConfigException>()),
       );
       expect(
         () => config.parseEquipment('{"equipment":{"roll_variance":-0.1}}'),
+        throwsA(isA<ConfigException>()),
+      );
+      expect(
+        () =>
+            config.parseEquipment('{"equipment":{"pct_caps":{"hp_pct":-0.1}}}'),
+        throwsA(isA<ConfigException>()),
+      );
+      expect(
+        () => config.parseEquipment(
+          '{"equipment":{"pct_caps":{"unknown_pct":0.2}}}',
+        ),
         throwsA(isA<ConfigException>()),
       );
     });

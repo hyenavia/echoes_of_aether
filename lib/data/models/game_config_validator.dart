@@ -1,14 +1,23 @@
 import '../../core/errors/config_exception.dart';
+import '../../domain/entities/boss_event.dart';
+import '../../domain/entities/cloud_config.dart';
+import '../../domain/entities/currency_config.dart';
 import '../../domain/entities/difficulty_config.dart';
 import '../../domain/entities/dungeon_definition.dart';
+import '../../domain/entities/equipment.dart';
+import '../../domain/entities/equipment_config.dart';
+import '../../domain/entities/event_shop_config.dart';
 import '../../domain/entities/farming_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/notification_config.dart';
 import '../../domain/entities/progression_config.dart';
 import '../../domain/entities/shop_config.dart';
 import '../../domain/entities/skill_definition.dart';
+import '../../domain/entities/time_config.dart';
 import '../../domain/services/damage_calculator.dart';
 import '../../domain/services/navigation_grid.dart';
+import '../../domain/services/period_service.dart';
 import 'monster_config_parser.dart';
 
 /// Memeriksa referensi antar file konfigurasi, misalnya monster yang merujuk
@@ -25,8 +34,16 @@ class GameConfigValidator {
     }
     _validateProgression(config.progression);
     _validateDifficulty(config.difficulty);
+    _validateEquipment(config.equipment);
     _validateFarming(config.farming);
+    _validateTime(config.time);
+    _validateClaimedRewards(config.claimedRewards);
+    _validateCurrencies(config.currencies);
+    _validateNotifications(config.notifications);
+    _validateCloud(config.cloud);
+    _validateBossEvents(config);
     _validateShop(config);
+    _validateEventShop(config);
     for (final table in config.lootTables.values) {
       for (final entry in table.entries) {
         if (!config.items.containsKey(entry.itemId)) {
@@ -482,6 +499,245 @@ class GameConfigValidator {
     }
   }
 
+  void _validateTime(TimeConfig time) {
+    if (time.resetHour < 0 || time.resetHour > 23) {
+      throw ConfigException(
+        'game_config.json: time.reset_hour harus 0..23 '
+        '(nilai: ${time.resetHour}).',
+      );
+    }
+    if (time.weekStart != 'monday') {
+      throw ConfigException(
+        'game_config.json: time.week_start tidak dikenal: "${time.weekStart}".',
+      );
+    }
+    final parsedEpoch = time.tryParseEpochMondayUtc();
+    if (parsedEpoch == null) {
+      throw ConfigException(
+        'game_config.json: time.epoch_monday tidak valid: "${time.epochMonday}".',
+      );
+    }
+    if (parsedEpoch.weekday != DateTime.monday) {
+      throw ConfigException(
+        'game_config.json: time.epoch_monday (${time.epochMonday}) harus hari Senin.',
+      );
+    }
+    if (time.forwardJumpRecordThresholdHours < 1) {
+      throw ConfigException(
+        'game_config.json: time.forward_jump_record_threshold_hours harus >= 1 '
+        '(nilai: ${time.forwardJumpRecordThresholdHours}).',
+      );
+    }
+  }
+
+  void _validateClaimedRewards(ClaimedRewardsConfig claimedRewards) {
+    if (claimedRewards.retentionDays < 1) {
+      throw ConfigException(
+        'game_config.json: claimed_rewards.retention_days harus >= 1 '
+        '(nilai: ${claimedRewards.retentionDays}).',
+      );
+    }
+  }
+
+  void _validateCloud(CloudConfig cloud) {
+    if (cloud.autoSyncMinIntervalMinutes < 0) {
+      throw ConfigException(
+        'game_config.json: cloud.auto_sync_min_interval_minutes harus >= 0 '
+        '(nilai: ${cloud.autoSyncMinIntervalMinutes}).',
+      );
+    }
+    if (cloud.rejectBackoffMinutes < 1) {
+      throw ConfigException(
+        'game_config.json: cloud.reject_backoff_minutes harus >= 1 '
+        '(nilai: ${cloud.rejectBackoffMinutes}).',
+      );
+    }
+    if (cloud.serverTimeToleranceMinutes < 0) {
+      throw ConfigException(
+        'game_config.json: cloud.server_time_tolerance_minutes harus >= 0 '
+        '(nilai: ${cloud.serverTimeToleranceMinutes}).',
+      );
+    }
+  }
+
+  void _validateNotifications(NotificationConfig notifications) {
+    if (notifications.dailyReminderHour < 0 ||
+        notifications.dailyReminderHour > 23) {
+      throw ConfigException(
+        'game_config.json: notifications.daily_reminder_hour harus 0..23 '
+        '(nilai: ${notifications.dailyReminderHour}).',
+      );
+    }
+    if (notifications.weeklyReminderHour < 0 ||
+        notifications.weeklyReminderHour > 23) {
+      throw ConfigException(
+        'game_config.json: notifications.weekly_reminder_hour harus 0..23 '
+        '(nilai: ${notifications.weeklyReminderHour}).',
+      );
+    }
+    if (notifications.weeklyReminderWeekday < DateTime.monday ||
+        notifications.weeklyReminderWeekday > DateTime.sunday) {
+      throw ConfigException(
+        'game_config.json: notifications.weekly_reminder_weekday harus 1..7 '
+        '(nilai: ${notifications.weeklyReminderWeekday}).',
+      );
+    }
+    if (notifications.quietHours.startHour < 0 ||
+        notifications.quietHours.startHour > 23 ||
+        notifications.quietHours.endHour < 0 ||
+        notifications.quietHours.endHour > 23) {
+      throw const ConfigException(
+        'game_config.json: notifications.quiet_hours.start/end harus 0..23.',
+      );
+    }
+    if (notifications.maxPerDay < 1) {
+      throw ConfigException(
+        'game_config.json: notifications.max_per_day minimal 1 '
+        '(nilai: ${notifications.maxPerDay}).',
+      );
+    }
+  }
+
+  void _validateCurrencies(Map<String, CurrencyDefinition> currencies) {
+    for (final entry in currencies.entries) {
+      final def = entry.value;
+      if (entry.key.trim().isEmpty || def.id.trim().isEmpty) {
+        throw const ConfigException(
+          'game_config.json: id mata uang pada "currencies" tidak boleh kosong.',
+        );
+      }
+      if (def.id != entry.key) {
+        throw ConfigException(
+          'game_config.json: id mata uang "${def.id}" tidak cocok dengan '
+          'key "${entry.key}".',
+        );
+      }
+      if (def.name.trim().isEmpty) {
+        throw ConfigException(
+          'game_config.json: currencies.${entry.key}."name" tidak boleh kosong.',
+        );
+      }
+      if (def.maxAmount < 1) {
+        throw ConfigException(
+          'game_config.json: currencies.${entry.key}."max_amount" harus >= 1 '
+          '(nilai: ${def.maxAmount}).',
+        );
+      }
+    }
+  }
+
+  void _validateBossEvents(GameConfig config) {
+    final bossEvents = config.bossEvents;
+    if (bossEvents == null) return;
+
+    final mapRef = bossEvents.arenaMapRef.trim();
+    if (mapRef.isEmpty) {
+      throw const ConfigException(
+        'boss_events.json: "arena_map_ref" tidak boleh kosong.',
+      );
+    }
+    final hasMapLayout =
+        config.mapLayouts.containsKey(mapRef) ||
+        config.dungeons.values.any(
+          (d) => d.rooms.values.any((r) => r.mapRef == mapRef),
+        );
+    if ((config.mapLayouts.isNotEmpty || config.dungeons.isNotEmpty) &&
+        !hasMapLayout) {
+      throw ConfigException(
+        'boss_events.json: arena_map_ref "$mapRef" tidak ditemukan di dungeons.json.',
+      );
+    }
+
+    final seenIds = <String>{};
+    void validateTier(
+      BossTierConfig tier,
+      String label,
+      Period expectedPeriod,
+    ) {
+      if (tier.period != null && tier.period != expectedPeriod) {
+        throw ConfigException(
+          'boss_events.json: $label memiliki period ${tier.period} (seharusnya $expectedPeriod).',
+        );
+      }
+      if (tier.questId.trim().isEmpty) {
+        throw ConfigException(
+          'boss_events.json: $label."quest_id" tidak boleh kosong.',
+        );
+      }
+      if (!tier.powerFactor.isFinite || tier.powerFactor <= 0) {
+        throw ConfigException(
+          'boss_events.json: $label."power_factor" harus > 0.',
+        );
+      }
+      if (tier.reward.exp < 0 || tier.reward.gold < 0) {
+        throw ConfigException(
+          'boss_events.json: $label.reward exp/gold tidak boleh negatif.',
+        );
+      }
+      for (final curr in tier.reward.currency.entries) {
+        if (curr.value < 0) {
+          throw ConfigException(
+            'boss_events.json: $label.reward.currency."${curr.key}" tidak boleh negatif.',
+          );
+        }
+        if (config.currencies.isNotEmpty &&
+            !config.currencies.containsKey(curr.key)) {
+          throw ConfigException(
+            'boss_events.json: $label.reward.currency merujuk "${curr.key}" yang tidak ada di game_config.json.',
+          );
+        }
+      }
+      if (tier.pool.isEmpty) {
+        throw ConfigException(
+          'boss_events.json: $label."pool" tidak boleh kosong.',
+        );
+      }
+      for (final boss in tier.pool) {
+        final bid = boss.id.trim();
+        if (bid.isEmpty) {
+          throw ConfigException(
+            'boss_events.json: $label.pool memiliki id kosong.',
+          );
+        }
+        if (!seenIds.add(bid)) {
+          throw ConfigException('boss_events.json: id boss ganda "$bid".');
+        }
+        if (boss.name.trim().isEmpty) {
+          throw ConfigException(
+            'boss_events.json: boss "$bid" harus memiliki nama non-kosong.',
+          );
+        }
+        if (config.monsters.isNotEmpty &&
+            !config.monsters.containsKey(boss.spriteRef)) {
+          throw ConfigException(
+            'boss_events.json: boss "$bid" merujuk sprite_ref "${boss.spriteRef}" yang tidak ada di monsters.json.',
+          );
+        }
+        final tint = boss.spriteTint;
+        if (tint != null && !MonsterConfigParser.isValidHexTint(tint)) {
+          throw ConfigException(
+            'boss_events.json: boss "$bid" memiliki sprite_tint tidak valid: "$tint".',
+          );
+        }
+        if (boss.baseStats.hp < 1 ||
+            boss.baseStats.atk < 0 ||
+            boss.baseStats.def < 0) {
+          throw ConfigException(
+            'boss_events.json: boss "$bid" memiliki base_stats tidak valid.',
+          );
+        }
+      }
+    }
+
+    validateTier(bossEvents.daily, 'daily', Period.daily);
+    validateTier(bossEvents.weekly, 'weekly', Period.weekly);
+    if (bossEvents.daily.questId.trim() == bossEvents.weekly.questId.trim()) {
+      throw const ConfigException(
+        'boss_events.json: daily."quest_id" dan weekly."quest_id" tidak boleh sama.',
+      );
+    }
+  }
+
   void _validateDungeonCatalog(GameConfig config) {
     final dungeons = config.dungeons;
     if (dungeons.isEmpty) return;
@@ -664,31 +920,11 @@ class GameConfigValidator {
         );
       }
 
-      for (final req in entry.requirements) {
-        switch (req) {
-          case MinLevelRequirement(:final minLevel):
-            if (minLevel < 1) {
-              throw ConfigException(
-                'shop.json: entri "${entry.id}" memiliki min_level < 1 ($minLevel).',
-              );
-            }
-          case DungeonClearedRequirement(:final dungeonId):
-            if (config.dungeons.isNotEmpty &&
-                !config.dungeons.containsKey(dungeonId)) {
-              throw ConfigException(
-                'shop.json: entri "${entry.id}" merujuk dungeon_cleared '
-                '"$dungeonId" yang tidak ada di dungeons.json.',
-              );
-            }
-          case MinAscensionRankRequirement(:final minRank):
-            if (minRank < 0) {
-              throw ConfigException(
-                'shop.json: entri "${entry.id}" memiliki min_ascension_rank < 0 '
-                '($minRank).',
-              );
-            }
-        }
-      }
+      _validatePurchaseRequirements(
+        entry.requirements,
+        config,
+        context: 'shop.json: entri "${entry.id}"',
+      );
 
       final prevMin = minPriceByRarity[item.rarity];
       final prevMax = maxPriceByRarity[item.rarity];
@@ -723,6 +959,201 @@ class GameConfigValidator {
       }
       lowerRarity = rarity;
       lowerMaxPrice = maxPrice;
+    }
+  }
+
+  void _validateEquipment(EquipmentConfig equipment) {
+    if (!equipment.rollVariance.isFinite ||
+        equipment.rollVariance < 0 ||
+        equipment.rollVariance > 0.5) {
+      throw ConfigException(
+        'game_config.json: equipment.roll_variance harus berada di [0, 0.5] '
+        '(nilai: ${equipment.rollVariance}).',
+      );
+    }
+    final caps = equipment.pctCaps;
+    void checkCap(String key, double value) {
+      if (!value.isFinite || value < 0 || value > 5.0) {
+        throw ConfigException(
+          'game_config.json: equipment.pct_caps."$key" harus berada di [0, 5.0] '
+          '(nilai: $value).',
+        );
+      }
+    }
+
+    checkCap('hp_pct', caps.hpPct);
+    checkCap('atk_pct', caps.atkPct);
+    checkCap('def_pct', caps.defPct);
+  }
+
+  void _validatePurchaseRequirements(
+    List<PurchaseRequirement> requirements,
+    GameConfig config, {
+    required String context,
+  }) {
+    for (final req in requirements) {
+      switch (req) {
+        case MinLevelRequirement(:final minLevel):
+          if (minLevel < 1) {
+            throw ConfigException(
+              '$context memiliki min_level < 1 ($minLevel).',
+            );
+          }
+        case DungeonClearedRequirement(:final dungeonId):
+          if (config.dungeons.isNotEmpty &&
+              !config.dungeons.containsKey(dungeonId)) {
+            throw ConfigException(
+              '$context merujuk dungeon_cleared '
+              '"$dungeonId" yang tidak ada di dungeons.json.',
+            );
+          }
+        case MinAscensionRankRequirement(:final minRank):
+          if (minRank < 0) {
+            throw ConfigException(
+              '$context memiliki min_ascension_rank < 0 ($minRank).',
+            );
+          }
+      }
+    }
+  }
+
+  void _validateEventShop(GameConfig config) {
+    final eventShop = config.eventShop;
+    if (eventShop == null) return;
+
+    if (eventShop.weeklyPurchaseLimit < 1) {
+      throw ConfigException(
+        'event_shop.json: "weekly_purchase_limit" harus >= 1 '
+        '(${eventShop.weeklyPurchaseLimit}).',
+      );
+    }
+    if (eventShop.currencyId.trim().isEmpty) {
+      throw const ConfigException(
+        'event_shop.json: "currency_id" tidak boleh kosong.',
+      );
+    }
+    if (config.currencies.isNotEmpty &&
+        !config.currencies.containsKey(eventShop.currencyId)) {
+      throw ConfigException(
+        'event_shop.json: currency_id "${eventShop.currencyId}" '
+        'tidak ditemukan di game_config.json.',
+      );
+    }
+
+    final pool = eventShop.pool;
+    if (pool.isEmpty || pool.length.isOdd) {
+      throw ConfigException(
+        'event_shop.json: ukuran "pool" harus genap dan minimal 2 '
+        '(nilai: ${pool.length}).',
+      );
+    }
+
+    final seenIds = <String>{};
+    final lootItemIds = <String>{
+      for (final table in config.lootTables.values)
+        for (final drop in table.entries) drop.itemId,
+    };
+    final shopItemIds = <String>{
+      for (final entry in config.shop.entries) entry.itemId,
+    };
+
+    var epicCount = 0;
+    var legendaryCount = 0;
+    final epicBySlot = <EquipmentSlot, int>{
+      for (final s in EquipmentSlot.values) s: 0,
+    };
+    final legendaryBySlot = <EquipmentSlot, int>{
+      for (final s in EquipmentSlot.values) s: 0,
+    };
+
+    for (final entry in pool) {
+      if (entry.id.trim().isEmpty) {
+        throw const ConfigException(
+          'event_shop.json: id entri tidak boleh kosong.',
+        );
+      }
+      if (!seenIds.add(entry.id)) {
+        throw ConfigException(
+          'event_shop.json: id entri duplikat "${entry.id}".',
+        );
+      }
+      if (entry.price <= 0) {
+        throw ConfigException(
+          'event_shop.json: entri "${entry.id}" memiliki price <= 0 (${entry.price}).',
+        );
+      }
+
+      final item = config.items[entry.itemId];
+      if (item == null) {
+        throw ConfigException(
+          'event_shop.json: entri "${entry.id}" merujuk item "${entry.itemId}" '
+          'yang tidak ada di items.json.',
+        );
+      }
+      if (!item.isEquipment || item.equipment == null) {
+        throw ConfigException(
+          'event_shop.json: entri "${entry.id}" merujuk item "${item.id}" '
+          'yang bukan equipment.',
+        );
+      }
+      if (item.sellable) {
+        throw ConfigException(
+          'event_shop.json: entri "${entry.id}" merujuk item "${item.id}" '
+          'yang harus bersifat non-sellable (`sellable: false`).',
+        );
+      }
+      if (lootItemIds.contains(item.id)) {
+        throw ConfigException(
+          'event_shop.json: item event "${item.id}" tidak boleh muncul '
+          'di loot_tables.json.',
+        );
+      }
+      if (shopItemIds.contains(item.id)) {
+        throw ConfigException(
+          'event_shop.json: item event "${item.id}" tidak boleh muncul '
+          'di shop.json.',
+        );
+      }
+
+      _validatePurchaseRequirements(
+        entry.requirements,
+        config,
+        context: 'event_shop.json: entri "${entry.id}"',
+      );
+
+      final slot = item.equipment!.slot;
+      switch (entry.tier) {
+        case EventItemTier.epic:
+          epicCount++;
+          epicBySlot[slot] = (epicBySlot[slot] ?? 0) + 1;
+        case EventItemTier.legendary:
+          legendaryCount++;
+          legendaryBySlot[slot] = (legendaryBySlot[slot] ?? 0) + 1;
+      }
+    }
+
+    if (epicCount != legendaryCount) {
+      throw ConfigException(
+        'event_shop.json: jumlah item tier epic ($epicCount) dan legendary '
+        '($legendaryCount) harus sama.',
+      );
+    }
+
+    for (final slot in EquipmentSlot.values) {
+      final epicsInSlot = epicBySlot[slot] ?? 0;
+      final legendariesInSlot = legendaryBySlot[slot] ?? 0;
+      if (epicsInSlot == 0 || legendariesInSlot == 0) {
+        throw ConfigException(
+          'event_shop.json: slot "${slot.name}" wajib memiliki minimal satu '
+          'epic dan satu legendary (epic: $epicsInSlot, legendary: $legendariesInSlot).',
+        );
+      }
+      if (epicsInSlot != legendariesInSlot) {
+        throw ConfigException(
+          'event_shop.json: slot "${slot.name}" memiliki jumlah epic '
+          '($epicsInSlot) dan legendary ($legendariesInSlot) tidak seimbang.',
+        );
+      }
     }
   }
 }

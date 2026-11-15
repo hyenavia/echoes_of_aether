@@ -1,7 +1,10 @@
+import 'clock_state.dart';
 import 'cycle_progress.dart';
 import 'dungeon_session.dart';
 import 'equipment.dart';
+import 'event_shop_purchase.dart';
 import 'offline_activity.dart';
+import 'periodic_quest_state.dart';
 import 'player_progress.dart';
 import 'player_status.dart';
 
@@ -93,6 +96,8 @@ class ActiveDungeonSessionSnapshot {
     this.reviveCooldownTicks = 0,
     this.playerStatus = PlayerStatus.alive,
     this.cycleRank = 0,
+    this.bossEventId,
+    this.periodKeyAtStart,
   });
 
   final String runId;
@@ -112,6 +117,14 @@ class ActiveDungeonSessionSnapshot {
   /// Cycle rank Ascension saat run dimulai agar session recovery memakai
   /// tingkat kesulitan yang konsisten dengan awal run.
   final int cycleRank;
+
+  /// ID boss event bila sesi ini merupakan run Daily/Weekly Boss.
+  final String? bossEventId;
+
+  /// Kunci periode (`YYYY-MM-DD`) saat run boss dimulai.
+  final String? periodKeyAtStart;
+
+  bool get isBossEvent => bossEventId != null && bossEventId!.trim().isNotEmpty;
 
   /// Sesi hanya dipulihkan ke dungeon bila belum terminal dan sudah dimulai.
   bool get isRecoverable =>
@@ -185,6 +198,10 @@ class PlayerSaveSnapshot {
     this.activeDungeonSession,
     this.offlineActivity = const OfflineActivitySnapshot.paused(),
     this.shopPurchases = const {},
+    this.eventShopPurchases = const [],
+    this.currencies = const {},
+    this.clockState = const ClockState(),
+    this.periodicQuestStates = const [],
   });
 
   final String playerId;
@@ -206,6 +223,18 @@ class PlayerSaveSnapshot {
 
   /// Jumlah pembelian per `entryId` shop (`ShopPurchases`).
   final Map<String, int> shopPurchases;
+
+  /// Riwayat pembelian Event Shop per `(entryId, periodKey)` (`EventShopPurchases`).
+  final List<EventShopPurchaseRecord> eventShopPurchases;
+
+  /// Saldo mata uang khusus non-gold (`Currencies`).
+  final Map<String, int> currencies;
+
+  /// State pengaman jam perangkat (`ClockStates`).
+  final ClockState clockState;
+
+  /// State penyelesaian quest periodik (`PeriodicQuestStates`).
+  final List<PeriodicQuestState> periodicQuestStates;
 
   /// Mengambil snapshot progres untuk [dungeonId] dengan fallback ke [dungeon]
   /// bila peta belum terisi.

@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:echoes_of_aether/data/models/boss_events_config_parser.dart';
 import 'package:echoes_of_aether/data/models/dungeon_config_parser.dart';
+import 'package:echoes_of_aether/data/models/event_shop_config_parser.dart';
 import 'package:echoes_of_aether/data/models/game_config_parser.dart';
 import 'package:echoes_of_aether/data/models/game_config_validator.dart';
 import 'package:echoes_of_aether/data/models/item_config_parser.dart';
@@ -10,12 +12,14 @@ import 'package:echoes_of_aether/data/models/monster_config_parser.dart';
 import 'package:echoes_of_aether/data/models/shop_config_parser.dart';
 import 'package:echoes_of_aether/data/models/skill_config_parser.dart';
 import 'package:echoes_of_aether/data/models/specialization_config_parser.dart';
+import 'package:echoes_of_aether/domain/entities/boss_event.dart';
 import 'package:echoes_of_aether/domain/entities/cycle_progress.dart';
 import 'package:echoes_of_aether/domain/entities/dungeon_definition.dart';
 import 'package:echoes_of_aether/domain/entities/dungeon_session.dart';
 import 'package:echoes_of_aether/domain/entities/enemy_definition.dart';
 import 'package:echoes_of_aether/domain/entities/equipment.dart';
 import 'package:echoes_of_aether/domain/entities/equipment_loadout.dart';
+import 'package:echoes_of_aether/domain/entities/event_shop_config.dart';
 import 'package:echoes_of_aether/domain/entities/game_config.dart';
 import 'package:echoes_of_aether/domain/entities/inventory.dart';
 import 'package:echoes_of_aether/domain/entities/item_definition.dart';
@@ -24,13 +28,16 @@ import 'package:echoes_of_aether/domain/entities/player_character.dart';
 import 'package:echoes_of_aether/domain/entities/player_progress.dart';
 import 'package:echoes_of_aether/domain/entities/player_save_snapshot.dart';
 import 'package:echoes_of_aether/domain/entities/progression_config.dart';
+import 'package:echoes_of_aether/domain/services/boss_event_service.dart';
 import 'package:echoes_of_aether/domain/services/damage_calculator.dart';
+import 'package:echoes_of_aether/domain/services/derived_stats_calculator.dart';
 import 'package:echoes_of_aether/domain/services/difficulty_service.dart';
 import 'package:echoes_of_aether/domain/services/dungeon_progression_service.dart';
 import 'package:echoes_of_aether/domain/services/equipment_factory.dart';
 import 'package:echoes_of_aether/domain/services/offline_dungeon_runner.dart';
 import 'package:echoes_of_aether/domain/services/offline_progression_service.dart';
 import 'package:echoes_of_aether/domain/services/offline_time_calculator.dart';
+import 'package:echoes_of_aether/domain/services/period_service.dart';
 import 'package:echoes_of_aether/domain/services/progression_service.dart';
 import 'package:echoes_of_aether/domain/services/reward_processor.dart';
 import 'package:echoes_of_aether/domain/services/shop_service.dart';
@@ -257,7 +264,9 @@ class BalanceSimulator {
   static GameConfig loadRealConfig({String assetsDir = 'assets/data'}) {
     String read(String name) => File('$assetsDir/$name').readAsStringSync();
     const parser = GameConfigParser();
+    const dungeonParser = DungeonConfigParser();
     final settings = read('game_config.json');
+    final dungeonsJson = read('dungeons.json');
     final difficulty = parser.parseDifficulty(settings);
     final config = GameConfig(
       monsters: const MonsterConfigParser().parse(read('monsters.json')),
@@ -267,6 +276,10 @@ class BalanceSimulator {
       revive: parser.parseRevive(settings),
       progression: parser.parseProgression(settings),
       equipment: parser.parseEquipment(settings),
+      time: parser.parseTime(settings),
+      claimedRewards: parser.parseClaimedRewards(settings),
+      currencies: parser.parseCurrencies(settings),
+      notifications: parser.parseNotifications(settings),
       dungeonCompletion: parser.parseDungeonCompletion(settings),
       items: const ItemConfigParser().parse(read('items.json')),
       lootTables: const LootConfigParser().parse(read('loot_tables.json')),
@@ -274,11 +287,16 @@ class BalanceSimulator {
       specializations: const SpecializationConfigParser().parse(
         read('specializations.json'),
       ),
-      dungeons: const DungeonConfigParser().parse(
-        read('dungeons.json'),
+      dungeons: dungeonParser.parse(
+        dungeonsJson,
         ascensionMultiplier: difficulty.ascensionMultiplier,
       ),
+      mapLayouts: dungeonParser.parseMaps(dungeonsJson),
+      bossEvents: const BossEventsConfigParser().parse(
+        read('boss_events.json'),
+      ),
       shop: const ShopConfigParser().parse(read('shop.json')),
+      eventShop: const EventShopConfigParser().parse(read('event_shop.json')),
     );
     const GameConfigValidator().validate(config);
     return config;
@@ -370,6 +388,7 @@ class BalanceSimulator {
     required String name,
     required ItemRarity maxRarity,
     required String? specializationId,
+    bool includeNonSellable = false,
   }) {
     final bySlot = <EquipmentSlot, ItemDefinition>{};
     for (final slot in EquipmentSlot.values) {
@@ -377,6 +396,7 @@ class BalanceSimulator {
           config.items.values.where((item) {
             final eq = item.equipment;
             if (eq == null || eq.slot != slot) return false;
+            if (!includeNonSellable && !item.sellable) return false;
             return item.rarity.index <= maxRarity.index;
           }).toList()..sort((a, b) {
             final rCmp = b.rarity.index.compareTo(a.rarity.index);
@@ -457,7 +477,7 @@ class BalanceSimulator {
               definitionId: def.id,
               slot: def.equipment!.slot,
               rarity: def.rarity,
-              rolledStats: safeRollBonus > 0
+              rolledStats: (!def.equipment!.fixedStats && safeRollBonus > 0)
                   ? def.equipment!.baseStats.scaled(1.0 + safeRollBonus)
                   : def.equipment!.baseStats,
             );
@@ -470,6 +490,9 @@ class BalanceSimulator {
       loadout: loadout,
       skillCatalog: config.skills,
       specializationConfig: config.specializations,
+      statsCalculator: DerivedStatsCalculator(
+        pctCaps: config.equipment.pctCaps,
+      ),
       initialSpecializationId: effectiveSpecId,
       skillLevels: skillLevelsFor(
         playerLevel: safeLevel,
@@ -1195,4 +1218,851 @@ class BalanceSimulator {
     }
     return results;
   }
+
+  /// Menjalankan simulasi pertempuran Boss Event (Daily/Weekly) dengan acuan
+  /// [referenceDungeonId] dan [cycleRank].
+  DungeonScenarioMetrics simulateBossScenario({
+    required Period period,
+    required String referenceDungeonId,
+    required String scenarioLabel,
+    required int playerLevel,
+    required TierGearProfile gearProfile,
+    BossEvent? boss,
+    int cycleRank = 0,
+    int seedCount = 20,
+    int baseSeed = 100,
+    bool randomizeGearRoll = true,
+    double? equipmentRollBonus,
+    Duration simulationBudget = const Duration(minutes: 45),
+    int maxIterations = 200000,
+  }) {
+    final bossEvents = config.bossEvents;
+    if (bossEvents == null) {
+      throw StateError('Konfigurasi bossEvents tidak tersedia.');
+    }
+    final refDungeon = config.dungeons[referenceDungeonId];
+    if (refDungeon == null || !refDungeon.isNormal) {
+      throw ArgumentError(
+        'Dungeon acuan "$referenceDungeonId" tidak ditemukan atau bukan normal.',
+      );
+    }
+    final arenaLayout = BossEventService.resolveArenaLayout(config);
+    if (arenaLayout == null || arenaLayout.isEmpty) {
+      throw StateError('Layout arena boss "${bossEvents.arenaMapRef}" kosong.');
+    }
+
+    final safeLevel = math.max(1, playerLevel);
+    final safeRank = cycleRank < 0 ? 0 : cycleRank;
+    final effectiveSeeds = math.max(1, seedCount);
+    final selectedBoss =
+        boss ??
+        (period == Period.daily
+            ? bossEvents.daily.pool.first
+            : bossEvents.weekly.pool.first);
+    final powerFactor = period == Period.daily
+        ? bossEvents.daily.powerFactor
+        : bossEvents.weekly.powerFactor;
+
+    final difficultyService = DifficultyService(config.difficulty);
+    final reference = BossReference(dungeon: refDungeon, cycleRank: safeRank);
+    final bossProfile = difficultyService.profileForBoss(
+      reference,
+      powerFactor,
+    );
+    final resolvedRollBonus =
+        equipmentRollBonus ?? bossProfile.equipmentRollBonus;
+    final resolvedRecommendedLevel = DungeonProgressionService(
+      config.difficulty,
+    ).recommendedLevel(refDungeon, safeRank);
+
+    final bossService = BossEventService(bossEvents);
+    final bossDungeon = bossService.buildBossDungeon(
+      boss: selectedBoss,
+      period: period,
+      reference: reference,
+      arenaLayout: arenaLayout,
+    );
+    final bossMonster = selectedBoss.toEnemyDefinition(
+      level: resolvedRecommendedLevel,
+      spriteTemplate: config.monsters[selectedBoss.spriteRef],
+    );
+    final runtimeConfig = GameConfig(
+      monsters: {...config.monsters, bossMonster.id: bossMonster},
+      damage: config.damage,
+      difficulty: config.difficulty,
+      farming: config.farming,
+      revive: config.revive,
+      progression: config.progression,
+      equipment: config.equipment,
+      time: config.time,
+      claimedRewards: config.claimedRewards,
+      currencies: config.currencies,
+      notifications: config.notifications,
+      dungeonCompletion: config.dungeonCompletion,
+      items: config.items,
+      lootTables: config.lootTables,
+      skills: config.skills,
+      specializations: config.specializations,
+      dungeons: {...config.dungeons, bossDungeon.id: bossDungeon},
+      mapLayouts: config.mapLayouts,
+      bossEvents: config.bossEvents,
+      shop: config.shop,
+    );
+
+    final factory = EquipmentFactory(config.equipment);
+    final calculator = const OfflineTimeCalculator();
+    final timeWindow = calculator.calculate(
+      session: const GameSessionSnapshot(lastSavedAtMs: 1000000),
+      nowMs: 1000000 + simulationBudget.inMilliseconds,
+    );
+
+    var winCount = 0;
+    var totalHpPct = 0.0;
+    var totalWinHpPct = 0.0;
+    var totalDurationSec = 0.0;
+    var totalWinDurationSec = 0.0;
+    var totalExp = 0;
+    var totalGold = 0;
+
+    for (var i = 0; i < effectiveSeeds; i++) {
+      final seed = baseSeed + i;
+      final character = buildCharacter(
+        level: safeLevel,
+        gearProfile: gearProfile,
+        seed: seed,
+        randomizeGearRoll: randomizeGearRoll,
+        equipmentRollBonus: resolvedRollBonus,
+      );
+      final inventory = Inventory(definitions: config.items);
+      final rewardProcessor = RewardProcessor(
+        character: character,
+        inventory: inventory,
+        items: config.items,
+        lootTables: config.lootTables,
+        equipmentFactory: factory,
+      );
+
+      final outcome = _runner.simulateManualRun(
+        OfflineDungeonRunRequest(
+          mode: OfflineActivityMode.continueDungeon,
+          character: character,
+          inventory: inventory,
+          config: runtimeConfig,
+          rewardProcessor: rewardProcessor,
+          dungeonId: bossDungeon.id,
+          dungeonProgress: DungeonProgressSnapshot(
+            currentDungeonId: bossDungeon.id,
+          ),
+          timeWindow: timeWindow,
+          simulationSeed: seed,
+          maxIterations: maxIterations,
+          cycleRank: safeRank,
+          difficultyProfileOverride: bossProfile,
+          activeDungeonSession: ActiveDungeonSessionSnapshot(
+            runId: 'sim_${bossDungeon.id}_${safeLevel}_$seed',
+            dungeonId: bossDungeon.id,
+            currentRoomId: bossDungeon.startRoomId,
+            currentRoomIndex: 0,
+            status: DungeonSessionStatus.inProgress,
+            cycleRank: safeRank,
+            bossEventId: selectedBoss.id,
+          ),
+        ),
+      );
+
+      final won =
+          outcome.stopReason == OfflineDungeonStopReason.dungeonCompleted &&
+          outcome.runsCompleted == 1;
+      final durSec =
+          outcome.ticksSimulated * OfflineDungeonRunner.tickDurationMs / 1000.0;
+      if (won) {
+        winCount++;
+        totalWinDurationSec += durSec;
+      }
+
+      final maxHp = math.max(
+        1,
+        outcome.finalPlayerMaxHp ?? character.stats.maxHp,
+      );
+      final remHp = math.max(0, outcome.finalPlayerHp ?? 0);
+      final hpPct = (remHp * 100.0 / maxHp).clamp(0.0, 100.0);
+      totalHpPct += hpPct;
+      if (won) totalWinHpPct += hpPct;
+
+      totalDurationSec += durSec;
+      totalExp += outcome.expGained;
+      totalGold += outcome.goldGained;
+    }
+
+    final refChar = buildCharacter(
+      level: safeLevel,
+      gearProfile: gearProfile,
+      seed: baseSeed,
+      randomizeGearRoll: false,
+      equipmentRollBonus: resolvedRollBonus,
+    );
+    final damageCalc = DamageCalculator(formula: config.damage.formula);
+    final scaledBossStats = difficultyService.scaleMonsterStats(
+      bossMonster.stats,
+      bossProfile,
+    );
+    final playerDmg = damageCalc.physicalDamage(
+      refChar.stats.atk,
+      scaledBossStats.def,
+    );
+    final bossDmg = damageCalc.physicalDamage(
+      scaledBossStats.atk,
+      refChar.stats.def,
+    );
+
+    final avgExp = totalExp / effectiveSeeds;
+    final expNeeded = config.progression.expToNext(safeLevel);
+    final runsPerLevel = avgExp > 0 ? expNeeded / avgExp : null;
+
+    return DungeonScenarioMetrics(
+      dungeonId: '${bossDungeon.id}@$referenceDungeonId',
+      dungeonName: selectedBoss.name,
+      scenarioLabel: scenarioLabel,
+      playerLevel: safeLevel,
+      recommendedLevel: resolvedRecommendedLevel,
+      cycleRank: safeRank,
+      seedCount: effectiveSeeds,
+      gearProfile: gearProfile,
+      winCount: winCount,
+      winRate: winCount / effectiveSeeds,
+      avgRemainingHpPercent: totalHpPct / effectiveSeeds,
+      avgWinRemainingHpPercent: winCount > 0 ? totalWinHpPct / winCount : 0.0,
+      avgDurationSeconds: winCount > 0
+          ? totalWinDurationSec / winCount
+          : totalDurationSec / effectiveSeeds,
+      avgExpPerRun: avgExp,
+      avgGoldPerRun: totalGold / effectiveSeeds,
+      runsPerLevel: runsPerLevel,
+      minPlayerHitOnMonsters: playerDmg,
+      maxPlayerHitOnBoss: playerDmg,
+      minBossHitOnPlayer: bossDmg,
+    );
+  }
+
+  /// Membandingkan hadiah Gold & EXP Boss Quest terhadap 1 jam farming online
+  /// di dungeon acuan, serta menghitung pendapatan Aether Shard per minggu.
+  List<BossQuestComparisonMetrics> simulateBossQuestComparison({
+    List<int> ranks = const [0, 1, 5, 10, 50],
+    int seedCount = 15,
+  }) {
+    final bossEvents = config.bossEvents;
+    if (bossEvents == null) {
+      throw StateError('Konfigurasi bossEvents tidak tersedia.');
+    }
+    final difficultyService = DifficultyService(config.difficulty);
+    final dungeonProgression = DungeonProgressionService(config.difficulty);
+    final normals = config.dungeons.values.where((d) => d.isNormal).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    final dailyBase = bossEvents.daily.reward;
+    final weeklyBase = bossEvents.weekly.reward;
+    final weeklyShardIncome =
+        (dailyBase.currency['aether_shard'] ?? 0) * 7 +
+        (weeklyBase.currency['aether_shard'] ?? 0);
+
+    int scaleQuestReward(int base, double mult) {
+      if (base <= 0) return 0;
+      return math.max(1, (base * mult).round());
+    }
+
+    final rows = <BossQuestComparisonMetrics>[];
+    for (final rank in ranks) {
+      final safeRank = rank < 0 ? 0 : rank;
+      for (final d in normals) {
+        final rec = dungeonProgression.recommendedLevel(d, safeRank);
+        final gear = rankTierGearProfile(
+          d,
+          cycleRank: safeRank,
+          playerLevel: rec,
+        );
+        final farming = simulateScenario(
+          dungeonId: d.id,
+          scenarioLabel: 'Farm1h-R$safeRank',
+          playerLevel: rec,
+          gearProfile: gear,
+          cycleRank: safeRank,
+          seedCount: seedCount,
+        );
+        final farmingGoldPerHour = farming.avgDurationSeconds > 0
+            ? (farming.avgGoldPerRun / farming.avgDurationSeconds) * 3600.0
+            : 0.0;
+        final farmingExpPerHour = farming.avgDurationSeconds > 0
+            ? (farming.avgExpPerRun / farming.avgDurationSeconds) * 3600.0
+            : 0.0;
+
+        final profile = difficultyService.profileFor(d, safeRank);
+        rows.add(
+          BossQuestComparisonMetrics(
+            cycleRank: safeRank,
+            referenceDungeonId: d.id,
+            recommendedLevel: rec,
+            farmingGoldPerHour: farmingGoldPerHour,
+            farmingExpPerHour: farmingExpPerHour,
+            dailyQuestGold: scaleQuestReward(
+              dailyBase.gold,
+              profile.rewardMultiplier,
+            ),
+            dailyQuestExp: scaleQuestReward(
+              dailyBase.exp,
+              profile.rewardMultiplier,
+            ),
+            weeklyQuestGold: scaleQuestReward(
+              weeklyBase.gold,
+              profile.rewardMultiplier,
+            ),
+            weeklyQuestExp: scaleQuestReward(
+              weeklyBase.exp,
+              profile.rewardMultiplier,
+            ),
+            weeklyAetherShardIncome: weeklyShardIncome,
+          ),
+        );
+      }
+    }
+    return rows;
+  }
+
+  /// Membangun profil 4-slot Event Set penuh untuk tier tertentu (`epic` / `legendary`).
+  TierGearProfile eventSetGearProfile(
+    EventItemTier tier, {
+    String specializationId = 'vanguard',
+  }) {
+    final eventShop = config.eventShop;
+    if (eventShop == null) {
+      throw StateError('Konfigurasi eventShop tidak tersedia.');
+    }
+    final bySlot = <EquipmentSlot, ItemDefinition>{};
+    for (final entry in eventShop.pool) {
+      if (entry.tier != tier) continue;
+      final item = config.items[entry.itemId];
+      final slot = item?.equipment?.slot;
+      if (item != null && slot != null) {
+        bySlot[slot] = item;
+      }
+    }
+    return TierGearProfile(
+      name: tier == EventItemTier.epic ? 'Event Epic Set' : 'Event Leg Set',
+      maxRarity: tier == EventItemTier.epic
+          ? ItemRarity.epic
+          : ItemRarity.legendary,
+      specializationId: specializationId,
+      itemsBySlot: Map.unmodifiable(bySlot),
+    );
+  }
+
+  /// Menghitung ekonomi Aether Shard mingguan untuk 3 pola bermain serta
+  /// memeriksa total persen kombinasi item legal terhadap `pct_caps`.
+  EventShopEconomyReport simulateEventShopEconomy() {
+    final bossEvents = config.bossEvents;
+    final eventShop = config.eventShop;
+    if (bossEvents == null || eventShop == null) {
+      throw StateError('Konfigurasi bossEvents atau eventShop tidak tersedia.');
+    }
+    final dailyShard = bossEvents.daily.reward.currency['aether_shard'] ?? 0;
+    final weeklyShard = bossEvents.weekly.reward.currency['aether_shard'] ?? 0;
+
+    final epicEntries = eventShop.pool
+        .where((e) => e.tier == EventItemTier.epic)
+        .toList();
+    final legEntries = eventShop.pool
+        .where((e) => e.tier == EventItemTier.legendary)
+        .toList();
+    final avgEpicPrice = epicEntries.isEmpty
+        ? 0.0
+        : epicEntries.fold<int>(0, (s, e) => s + e.price) / epicEntries.length;
+    final avgLegPrice = legEntries.isEmpty
+        ? 0.0
+        : legEntries.fold<int>(0, (s, e) => s + e.price) / legEntries.length;
+    final fullEpicSetCost = epicEntries.fold<int>(0, (s, e) => s + e.price);
+    final fullLegSetCost = legEntries.fold<int>(0, (s, e) => s + e.price);
+    final totalPoolCost = fullEpicSetCost + fullLegSetCost;
+    final cycleWeeks = math.max(1, eventShop.cycleLength);
+
+    final cadences = <ShardCadenceMetrics>[
+      _buildCadence(
+        name: 'Setiap hari (7 Daily + 1 Weekly)',
+        weeklyShardIncome: dailyShard * 7 + weeklyShard,
+        epicPrice: avgEpicPrice,
+        legendaryPrice: avgLegPrice,
+        fullEpicSetCost: fullEpicSetCost,
+        fullLegendarySetCost: fullLegSetCost,
+        totalPoolCost: totalPoolCost,
+        cycleWeeks: cycleWeeks,
+      ),
+      _buildCadence(
+        name: '3 hari/minggu (3 Daily + 1 Weekly)',
+        weeklyShardIncome: dailyShard * 3 + weeklyShard,
+        epicPrice: avgEpicPrice,
+        legendaryPrice: avgLegPrice,
+        fullEpicSetCost: fullEpicSetCost,
+        fullLegendarySetCost: fullLegSetCost,
+        totalPoolCost: totalPoolCost,
+        cycleWeeks: cycleWeeks,
+      ),
+      _buildCadence(
+        name: 'Hanya Weekly (0 Daily + 1 Weekly)',
+        weeklyShardIncome: weeklyShard,
+        epicPrice: avgEpicPrice,
+        legendaryPrice: avgLegPrice,
+        fullEpicSetCost: fullEpicSetCost,
+        fullLegendarySetCost: fullLegSetCost,
+        totalPoolCost: totalPoolCost,
+        cycleWeeks: cycleWeeks,
+      ),
+    ];
+
+    final pctCheck = computeMaxLegalPctTotals();
+    return EventShopEconomyReport(
+      dailyShard: dailyShard,
+      weeklyShard: weeklyShard,
+      cycleWeeks: cycleWeeks,
+      epicPrice: avgEpicPrice.round(),
+      legendaryPrice: avgLegPrice.round(),
+      fullEpicSetCost: fullEpicSetCost,
+      fullLegendarySetCost: fullLegSetCost,
+      totalPoolCost: totalPoolCost,
+      cadences: cadences,
+      pctCapCheck: pctCheck,
+    );
+  }
+
+  ShardCadenceMetrics _buildCadence({
+    required String name,
+    required int weeklyShardIncome,
+    required double epicPrice,
+    required double legendaryPrice,
+    required int fullEpicSetCost,
+    required int fullLegendarySetCost,
+    required int totalPoolCost,
+    required int cycleWeeks,
+  }) {
+    double weeksFor(num cost) =>
+        weeklyShardIncome > 0 ? cost / weeklyShardIncome : double.infinity;
+
+    final cycleIncome = weeklyShardIncome * cycleWeeks;
+    return ShardCadenceMetrics(
+      cadenceName: name,
+      weeklyShardIncome: weeklyShardIncome,
+      weeksForOneEpic: weeksFor(epicPrice),
+      weeksForOneLegendary: weeksFor(legendaryPrice),
+      weeksForFullEpicSet: weeksFor(fullEpicSetCost),
+      weeksForFullLegendarySet: weeksFor(fullLegendarySetCost),
+      weeksForFullPool: weeksFor(totalPoolCost),
+      buysAllInSingleCycle: cycleIncome >= totalPoolCost,
+      impossibleForLegendary: !weeksFor(legendaryPrice).isFinite,
+    );
+  }
+
+  /// Menghitung jumlah total `hp_pct`, `atk_pct`, `def_pct` terbesar dari seluruh
+  /// kombinasi legal 4-slot equipment di `items.json` dan membandingkan dengan cap.
+  PctCapCheckResult computeMaxLegalPctTotals() {
+    final caps = config.equipment.pctCaps;
+    var maxHpPct = 0.0;
+    var maxAtkPct = 0.0;
+    var maxDefPct = 0.0;
+    for (final slot in EquipmentSlot.values) {
+      var slotHp = 0.0;
+      var slotAtk = 0.0;
+      var slotDef = 0.0;
+      for (final item in config.items.values) {
+        final eq = item.equipment;
+        if (eq == null || eq.slot != slot) continue;
+        slotHp = math.max(slotHp, eq.baseStats.hpPct);
+        slotAtk = math.max(slotAtk, eq.baseStats.atkPct);
+        slotDef = math.max(slotDef, eq.baseStats.defPct);
+      }
+      maxHpPct += slotHp;
+      maxAtkPct += slotAtk;
+      maxDefPct += slotDef;
+    }
+    return PctCapCheckResult(
+      maxLegalHpPct: maxHpPct,
+      maxLegalAtkPct: maxAtkPct,
+      maxLegalDefPct: maxDefPct,
+      capHpPct: caps.hpPct,
+      capAtkPct: caps.atkPct,
+      capDefPct: caps.defPct,
+    );
+  }
+
+  /// Mensimulasikan dampak set Event Epic & Legendary penuh (4 slot) terhadap
+  /// Dungeon 1–5, Daily Boss, Weekly Boss, dan Ascension Dungeon pada daftar rank.
+  List<EventSetImpactRow> simulateEventSetImpact({
+    List<int> ranks = const [0, 1, 5, 10, 50],
+    int seedCount = 15,
+  }) {
+    final dungeonProg = DungeonProgressionService(config.difficulty);
+    final normals = config.dungeons.values.where((d) => d.isNormal).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    final ascDungeon = config.dungeons['ascension_sanctum']!;
+    final epicGear = eventSetGearProfile(EventItemTier.epic);
+    final legGear = eventSetGearProfile(EventItemTier.legendary);
+    final damageCalc = DamageCalculator(formula: config.damage.formula);
+    final rows = <EventSetImpactRow>[];
+
+    EventSetImpactRow compareTarget({
+      required String targetId,
+      required String targetKind,
+      required int cycleRank,
+      required int level,
+      required TierGearProfile baseGear,
+      required int enemyAtk,
+      required int enemyDef,
+      required DungeonScenarioMetrics Function(TierGearProfile gear, String lbl)
+      runSim,
+    }) {
+      final baseMetrics = runSim(baseGear, 'Base');
+      final epicMetrics = runSim(epicGear, 'EventEpic');
+      final legMetrics = runSim(legGear, 'EventLeg');
+
+      final baseChar = buildCharacter(
+        level: level,
+        gearProfile: baseGear,
+        seed: 1,
+      );
+      final epicChar = buildCharacter(
+        level: level,
+        gearProfile: epicGear,
+        seed: 1,
+      );
+      final legChar = buildCharacter(
+        level: level,
+        gearProfile: legGear,
+        seed: 1,
+      );
+
+      double effectiveDps(PlayerCharacter c) {
+        final rawDmg = damageCalc.physicalDamage(c.stats.atk, enemyDef);
+        final critMult =
+            1.0 + c.stats.critRate * math.max(0.0, c.stats.critDamage - 1.0);
+        return rawDmg * c.stats.attackSpeed * critMult;
+      }
+
+      double effectiveEhp(PlayerCharacter c) {
+        final taken = math.max(
+          1,
+          damageCalc.physicalDamage(enemyAtk, c.stats.def),
+        );
+        return c.stats.maxHp / taken;
+      }
+
+      final baseDps = effectiveDps(baseChar);
+      final epicDps = effectiveDps(epicChar);
+      final legDps = effectiveDps(legChar);
+      final baseEhp = effectiveEhp(baseChar);
+      final epicEhp = effectiveEhp(epicChar);
+      final legEhp = effectiveEhp(legChar);
+
+      double deltaPct(double next, double base) =>
+          base > 0 ? ((next - base) / base) * 100.0 : 0.0;
+
+      final allFinite =
+          baseMetrics.avgDurationSeconds.isFinite &&
+          epicMetrics.avgDurationSeconds.isFinite &&
+          legMetrics.avgDurationSeconds.isFinite &&
+          baseDps.isFinite &&
+          epicDps.isFinite &&
+          legDps.isFinite &&
+          baseEhp.isFinite &&
+          epicEhp.isFinite &&
+          legEhp.isFinite &&
+          !epicChar.stats.atk.isNaN &&
+          !legChar.stats.atk.isNaN;
+
+      return EventSetImpactRow(
+        targetId: targetId,
+        targetKind: targetKind,
+        cycleRank: cycleRank,
+        playerLevel: level,
+        baseWinRate: baseMetrics.winRate,
+        epicWinRate: epicMetrics.winRate,
+        legendaryWinRate: legMetrics.winRate,
+        baseDurationSec: baseMetrics.avgDurationSeconds,
+        epicDurationSec: epicMetrics.avgDurationSeconds,
+        legendaryDurationSec: legMetrics.avgDurationSeconds,
+        epicDamageDeltaPct: deltaPct(epicDps, baseDps),
+        legendaryDamageDeltaPct: deltaPct(legDps, baseDps),
+        epicToughnessDeltaPct: deltaPct(epicEhp, baseEhp),
+        legendaryToughnessDeltaPct: deltaPct(legEhp, baseEhp),
+        allFiniteAndSafe: allFinite,
+      );
+    }
+
+    final diffService = DifficultyService(config.difficulty);
+    for (final rank in ranks) {
+      final safeRank = rank < 0 ? 0 : rank;
+
+      // 1. Dungeon 1..5
+      for (final d in normals) {
+        final rec = dungeonProg.recommendedLevel(d, safeRank);
+        final baseGear = rankTierGearProfile(
+          d,
+          cycleRank: safeRank,
+          playerLevel: rec,
+        );
+        final profile = diffService.profileFor(d, safeRank);
+        final bossMonster =
+            config.monsters[d.rooms.values.last.spawns.first.monsterId]!;
+        final scaledBoss = diffService.scaleMonsterStats(
+          bossMonster.stats,
+          profile,
+        );
+        rows.add(
+          compareTarget(
+            targetId: d.id,
+            targetKind: 'normal',
+            cycleRank: safeRank,
+            level: rec,
+            baseGear: baseGear,
+            enemyAtk: scaledBoss.atk,
+            enemyDef: scaledBoss.def,
+            runSim: (gear, lbl) => simulateScenario(
+              dungeonId: d.id,
+              scenarioLabel: '$lbl-R$safeRank',
+              playerLevel: rec,
+              gearProfile: gear,
+              cycleRank: safeRank,
+              seedCount: seedCount,
+              randomizeGearRoll: false,
+            ),
+          ),
+        );
+      }
+
+      // 2. Ascension Sanctum
+      final ascRec = dungeonProg.recommendedLevel(ascDungeon, safeRank);
+      final ascGear = rankTierGearProfile(
+        ascDungeon,
+        cycleRank: safeRank,
+        playerLevel: ascRec,
+      );
+      final ascProfile = diffService.profileFor(ascDungeon, safeRank);
+      final ascBoss =
+          config.monsters[ascDungeon.rooms.values.last.spawns.first.monsterId]!;
+      final scaledAscBoss = diffService.scaleMonsterStats(
+        ascBoss.stats,
+        ascProfile,
+      );
+      rows.add(
+        compareTarget(
+          targetId: ascDungeon.id,
+          targetKind: 'ascension',
+          cycleRank: safeRank,
+          level: ascRec,
+          baseGear: ascGear,
+          enemyAtk: scaledAscBoss.atk,
+          enemyDef: scaledAscBoss.def,
+          runSim: (gear, lbl) => simulateScenario(
+            dungeonId: ascDungeon.id,
+            scenarioLabel: '$lbl-Asc-R$safeRank',
+            playerLevel: ascRec,
+            gearProfile: gear,
+            cycleRank: safeRank,
+            seedCount: seedCount,
+            randomizeGearRoll: false,
+          ),
+        ),
+      );
+
+      // 3. Daily & Weekly Boss (acuan tertinggi & terendah agar merangkum progresi)
+      for (final refDungeon in [normals.first, normals.last]) {
+        final rec = dungeonProg.recommendedLevel(refDungeon, safeRank);
+        final baseGear = rankTierGearProfile(
+          refDungeon,
+          cycleRank: safeRank,
+          playerLevel: rec,
+        );
+        for (final period in [Period.daily, Period.weekly]) {
+          final boss = period == Period.daily
+              ? config.bossEvents!.daily.pool.first
+              : config.bossEvents!.weekly.pool.first;
+          final pf = period == Period.daily
+              ? config.bossEvents!.daily.powerFactor
+              : config.bossEvents!.weekly.powerFactor;
+          final bProfile = diffService.profileForBoss(
+            BossReference(dungeon: refDungeon, cycleRank: safeRank),
+            pf,
+          );
+          final scaledB = diffService.scaleMonsterStats(
+            boss
+                .toEnemyDefinition(
+                  level: rec,
+                  spriteTemplate: config.monsters[boss.spriteRef],
+                )
+                .stats,
+            bProfile,
+          );
+          rows.add(
+            compareTarget(
+              targetId: '${period.name}_boss@${refDungeon.id}',
+              targetKind: period == Period.daily ? 'boss_daily' : 'boss_weekly',
+              cycleRank: safeRank,
+              level: rec,
+              baseGear: baseGear,
+              enemyAtk: scaledB.atk,
+              enemyDef: scaledB.def,
+              runSim: (gear, lbl) => simulateBossScenario(
+                period: period,
+                boss: boss,
+                referenceDungeonId: refDungeon.id,
+                scenarioLabel: '$lbl-${period.name}-R$safeRank',
+                playerLevel: rec,
+                gearProfile: gear,
+                cycleRank: safeRank,
+                seedCount: seedCount,
+                randomizeGearRoll: false,
+              ),
+            ),
+          );
+        }
+      }
+    }
+    return rows;
+  }
+}
+
+class ShardCadenceMetrics {
+  const ShardCadenceMetrics({
+    required this.cadenceName,
+    required this.weeklyShardIncome,
+    required this.weeksForOneEpic,
+    required this.weeksForOneLegendary,
+    required this.weeksForFullEpicSet,
+    required this.weeksForFullLegendarySet,
+    required this.weeksForFullPool,
+    required this.buysAllInSingleCycle,
+    required this.impossibleForLegendary,
+  });
+
+  final String cadenceName;
+  final int weeklyShardIncome;
+  final double weeksForOneEpic;
+  final double weeksForOneLegendary;
+  final double weeksForFullEpicSet;
+  final double weeksForFullLegendarySet;
+  final double weeksForFullPool;
+  final bool buysAllInSingleCycle;
+  final bool impossibleForLegendary;
+}
+
+class PctCapCheckResult {
+  const PctCapCheckResult({
+    required this.maxLegalHpPct,
+    required this.maxLegalAtkPct,
+    required this.maxLegalDefPct,
+    required this.capHpPct,
+    required this.capAtkPct,
+    required this.capDefPct,
+  });
+
+  final double maxLegalHpPct;
+  final double maxLegalAtkPct;
+  final double maxLegalDefPct;
+  final double capHpPct;
+  final double capAtkPct;
+  final double capDefPct;
+
+  bool get isBelowAllCaps =>
+      maxLegalHpPct < capHpPct &&
+      maxLegalAtkPct < capAtkPct &&
+      maxLegalDefPct < capDefPct;
+}
+
+class EventShopEconomyReport {
+  const EventShopEconomyReport({
+    required this.dailyShard,
+    required this.weeklyShard,
+    required this.cycleWeeks,
+    required this.epicPrice,
+    required this.legendaryPrice,
+    required this.fullEpicSetCost,
+    required this.fullLegendarySetCost,
+    required this.totalPoolCost,
+    required this.cadences,
+    required this.pctCapCheck,
+  });
+
+  final int dailyShard;
+  final int weeklyShard;
+  final int cycleWeeks;
+  final int epicPrice;
+  final int legendaryPrice;
+  final int fullEpicSetCost;
+  final int fullLegendarySetCost;
+  final int totalPoolCost;
+  final List<ShardCadenceMetrics> cadences;
+  final PctCapCheckResult pctCapCheck;
+}
+
+class EventSetImpactRow {
+  const EventSetImpactRow({
+    required this.targetId,
+    required this.targetKind,
+    required this.cycleRank,
+    required this.playerLevel,
+    required this.baseWinRate,
+    required this.epicWinRate,
+    required this.legendaryWinRate,
+    required this.baseDurationSec,
+    required this.epicDurationSec,
+    required this.legendaryDurationSec,
+    required this.epicDamageDeltaPct,
+    required this.legendaryDamageDeltaPct,
+    required this.epicToughnessDeltaPct,
+    required this.legendaryToughnessDeltaPct,
+    required this.allFiniteAndSafe,
+  });
+
+  final String targetId;
+  final String targetKind;
+  final int cycleRank;
+  final int playerLevel;
+  final double baseWinRate;
+  final double epicWinRate;
+  final double legendaryWinRate;
+  final double baseDurationSec;
+  final double epicDurationSec;
+  final double legendaryDurationSec;
+  final double epicDamageDeltaPct;
+  final double legendaryDamageDeltaPct;
+  final double epicToughnessDeltaPct;
+  final double legendaryToughnessDeltaPct;
+  final bool allFiniteAndSafe;
+}
+
+class BossQuestComparisonMetrics {
+  const BossQuestComparisonMetrics({
+    required this.cycleRank,
+    required this.referenceDungeonId,
+    required this.recommendedLevel,
+    required this.farmingGoldPerHour,
+    required this.farmingExpPerHour,
+    required this.dailyQuestGold,
+    required this.dailyQuestExp,
+    required this.weeklyQuestGold,
+    required this.weeklyQuestExp,
+    required this.weeklyAetherShardIncome,
+  });
+
+  final int cycleRank;
+  final String referenceDungeonId;
+  final int recommendedLevel;
+  final double farmingGoldPerHour;
+  final double farmingExpPerHour;
+  final int dailyQuestGold;
+  final int dailyQuestExp;
+  final int weeklyQuestGold;
+  final int weeklyQuestExp;
+  final int weeklyAetherShardIncome;
+
+  bool get dailyExceedsFarmingHour =>
+      dailyQuestGold > farmingGoldPerHour || dailyQuestExp > farmingExpPerHour;
+  bool get weeklyExceedsFarmingHour =>
+      weeklyQuestGold > farmingGoldPerHour ||
+      weeklyQuestExp > farmingExpPerHour;
 }

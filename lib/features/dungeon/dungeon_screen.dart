@@ -6,13 +6,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_tokens.dart';
+import '../../app/theme/echoes_theme.dart';
 import '../../application/providers/database_provider.dart';
+import '../../application/providers/game_clock_provider.dart';
 import '../../application/providers/game_config_provider.dart';
+import '../../application/providers/notification_provider.dart';
 import '../../application/services/game_session_coordinator.dart';
+import '../../domain/entities/currency_config.dart';
 import '../../domain/entities/cycle_progress.dart';
 import '../../domain/entities/difficulty_config.dart';
+import '../../domain/entities/dungeon_definition.dart';
 import '../../domain/entities/dungeon_session.dart';
 import '../../domain/entities/equipment.dart';
+import '../../domain/entities/event_shop_purchase.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/inventory.dart';
@@ -22,13 +28,19 @@ import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/entities/player_status.dart';
 import '../../domain/repositories/game_settings_repository.dart';
 import '../../domain/services/ascension_service.dart';
+import '../../domain/services/boss_event_service.dart';
+import '../../domain/services/boss_quest_service.dart';
+import '../../domain/services/currency_service.dart';
 import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_manager.dart';
 import '../../domain/services/dungeon_progression_service.dart';
 import '../../domain/services/encounter_tracker.dart';
 import '../../domain/services/equipment_factory.dart';
 import '../../domain/services/equipment_service.dart';
+import '../../domain/services/event_shop_service.dart';
+import '../../domain/services/game_clock.dart';
 import '../../domain/services/offline_progression_service.dart';
+import '../../domain/services/period_service.dart';
 import '../../domain/services/reward_processor.dart';
 import '../../domain/services/shop_service.dart';
 import '../../game/audio/audio_service.dart';
@@ -37,6 +49,7 @@ import '../../game/hud/inventory_views.dart';
 import '../../game/overlays.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'character_overlay.dart';
+import 'boss_events_overlay.dart';
 import 'dungeon_completed_overlay.dart';
 import 'equipment_overlay.dart';
 import 'hud_overlay.dart';
@@ -66,6 +79,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   Inventory? _inventory;
   InventoryViews? _views;
   EquipmentService? _equipmentService;
+  CurrencyService? _currencyService;
   RewardProcessor? _rewardProcessor;
   DungeonManager? _dungeonManager;
   DungeonProgressSnapshot _dungeon = const DungeonProgressSnapshot();
@@ -79,13 +93,20 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   Map<String, int> _pendingRecoveredSkillCooldowns = const {};
   GrantedReward? _lastCompletionReward;
   AscensionResult? _lastAscensionResult;
+  BossQuestSettlementResult? _lastBossQuestResult;
+  DifficultyProfile? _activeBossDifficultyProfile;
+  bool _showBossEvents = false;
+  BossQuestService _bossQuestService = BossQuestService();
   Map<String, int> _consecutiveDefeats = const {};
   String? _lastFailedDungeonId;
   Map<String, int> _shopPurchases = {};
+  Map<(String, String), int> _eventShopPurchases = {};
+  final Set<String> _processedEventShopActionIds = {};
   int _shopActionCounter = 0;
   final math.Random _shopRandom = math.Random();
   DungeonEventListener? _managerListener;
   GameSessionCoordinator? _coordinator;
+  GameClock _clock = const SystemGameClock();
   GameSettingsRepository? _settingsRepo;
   final AudioService _audioService = AudioService();
   GameConfig? _config;
@@ -183,10 +204,22 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         _dungeonProgresses = Map.of(loaded.dungeonProgresses);
         _cycleProgress = loaded.cycleProgress;
         _shopPurchases = Map.of(loaded.shopPurchases);
+        _eventShopPurchases = {
+          for (final record in loaded.eventShopPurchases)
+            (record.entryId, record.periodKey): record.purchasedCount,
+        };
         _consecutiveDefeats = Map.of(loaded.session.consecutiveDefeats);
         _lastFailedDungeonId = loaded.session.lastFailedDungeonId;
         _lastSessionSnapshot = loaded.activeDungeonSession;
         _rewardProcessor = loaded.rewardProcessor;
+        _currencyService = CurrencyService(
+          definitions: _config?.currencies ?? CurrencyDefinition.defaults,
+          initialBalances: loaded.currencies,
+          claimedIds: loaded.rewardProcessor.claimedEventIds,
+        );
+        _bossQuestService = BossQuestService(
+          initialStates: loaded.periodicQuestStates,
+        );
         _autoSkill.value = loaded.session.autoSkillEnabled;
 
         final manager = _dungeonManager;
@@ -282,10 +315,13 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       unawaited(_audioService.preload());
       unawaited(_audioService.startBgm());
       final offlineService = ref.read(offlineProgressionServiceProvider);
+      final clock = ref.read(gameClockProvider);
+      _clock = clock;
       final coordinator = GameSessionCoordinator(
         repository: repo,
         config: config,
         offlineService: offlineService,
+        clock: clock,
       );
       final loaded = await coordinator.loadAndProcessOffline();
       if (!mounted) return;
@@ -305,11 +341,23 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       _dungeonProgresses = Map.of(loaded.dungeonProgresses);
       _cycleProgress = loaded.cycleProgress;
       _shopPurchases = Map.of(loaded.shopPurchases);
+      _eventShopPurchases = {
+        for (final record in loaded.eventShopPurchases)
+          (record.entryId, record.periodKey): record.purchasedCount,
+      };
       _consecutiveDefeats = Map.of(loaded.session.consecutiveDefeats);
       _lastFailedDungeonId = loaded.session.lastFailedDungeonId;
       _lastSessionSnapshot = loaded.activeDungeonSession;
       _offlineActivity = loaded.offlineActivity;
       _rewardProcessor = loaded.rewardProcessor;
+      _currencyService = CurrencyService(
+        definitions: config.currencies,
+        initialBalances: loaded.currencies,
+        claimedIds: loaded.rewardProcessor.claimedEventIds,
+      );
+      _bossQuestService = BossQuestService(
+        initialStates: loaded.periodicQuestStates,
+      );
       _lastOfflineClaimAtMs = loaded.offlineResult.newLastOfflineClaimAtMs;
       _autoSkill.value = loaded.session.autoSkillEnabled;
       final manager = config.dungeons.isNotEmpty
@@ -318,6 +366,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
               encounterTracker: EncounterTracker(
                 monsterCatalog: config.monsters,
               ),
+              clock: _clock,
               difficultyService: DifficultyService(config.difficulty),
             )
           : null;
@@ -524,7 +573,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     setState(() {
       _offlineActivity = _offlineActivity.withAutoFarming(
         dungeonId: dungeonId,
-        checkpointAtMs: DateTime.now().millisecondsSinceEpoch,
+        checkpointAtMs: _clock.nowMs,
       );
     });
     unawaited(_flushSaveNow());
@@ -545,7 +594,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       _offlineActivity = _offlineActivity.withContinueDungeon(
         dungeonId: session.dungeonId,
         activeRunId: session.runId,
-        checkpointAtMs: DateTime.now().millisecondsSinceEpoch,
+        checkpointAtMs: _clock.nowMs,
       );
     });
     unawaited(_flushSaveNow());
@@ -644,6 +693,9 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         offlineActivity: _offlineActivity,
         consecutiveDefeats: _consecutiveDefeats,
         lastFailedDungeonId: _lastFailedDungeonId,
+        currencyService: _currencyService,
+        periodicQuestStates: _bossQuestService.toSnapshot(),
+        eventShopPurchases: _eventShopPurchaseRecords(),
       );
     } catch (e) {
       _dirty = true;
@@ -745,7 +797,11 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
             event.session.dungeonId: updated,
           };
 
-          if (dungeonDef != null && dungeonDef.isAscension && cfg != null) {
+          if (event.session.isBossEvent) {
+            unawaited(_settleBossQuestVictory(event, dungeonDef));
+          } else if (dungeonDef != null &&
+              dungeonDef.isAscension &&
+              cfg != null) {
             final ascResult = AscensionService(progressionService: progression)
                 .complete(
                   runId: event.session.runId,
@@ -783,6 +839,8 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
               event.session.completionRewardClaimed,
           reviveCooldownTicks: 0,
           cycleRank: event.session.cycleRank,
+          bossEventId: event.session.bossEventId,
+          periodKeyAtStart: event.session.periodKeyAtStart,
           playerStatus: event.finalStatus == DungeonSessionStatus.failed
               ? PlayerStatus.runEnded
               : PlayerStatus.alive,
@@ -814,10 +872,20 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     cycleProgress: _cycleProgress,
     dungeonProgresses: _dungeonProgresses,
     shopPurchases: Map.unmodifiable(_shopPurchases),
+    eventShopPurchases: Map.unmodifiable(_eventShopPurchases),
   );
 
+  List<EventShopPurchaseRecord> _eventShopPurchaseRecords() => [
+    for (final entry in _eventShopPurchases.entries)
+      EventShopPurchaseRecord(
+        entryId: entry.key.$1,
+        periodKey: entry.key.$2,
+        purchasedCount: entry.value,
+      ),
+  ];
+
   String _nextShopActionId(String kind) =>
-      '${kind}_${DateTime.now().microsecondsSinceEpoch}_${++_shopActionCounter}';
+      '${kind}_${_clock.nowMs}_${++_shopActionCounter}';
 
   Future<ShopBuyResult> _buyFromShop(GameConfig cfg, String entryId) async {
     final character = _character;
@@ -939,6 +1007,101 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     return result;
   }
 
+  EventShopService? _eventShopServiceFor(GameConfig cfg) {
+    final eventShop = cfg.eventShop;
+    if (eventShop == null) return null;
+    return EventShopService(
+      catalog: eventShop,
+      items: cfg.items,
+      equipmentFactory: EquipmentFactory(cfg.equipment),
+    );
+  }
+
+  EventShopViewData? _eventShopViewDataFor(GameConfig cfg) {
+    final service = _eventShopServiceFor(cfg);
+    if (service == null) return null;
+    final effectiveNowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
+    final balance = _currencyService?.balance(cfg.eventShop!.currencyId) ?? 0;
+    final hasSpace = _inventory?.hasEquipmentSpace ?? false;
+    return service.buildViewData(
+      effectiveNowMs: effectiveNowMs,
+      context: _shopContextFor(),
+      currencyBalance: balance,
+      hasInventorySpace: hasSpace,
+      purchaseCounts: _eventShopPurchases,
+    );
+  }
+
+  Future<EventShopBuyResult> _buyFromEventShop(
+    GameConfig cfg,
+    String entryId,
+  ) async {
+    final character = _character;
+    final inventory = _inventory;
+    final currencyService = _currencyService;
+    final service = _eventShopServiceFor(cfg);
+    if (character == null ||
+        inventory == null ||
+        currencyService == null ||
+        service == null) {
+      return EventShopBuyNotFound(entryId: entryId);
+    }
+    final actionId = _nextShopActionId('event_buy');
+    final effectiveNowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
+    final prevBalances = currencyService.toSnapshot();
+    final prevClaims = currencyService.claimedIds;
+    final periodKey = service.periodKeyAt(effectiveNowMs);
+    final key = (entryId, periodKey);
+    final prevCount = _eventShopPurchases[key];
+    final result = service.buy(
+      entryId: entryId,
+      effectiveNowMs: effectiveNowMs,
+      inventory: inventory,
+      currencyService: currencyService,
+      context: _shopContextFor(),
+      random: _shopRandom,
+      purchaseCounts: _eventShopPurchases,
+      actionId: actionId,
+      processedActionIds: _processedEventShopActionIds,
+    );
+    if (result is EventShopBuySuccess && !result.wasDuplicate) {
+      try {
+        await _coordinator?.saveEventShopTransaction(
+          character: character,
+          inventory: inventory,
+          currencyService: currencyService,
+          purchase: EventShopPurchaseRecord(
+            entryId: entryId,
+            periodKey: result.periodKey,
+            purchasedCount: result.newPurchaseCount,
+          ),
+          actionId: actionId,
+        );
+      } catch (_) {
+        currencyService.restoreState(
+          balances: prevBalances,
+          claimedIds: prevClaims,
+        );
+        final eq = result.purchasedEquipment;
+        if (eq != null) {
+          inventory.removeEquipment(eq.id);
+        }
+        if (prevCount == null) {
+          _eventShopPurchases.remove(key);
+        } else {
+          _eventShopPurchases[key] = prevCount;
+        }
+        _processedEventShopActionIds.remove(actionId);
+        rethrow;
+      }
+      _views?.refresh();
+      if (mounted) {
+        setState(() {});
+      }
+    }
+    return result;
+  }
+
   void _unequip(EquipmentSlot slot) {
     final service = _equipmentService;
     if (service != null && service.unequip(slot)) {
@@ -1052,6 +1215,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       manager = DungeonManager(
         dungeons: config.dungeons,
         encounterTracker: EncounterTracker(monsterCatalog: config.monsters),
+        clock: _clock,
         difficultyService: DifficultyService(config.difficulty),
       );
       _dungeonManager = manager;
@@ -1099,6 +1263,184 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     unawaited(_flushSaveNow());
   }
 
+  Future<void> _settleBossQuestVictory(
+    DungeonEndedEvent event,
+    DungeonDefinition? dungeonDef,
+  ) async {
+    final coordinator = _coordinator;
+    final character = _character;
+    final inventory = _inventory;
+    final rewardProcessor = _rewardProcessor;
+    final currencyService = _currencyService;
+    final config = _config;
+    if (coordinator == null ||
+        character == null ||
+        inventory == null ||
+        rewardProcessor == null ||
+        currencyService == null ||
+        config == null ||
+        config.bossEvents == null) {
+      return;
+    }
+    final period = config.bossEvents!.periodForSession(
+      dungeon: dungeonDef,
+      bossEventId: event.session.bossEventId,
+      dungeonId: event.session.dungeonId,
+    );
+    if (period == null) {
+      return;
+    }
+    final periodKeyAtStart = event.session.periodKeyAtStart ?? '';
+    final profile =
+        _activeBossDifficultyProfile ??
+        _dungeonManager?.activeDifficultyProfile ??
+        DifficultyProfile.identity;
+    try {
+      final result = await coordinator.settleBossQuestVictory(
+        period: period,
+        periodKeyAtStart: periodKeyAtStart,
+        difficultyProfile: profile,
+        character: character,
+        inventory: inventory,
+        dungeon: _dungeon,
+        dungeonProgresses: _dungeonProgresses,
+        cycleProgress: _cycleProgress,
+        rewardProcessor: rewardProcessor,
+        currencyService: currencyService,
+        bossQuestService: _bossQuestService,
+        autoSkillEnabled: _autoSkill.value,
+        lastOfflineClaimAtMs: _lastOfflineClaimAtMs,
+        activeDungeonSession: _lastSessionSnapshot,
+        offlineActivity: _offlineActivity,
+        consecutiveDefeats: _consecutiveDefeats,
+        lastFailedDungeonId: _lastFailedDungeonId,
+      );
+      if (!mounted) return;
+      _views?.refresh();
+      setState(() {
+        _lastBossQuestResult = result;
+      });
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Gagal memproses hadiah Boss Quest: $e');
+      }
+    }
+  }
+
+  Future<void> _enterBossRun(GameConfig config, Period period) async {
+    final coordinator = _coordinator;
+    final character = _character;
+    final inventory = _inventory;
+    final rewardProcessor = _rewardProcessor;
+    final currencyService = _currencyService;
+    if (coordinator == null ||
+        character == null ||
+        inventory == null ||
+        rewardProcessor == null ||
+        config.bossEvents == null) {
+      _showMessage('Konfigurasi Boss Events tidak tersedia.');
+      return;
+    }
+    var manager = _dungeonManager;
+    if (manager == null) {
+      manager = DungeonManager(
+        dungeons: config.dungeons,
+        encounterTracker: EncounterTracker(monsterCatalog: config.monsters),
+        clock: _clock,
+        difficultyService: DifficultyService(config.difficulty),
+      );
+      _dungeonManager = manager;
+      _attachManagerListener(manager);
+    }
+    _game?.detachSessionListeners();
+    manager.exitToTown();
+    _lastCompletionReward = null;
+    _lastAscensionResult = null;
+    _lastBossQuestResult = null;
+    _lastSessionSnapshot = null;
+    _pendingRecoveredHp = null;
+    _pendingRecoveredSkillCooldowns = const {};
+    if (_offlineActivity.mode == OfflineActivityMode.autoFarming ||
+        _offlineActivity.mode == OfflineActivityMode.continueDungeon) {
+      _offlineActivity = _offlineActivity.withPauseProgression();
+    }
+    final prepared = await coordinator.startBossRun(
+      period: period,
+      dungeonManager: manager,
+      character: character,
+      inventory: inventory,
+      dungeon: _dungeon,
+      dungeonProgresses: _progressMapWithCurrent(),
+      cycleProgress: _cycleProgress,
+      rewardProcessor: rewardProcessor,
+      autoSkillEnabled: _autoSkill.value,
+      lastOfflineClaimAtMs: _lastOfflineClaimAtMs,
+      currencyService: currencyService,
+      offlineActivity: _offlineActivity,
+      consecutiveDefeats: _consecutiveDefeats,
+      lastFailedDungeonId: _lastFailedDungeonId,
+      periodicQuestStates: _bossQuestService.toSnapshot(),
+    );
+    _activeBossDifficultyProfile = prepared.difficultyProfile;
+    _lastSessionSnapshot = manager.toActiveSessionSnapshot();
+    if (!mounted) return;
+    setState(() {
+      _showBossEvents = false;
+      _game = _newGame(config);
+      _inDungeon = true;
+    });
+  }
+
+  Widget _buildBossEventsOverlay(GameConfig config) {
+    final bossEvents = config.bossEvents!;
+    final nowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
+    final periodService = PeriodService(config: config.time);
+    final bossService = BossEventService(bossEvents);
+    final ref = bossService.resolveReference(
+      _cycleProgress,
+      _progressMapWithCurrent(),
+      config.dungeons,
+    );
+    final diffService = DifficultyService(config.difficulty);
+    final profile = diffService.profileFor(ref.dungeon, ref.cycleRank);
+
+    BossEventCardData buildCard(Period period, String label) {
+      final tier = bossEvents.tierFor(period);
+      final index = period == Period.daily
+          ? periodService.dayIndex(nowMs)
+          : periodService.weekIndex(nowMs);
+      final key = periodService.keyFor(period, nowMs);
+      final boss = bossService.bossFor(period, index);
+      final nextResetMs = periodService.nextResetMs(period, nowMs);
+      final remaining = Duration(
+        milliseconds: math.max(0, nextResetMs - nowMs),
+      );
+      final scaled = BossQuestService.computeScaledReward(
+        reward: tier.reward,
+        difficultyProfile: profile,
+      );
+      final isDone = _bossQuestService.isCompleted(tier.questId, key);
+      return BossEventCardData(
+        periodKeyId: period.name,
+        periodLabel: label,
+        bossName: boss.name,
+        referenceDungeonName: ref.dungeon.name,
+        recommendedLevel: ref.dungeon.recommendedLevel,
+        isCompleted: isDone,
+        remainingToReset: remaining,
+        rewardSummary:
+            '${scaled.aetherShard} Aether Shard • ${scaled.gold} Gold • ${scaled.exp} EXP',
+        onFight: () => unawaited(_enterBossRun(config, period)),
+      );
+    }
+
+    return BossEventsOverlay(
+      daily: buildCard(Period.daily, 'Daily Boss'),
+      weekly: buildCard(Period.weekly, 'Weekly Boss'),
+      onClose: () => setState(() => _showBossEvents = false),
+    );
+  }
+
   void _returnToTown() {
     final exitedDungeonId =
         _dungeonManager?.activeDungeon?.id ?? _lastSessionSnapshot?.dungeonId;
@@ -1141,15 +1483,34 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
             builder: (context, snapshot) {
               if (!_initialized &&
                   snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator());
+                return const LoadingState(title: 'Menyiapkan Camp Aether...');
               }
               if (snapshot.hasError && !_initialized) {
                 return Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Gagal menginisialisasi data progres:\n${snapshot.error}',
-                      textAlign: TextAlign.center,
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: PanelFrame(
+                        showCornerOrnaments: true,
+                        borderColor: AppColors.emberRed,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              color: AppColors.emberRed,
+                              size: 32,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Gagal menginisialisasi data progres:\n${snapshot.error}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 );
@@ -1202,6 +1563,19 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                           _sellMaterialBulkFromShop(cfg, itemId, qty),
                       onShopSellBatch: (eqIds, matQtys) =>
                           _sellBatchFromShop(cfg, eqIds, matQtys),
+                      eventShopData: _eventShopViewDataFor(cfg),
+                      onEventShopBuy: cfg.eventShop != null
+                          ? (entryId) => _buyFromEventShop(cfg, entryId)
+                          : null,
+                      aetherShard:
+                          _currencyService?.balance(kAetherShardCurrencyId) ??
+                          0,
+                      onOpenBossEvents: cfg.bossEvents != null
+                          ? () => setState(() => _showBossEvents = true)
+                          : null,
+                      onRequestNotificationPermission: () => ref
+                          .read(notificationSchedulerProvider)
+                          .requestPermission(),
                     )
                   : _buildGame(cfg);
               final pendingSummary = _offlineActivity.pendingSummary;
@@ -1210,6 +1584,8 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
               return Stack(
                 children: [
                   content,
+                  if (!_inDungeon && _showBossEvents && cfg.bossEvents != null)
+                    _buildBossEventsOverlay(cfg),
                   if (showOfflineSummary)
                     OfflineSummaryOverlay(
                       summary: pendingSummary,
@@ -1222,13 +1598,33 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
               );
             },
           ),
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () =>
+              const LoadingState(title: 'Memuat Konfigurasi Dunia...'),
           error: (error, _) => Center(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Gagal memuat konfigurasi game:\n$error',
-                textAlign: TextAlign.center,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: PanelFrame(
+                  showCornerOrnaments: true,
+                  borderColor: AppColors.emberRed,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.emberRed,
+                        size: 32,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'Gagal memuat konfigurasi game:\n$error',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -1284,34 +1680,44 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     Color? accentColor,
   }) {
     final color = accentColor ?? AppColors.textPrimary;
+    final borderTint = accentColor ?? AppColors.panelBorder;
     return Material(
-      color: AppColors.backgroundDark.withValues(alpha: 0.82),
+      color: AppColors.midnightForest.withValues(alpha: 0.88),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.sm),
         side: BorderSide(
-          color: (accentColor ?? AppColors.panelBorder).withValues(alpha: 0.75),
+          color: borderTint.withValues(alpha: 0.78),
+          width: 1.25,
         ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: key,
         onTap: onPressed,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm + 1,
+              vertical: 6,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                    letterSpacing: 0.15,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1367,6 +1773,8 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           settings: _audioService.settingsNotifier,
           onChanged: _updateSettings,
           onTestSfx: () => unawaited(_audioService.playSfx(AudioCue.loot)),
+          onRequestNotificationPermission: () =>
+              ref.read(notificationSchedulerProvider).requestPermission(),
           onClose: () => g.overlays.remove(GameOverlays.settings),
         ),
         GameOverlays.runEnded: (context, _) {
@@ -1400,6 +1808,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                 ),
               );
           final isAscension = dungeon?.isAscension ?? false;
+          final isBossEvent = dungeon?.isBossEvent ?? false;
           final ascResult = _lastAscensionResult;
           return DungeonCompletedOverlay(
             dungeonName: dungeonName,
@@ -1411,7 +1820,11 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                 ? (ascResult?.newRank ?? _cycleProgress.ascensionRank)
                 : null,
             completionReward: _lastCompletionReward,
-            onRetry: isAscension
+            bossQuestMessage: isBossEvent
+                ? (_lastBossQuestResult?.userMessage ??
+                      'Memproses hadiah boss quest...')
+                : null,
+            onRetry: (isAscension || isBossEvent)
                 ? null
                 : () {
                     unawaited(_flushSaveNow());
@@ -1470,13 +1883,18 @@ class _DungeonCompactMenuClusterState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
     return Align(
       alignment: Alignment.bottomRight,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.sm),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.50,
+            maxWidth: (MediaQuery.sizeOf(context).width * 0.68).clamp(
+              180.0,
+              320.0,
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1484,14 +1902,34 @@ class _DungeonCompactMenuClusterState
             children: [
               if (_expanded) ...[
                 PanelFrame(
-                  padding: const EdgeInsets.all(AppSpacing.xs + 2),
-                  backgroundColor: AppColors.backgroundDark.withValues(
-                    alpha: 0.94,
+                  key: const Key('hud_menu_drawer'),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  backgroundColor: AppColors.midnightForest.withValues(
+                    alpha: 0.95,
                   ),
+                  borderColor: ext.gold.withValues(alpha: 0.72),
+                  showCornerOrnaments: true,
+                  boxShadow: AppShadows.glow(ext.gold, alpha: 0.16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          'Menu Dungeon',
+                          style: AppTypography.headingSerif(
+                            (theme.textTheme.labelSmall ?? const TextStyle())
+                                .copyWith(fontSize: 11),
+                            color: ext.gold,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       _drawerItem(
                         icon: Icons.inventory_2_outlined,
                         label: 'Tas',
@@ -1512,11 +1950,11 @@ class _DungeonCompactMenuClusterState
                         label: 'Pengaturan',
                         onTap: () => _openPanel(GameOverlays.settings),
                       ),
-                      const Divider(height: 8),
+                      const Divider(height: 10),
                       _drawerItem(
                         icon: Icons.home_outlined,
                         label: 'Kembali ke Town',
-                        color: AppColors.warmGold,
+                        color: ext.gold,
                         onTap: () {
                           setState(() => _expanded = false);
                           widget.onReturnToTown();
@@ -1538,9 +1976,7 @@ class _DungeonCompactMenuClusterState
                       key: const Key('hud_auto_skill_button'),
                       icon: on ? Icons.flash_on : Icons.flash_off,
                       label: 'Auto Skill: ${on ? 'ON' : 'OFF'}',
-                      accentColor: on
-                          ? AppColors.aetherBlue
-                          : AppColors.textSecondary,
+                      accentColor: on ? ext.expBar : AppColors.textSecondary,
                       onPressed: () => widget.onToggleAutoSkill(on),
                     ),
                   ),
@@ -1553,7 +1989,7 @@ class _DungeonCompactMenuClusterState
                         ? 'Offline: Lanjut'
                         : 'Offline: Pause',
                     accentColor: widget.continueOffline
-                        ? AppColors.success
+                        ? ext.success
                         : AppColors.textSecondary,
                     onPressed: widget.onToggleOffline,
                   ),
@@ -1561,7 +1997,7 @@ class _DungeonCompactMenuClusterState
                     key: const Key('hud_menu_toggle_button'),
                     icon: _expanded ? Icons.close : Icons.menu,
                     label: 'Menu',
-                    accentColor: AppColors.warmGold,
+                    accentColor: ext.gold,
                     onPressed: () => setState(() => _expanded = !_expanded),
                   ),
                 ],
@@ -1589,12 +2025,16 @@ class _DungeonCompactMenuClusterState
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
               ),
             ),
           ],

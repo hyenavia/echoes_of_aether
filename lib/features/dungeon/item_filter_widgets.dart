@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme/app_tokens.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/item_definition.dart';
 
@@ -51,13 +52,7 @@ String itemRarityLabel(ItemRarity rarity) => switch (rarity) {
   ItemRarity.legendary => 'Legendary',
 };
 
-Color itemRarityColor(ItemRarity rarity) => switch (rarity) {
-  ItemRarity.common => Colors.grey.shade700,
-  ItemRarity.uncommon => Colors.green.shade700,
-  ItemRarity.rare => Colors.blue.shade700,
-  ItemRarity.epic => Colors.purple.shade700,
-  ItemRarity.legendary => Colors.orange.shade800,
-};
+Color itemRarityColor(ItemRarity rarity) => AppColors.colorForRarity(rarity);
 
 bool matchesEquipmentFilter(
   EquipmentSlot slot,

@@ -2,23 +2,28 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
+import '../../domain/entities/clock_state.dart';
 import '../../domain/entities/combat_stats.dart';
 import '../../domain/entities/cycle_progress.dart';
 import '../../domain/entities/dungeon_session.dart';
 import '../../domain/entities/equipment.dart';
+import '../../domain/entities/event_shop_purchase.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/offline_activity.dart';
+import '../../domain/entities/periodic_quest_state.dart';
 import '../../domain/entities/player_progress.dart';
 import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/entities/player_status.dart';
 import '../../domain/entities/progression_config.dart';
 import '../../domain/repositories/game_settings_repository.dart';
 import '../../domain/repositories/player_progress_repository.dart';
-import '../database/app_database.dart';
+import '../../domain/services/claimed_rewards_pruner.dart';
+import '../../domain/services/game_clock.dart';
+import '../database/app_database.dart' hide ClockState, PeriodicQuestState;
 
 typedef RecoveryWarningLogger = void Function(String message);
 
@@ -29,20 +34,26 @@ typedef RecoveryWarningLogger = void Function(String message);
 class DriftPlayerSaveRepository
     implements
         PlayerSaveRepository,
+        SnapshotReplaceRepository,
         PlayerProgressRepository,
         GameSettingsRepository,
         CycleProgressRepository,
-        ShopPurchaseRepository {
+        ShopPurchaseRepository,
+        EventShopPurchaseRepository,
+        ClockStateRepository,
+        ClaimedRewardsPruningRepository {
   DriftPlayerSaveRepository({
     required this.db,
     required this.config,
     this.playerId = GameSessionSnapshot.defaultPlayerId,
+    this.clock = const SystemGameClock(),
     RecoveryWarningLogger? onRecoveryWarning,
   }) : _warn = onRecoveryWarning ?? _defaultWarn;
 
   final AppDatabase db;
   final GameConfig config;
   final String playerId;
+  final GameClock clock;
   final RecoveryWarningLogger _warn;
 
   static void _defaultWarn(String message) =>
@@ -52,6 +63,13 @@ class DriftPlayerSaveRepository
   static const String _keySfxEnabled = 'audio.sfx_enabled';
   static const String _keyBgmVolume = 'audio.bgm_volume';
   static const String _keySfxVolume = 'audio.sfx_volume';
+  static const String _keyNotifyAutoFarm = 'notifications.auto_farming_full';
+  static const String _keyNotifyDailyBoss = 'notifications.daily_boss_reminder';
+  static const String _keyNotifyWeeklyBoss =
+      'notifications.weekly_boss_reminder';
+  static const String _keyNotifyEventShop = 'notifications.event_shop_ending';
+  static const String _keyNotifyQuietHours =
+      'notifications.quiet_hours_enabled';
 
   @override
   Future<GameSettingsData> loadSettings() async {
@@ -79,6 +97,26 @@ class DriftPlayerSaveRepository
       sfxEnabled: parseBool(_keySfxEnabled, defaults.sfxEnabled),
       bgmVolume: parseVol(_keyBgmVolume, defaults.bgmVolume),
       sfxVolume: parseVol(_keySfxVolume, defaults.sfxVolume),
+      notifyAutoFarmingFull: parseBool(
+        _keyNotifyAutoFarm,
+        defaults.notifyAutoFarmingFull,
+      ),
+      notifyDailyBossReminder: parseBool(
+        _keyNotifyDailyBoss,
+        defaults.notifyDailyBossReminder,
+      ),
+      notifyWeeklyBossReminder: parseBool(
+        _keyNotifyWeeklyBoss,
+        defaults.notifyWeeklyBossReminder,
+      ),
+      notifyEventShopEnding: parseBool(
+        _keyNotifyEventShop,
+        defaults.notifyEventShopEnding,
+      ),
+      notifyQuietHoursEnabled: parseBool(
+        _keyNotifyQuietHours,
+        defaults.notifyQuietHoursEnabled,
+      ),
     );
   }
 
@@ -103,6 +141,26 @@ class DriftPlayerSaveRepository
           GameSettingsCompanion.insert(
             key: _keySfxVolume,
             value: normalized.sfxVolume.toStringAsFixed(3),
+          ),
+          GameSettingsCompanion.insert(
+            key: _keyNotifyAutoFarm,
+            value: normalized.notifyAutoFarmingFull ? 'true' : 'false',
+          ),
+          GameSettingsCompanion.insert(
+            key: _keyNotifyDailyBoss,
+            value: normalized.notifyDailyBossReminder ? 'true' : 'false',
+          ),
+          GameSettingsCompanion.insert(
+            key: _keyNotifyWeeklyBoss,
+            value: normalized.notifyWeeklyBossReminder ? 'true' : 'false',
+          ),
+          GameSettingsCompanion.insert(
+            key: _keyNotifyEventShop,
+            value: normalized.notifyEventShopEnding ? 'true' : 'false',
+          ),
+          GameSettingsCompanion.insert(
+            key: _keyNotifyQuietHours,
+            value: normalized.notifyQuietHoursEnabled ? 'true' : 'false',
           ),
         ], mode: InsertMode.insertOrReplace);
       });
@@ -135,7 +193,7 @@ class DriftPlayerSaveRepository
   @override
   Future<void> save(PlayerProgress progress) async {
     _validateProgress(progress);
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final nowMs = clock.nowMs;
     final baseStats = config.progression.statsAt(progress.level);
     await db.transaction(() async {
       await db
@@ -157,6 +215,95 @@ class DriftPlayerSaveRepository
 
   @override
   Future<void> saveSnapshot(PlayerSaveSnapshot snapshot) async {
+    final prepared = _validateAndPrepareSnapshot(snapshot);
+    final savedAtMs = snapshot.session.lastSavedAtMs > 0
+        ? snapshot.session.lastSavedAtMs
+        : clock.nowMs;
+    final activeAtMs = snapshot.session.lastActiveAtMs > 0
+        ? snapshot.session.lastActiveAtMs
+        : savedAtMs;
+
+    await db.transaction(() async {
+      await _writePreparedSnapshot(
+        prepared,
+        savedAtMs: savedAtMs,
+        activeAtMs: activeAtMs,
+        lastOfflineClaimAtMs: math.max(
+          0,
+          snapshot.session.lastOfflineClaimAtMs,
+        ),
+        clockState: snapshot.clockState,
+        deleteAllPlayerRowsFirst: false,
+      );
+    });
+  }
+
+  /// Mengganti seluruh data pemain dalam satu transaksi atomik tanpa menyentuh
+  /// `GameSettings`. Mengosongkan sesi dungeon aktif, menyetel jangkar offline
+  /// ke [restoredAtMs] dengan mode pause, serta menjaga `ClockState.lastSeenAtMs`
+  /// minimal sebesar nilai lokal sebelumnya.
+  @override
+  Future<void> replaceSnapshot(
+    PlayerSaveSnapshot snapshot, {
+    required int restoredAtMs,
+    @visibleForTesting void Function()? beforeCommitHook,
+  }) async {
+    final safeRestoredAt = math.max(0, restoredAtMs);
+    final sanitizedSnapshot = PlayerSaveSnapshot(
+      playerId: snapshot.playerId,
+      character: snapshot.character,
+      inventory: snapshot.inventory,
+      dungeon: snapshot.dungeon,
+      dungeonProgresses: snapshot.dungeonProgresses,
+      cycleProgress: snapshot.cycleProgress,
+      session: snapshot.session.copyWith(
+        lastActiveAtMs: safeRestoredAt,
+        lastSavedAtMs: safeRestoredAt,
+        lastOfflineClaimAtMs: safeRestoredAt,
+      ),
+      claimedEventIds: snapshot.claimedEventIds,
+      activeDungeonSession: null,
+      offlineActivity: const OfflineActivitySnapshot.paused(),
+      shopPurchases: snapshot.shopPurchases,
+      eventShopPurchases: snapshot.eventShopPurchases,
+      currencies: snapshot.currencies,
+      clockState: snapshot.clockState,
+      periodicQuestStates: snapshot.periodicQuestStates,
+    );
+    final prepared = _validateAndPrepareSnapshot(sanitizedSnapshot);
+
+    await db.transaction(() async {
+      final existingClock = await (db.select(
+        db.clockStates,
+      )..where((t) => t.playerId.equals(prepared.pid))).getSingleOrNull();
+      final mergedClockState = ClockState(
+        lastSeenAtMs: math.max(
+          0,
+          math.max(
+            snapshot.clockState.lastSeenAtMs,
+            existingClock?.lastSeenAtMs ?? 0,
+          ),
+        ),
+        forwardJumpCount: math.max(0, snapshot.clockState.forwardJumpCount),
+        maxForwardJumpMs: math.max(0, snapshot.clockState.maxForwardJumpMs),
+      );
+
+      await _writePreparedSnapshot(
+        prepared,
+        savedAtMs: safeRestoredAt,
+        activeAtMs: safeRestoredAt,
+        lastOfflineClaimAtMs: safeRestoredAt,
+        clockState: mergedClockState,
+        deleteAllPlayerRowsFirst: true,
+      );
+
+      beforeCommitHook?.call();
+    });
+  }
+
+  _PreparedSnapshotWrite _validateAndPrepareSnapshot(
+    PlayerSaveSnapshot snapshot,
+  ) {
     final pid = snapshot.playerId;
     final progress = snapshot.character.progress;
     _validateProgress(progress);
@@ -200,6 +347,41 @@ class DriftPlayerSaveRepository
       }
     }
 
+    for (final currency in snapshot.currencies.entries) {
+      final cid = currency.key.trim();
+      if (cid.isEmpty) {
+        throw StateError('Empty currency id in snapshot.');
+      }
+      if (currency.value < 0) {
+        throw StateError(
+          'Negative currency amount (${currency.value}) for "$cid".',
+        );
+      }
+      if (config.currencies.isNotEmpty && !config.currencies.containsKey(cid)) {
+        throw StateError('Unknown currency "$cid".');
+      }
+    }
+    for (final q in snapshot.periodicQuestStates) {
+      if (q.questId.trim().isEmpty || q.periodKey.trim().isEmpty) {
+        throw StateError('Empty questId/periodKey in periodicQuestStates.');
+      }
+      if (q.completedAtMs < 0) {
+        throw StateError(
+          'Negative completedAtMs (${q.completedAtMs}) for quest "${q.questId}".',
+        );
+      }
+    }
+    for (final p in snapshot.eventShopPurchases) {
+      if (p.entryId.trim().isEmpty || p.periodKey.trim().isEmpty) {
+        throw StateError('Empty entryId/periodKey in eventShopPurchases.');
+      }
+      if (p.purchasedCount < 0) {
+        throw StateError(
+          'Negative purchasedCount (${p.purchasedCount}) for "${p.entryId}".',
+        );
+      }
+    }
+
     final specId = snapshot.character.specializationId;
     if (specId != null &&
         !config.specializations.definitions.containsKey(specId)) {
@@ -225,33 +407,35 @@ class DriftPlayerSaveRepository
       snapshot.cycleProgress.highestAscensionRank,
     );
 
-    final savedAtMs = snapshot.session.lastSavedAtMs > 0
-        ? snapshot.session.lastSavedAtMs
-        : DateTime.now().millisecondsSinceEpoch;
-    final activeAtMs = snapshot.session.lastActiveAtMs > 0
-        ? snapshot.session.lastActiveAtMs
-        : savedAtMs;
+    return _PreparedSnapshotWrite(
+      snapshot: snapshot,
+      pid: pid,
+      progress: progress,
+      allEquipment: allEquipment,
+      specId: specId,
+      safeLastNormalId: safeLastNormalId,
+      safeAscensionRank: safeAscensionRank,
+      safeHighestAscensionRank: safeHighestAscensionRank,
+    );
+  }
+
+  Future<void> _writePreparedSnapshot(
+    _PreparedSnapshotWrite prepared, {
+    required int savedAtMs,
+    required int activeAtMs,
+    required int lastOfflineClaimAtMs,
+    required ClockState clockState,
+    required bool deleteAllPlayerRowsFirst,
+  }) async {
+    final snapshot = prepared.snapshot;
+    final pid = prepared.pid;
+    final progress = prepared.progress;
+    final specId = prepared.specId;
     final baseStats = config.progression.statsAt(progress.level);
 
-    await db.transaction(() async {
-      await db
-          .into(db.players)
-          .insertOnConflictUpdate(
-            PlayersCompanion.insert(
-              id: pid,
-              level: progress.level,
-              currentExp: progress.currentExp,
-              gold: progress.gold,
-              currentHp: Value(snapshot.character.currentHp),
-              activeSpecializationId: Value(specId),
-              baseStatsJson: jsonEncode(_encodeCombatStats(baseStats)),
-              equipmentCounter: Value(snapshot.inventory.equipmentCounter),
-              lastSavedAtMs: savedAtMs,
-            ),
-          );
-
-      // Ganti baris anak secara bersih di dalam transaksi atomik agar tidak
-      // pernah meninggalkan item duplikat atau slot lama yang terlepas.
+    if (deleteAllPlayerRowsFirst) {
+      // Hapus seluruh baris milik pemain (kecuali GameSettings, CloudSyncStates,
+      // LocalSaveBackups) sebelum menulis ulang data terpulihkan.
       await (db.delete(
         db.equippedItems,
       )..where((t) => t.playerId.equals(pid))).go();
@@ -264,171 +448,275 @@ class DriftPlayerSaveRepository
       await (db.delete(
         db.skillProgresses,
       )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.dungeonProgresses,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.cycleProgresses,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.gameSessions,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.claimedRewards,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.shopPurchases,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.currencies,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.clockStates,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.periodicQuestStates,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.eventShopPurchases,
+      )..where((t) => t.playerId.equals(pid))).go();
+    } else {
+      await (db.delete(
+        db.equippedItems,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.equipmentInstances,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.inventoryEntries,
+      )..where((t) => t.playerId.equals(pid))).go();
+      await (db.delete(
+        db.skillProgresses,
+      )..where((t) => t.playerId.equals(pid))).go();
+    }
 
-      if (config.skills.isNotEmpty) {
-        final skillRows = <SkillProgressesCompanion>[];
-        for (final skill in config.skills.values) {
-          final level = math.min(
-            skill.maxLevel,
-            math.max(1, snapshot.character.skillLevels[skill.id] ?? 1),
-          );
-          final unlocked =
-              progress.level >= skill.unlockLevel &&
-              (skill.specializationId == null ||
-                  skill.specializationId == specId);
-          final cooldown = math.max(
-            0,
-            snapshot.character.skillCooldownTicks[skill.id] ?? 0,
-          );
-          skillRows.add(
-            SkillProgressesCompanion.insert(
-              playerId: pid,
-              skillId: skill.id,
-              skillLevel: level,
-              unlocked: unlocked,
-              cooldownTicksRemaining: Value(cooldown),
-            ),
-          );
-        }
-        await db.batch((b) => b.insertAll(db.skillProgresses, skillRows));
+    await db
+        .into(db.players)
+        .insertOnConflictUpdate(
+          PlayersCompanion.insert(
+            id: pid,
+            level: progress.level,
+            currentExp: progress.currentExp,
+            gold: progress.gold,
+            currentHp: Value(snapshot.character.currentHp),
+            activeSpecializationId: Value(specId),
+            baseStatsJson: jsonEncode(_encodeCombatStats(baseStats)),
+            equipmentCounter: Value(snapshot.inventory.equipmentCounter),
+            lastSavedAtMs: savedAtMs,
+          ),
+        );
+
+    if (config.skills.isNotEmpty) {
+      final skillRows = <SkillProgressesCompanion>[];
+      for (final skill in config.skills.values) {
+        final level = math.min(
+          skill.maxLevel,
+          math.max(1, snapshot.character.skillLevels[skill.id] ?? 1),
+        );
+        final unlocked =
+            progress.level >= skill.unlockLevel &&
+            (skill.specializationId == null ||
+                skill.specializationId == specId);
+        final cooldown = math.max(
+          0,
+          snapshot.character.skillCooldownTicks[skill.id] ?? 0,
+        );
+        skillRows.add(
+          SkillProgressesCompanion.insert(
+            playerId: pid,
+            skillId: skill.id,
+            skillLevel: level,
+            unlocked: unlocked,
+            cooldownTicksRemaining: Value(cooldown),
+          ),
+        );
       }
+      await db.batch((b) => b.insertAll(db.skillProgresses, skillRows));
+    }
 
-      final stackRows = [
-        for (final entry in snapshot.inventory.stacks.entries)
-          if (entry.value > 0)
-            InventoryEntriesCompanion.insert(
-              playerId: pid,
-              itemId: entry.key,
-              quantity: entry.value,
+    final stackRows = [
+      for (final entry in snapshot.inventory.stacks.entries)
+        if (entry.value > 0)
+          InventoryEntriesCompanion.insert(
+            playerId: pid,
+            itemId: entry.key,
+            quantity: entry.value,
+          ),
+    ];
+    if (stackRows.isNotEmpty) {
+      await db.batch((b) => b.insertAll(db.inventoryEntries, stackRows));
+    }
+
+    if (prepared.allEquipment.isNotEmpty) {
+      final instanceRows = [
+        for (final item in prepared.allEquipment)
+          EquipmentInstancesCompanion.insert(
+            playerId: pid,
+            instanceId: item.id,
+            definitionId: item.definitionId,
+            slot: item.slot.name,
+            rarity: item.rarity.name,
+            rolledStatsJson: jsonEncode(
+              _encodeEquipmentStats(item.rolledStats),
             ),
+            enhancementLevel: Value(item.enhancementLevel),
+          ),
       ];
-      if (stackRows.isNotEmpty) {
-        await db.batch((b) => b.insertAll(db.inventoryEntries, stackRows));
-      }
+      await db.batch((b) => b.insertAll(db.equipmentInstances, instanceRows));
+    }
 
-      if (allEquipment.isNotEmpty) {
-        final instanceRows = [
-          for (final item in allEquipment)
-            EquipmentInstancesCompanion.insert(
-              playerId: pid,
-              instanceId: item.id,
-              definitionId: item.definitionId,
-              slot: item.slot.name,
-              rarity: item.rarity.name,
-              rolledStatsJson: jsonEncode(
-                _encodeEquipmentStats(item.rolledStats),
-              ),
-              enhancementLevel: Value(item.enhancementLevel),
-            ),
-        ];
-        await db.batch((b) => b.insertAll(db.equipmentInstances, instanceRows));
-      }
+    if (snapshot.character.equipped.isNotEmpty) {
+      final equippedRows = [
+        for (final entry in snapshot.character.equipped.entries)
+          EquippedItemsCompanion.insert(
+            playerId: pid,
+            slot: entry.key.name,
+            equipmentInstanceId: entry.value.id,
+          ),
+      ];
+      await db.batch((b) => b.insertAll(db.equippedItems, equippedRows));
+    }
 
-      if (snapshot.character.equipped.isNotEmpty) {
-        final equippedRows = [
-          for (final entry in snapshot.character.equipped.entries)
-            EquippedItemsCompanion.insert(
-              playerId: pid,
-              slot: entry.key.name,
-              equipmentInstanceId: entry.value.id,
-            ),
-        ];
-        await db.batch((b) => b.insertAll(db.equippedItems, equippedRows));
-      }
-
-      final allDungeonProgresses = <String, DungeonProgressSnapshot>{
-        ...snapshot.dungeonProgresses,
-        snapshot.dungeon.currentDungeonId: snapshot.dungeon,
-      };
-      for (final dungeon in allDungeonProgresses.values) {
-        await db
-            .into(db.dungeonProgresses)
-            .insertOnConflictUpdate(
-              DungeonProgressesCompanion.insert(
-                playerId: pid,
-                dungeonId: dungeon.currentDungeonId,
-                currentRoomId: dungeon.currentRoomId,
-                currentRoomIndex: math.max(0, dungeon.currentRoomIndex),
-                highestClearedRoomIndex: math.max(
-                  -1,
-                  dungeon.highestClearedRoomIndex,
-                ),
-                clearsCount: math.max(0, dungeon.clearsCount),
-                clearedInCycleRank: Value(
-                  math.max(-1, dungeon.clearedInCycleRank),
-                ),
-                rewardStateJson: Value(
-                  jsonEncode(_encodeRewardState(dungeon.rewardState)),
-                ),
-              ),
-            );
-      }
-
+    final allDungeonProgresses = <String, DungeonProgressSnapshot>{
+      ...snapshot.dungeonProgresses,
+      snapshot.dungeon.currentDungeonId: snapshot.dungeon,
+    };
+    for (final dungeon in allDungeonProgresses.values) {
       await db
-          .into(db.cycleProgresses)
+          .into(db.dungeonProgresses)
           .insertOnConflictUpdate(
-            CycleProgressesCompanion.insert(
+            DungeonProgressesCompanion.insert(
               playerId: pid,
-              ascensionRank: Value(safeAscensionRank),
-              highestAscensionRank: Value(safeHighestAscensionRank),
-              lastNormalDungeonId: Value(safeLastNormalId),
-              updatedAtMs: savedAtMs,
-            ),
-          );
-
-      for (final purchase in snapshot.shopPurchases.entries) {
-        final entryId = purchase.key.trim();
-        if (entryId.isEmpty || purchase.value < 0) continue;
-        await db
-            .into(db.shopPurchases)
-            .insertOnConflictUpdate(
-              ShopPurchasesCompanion.insert(
-                playerId: pid,
-                entryId: entryId,
-                purchasedCount: Value(purchase.value),
+              dungeonId: dungeon.currentDungeonId,
+              currentRoomId: dungeon.currentRoomId,
+              currentRoomIndex: math.max(0, dungeon.currentRoomIndex),
+              highestClearedRoomIndex: math.max(
+                -1,
+                dungeon.highestClearedRoomIndex,
               ),
-            );
-      }
-
-      await db
-          .into(db.gameSessions)
-          .insertOnConflictUpdate(
-            GameSessionsCompanion.insert(
-              id: pid,
-              playerId: pid,
-              lastActiveAtMs: math.max(0, activeAtMs),
-              lastSavedAtMs: math.max(0, savedAtMs),
-              lastOfflineClaimAtMs: math.max(
-                0,
-                snapshot.session.lastOfflineClaimAtMs,
+              clearsCount: math.max(0, dungeon.clearsCount),
+              clearedInCycleRank: Value(
+                math.max(-1, dungeon.clearedInCycleRank),
               ),
-              autoSkillEnabled: snapshot.session.autoSkillEnabled,
-              sessionDataJson: Value(
-                jsonEncode(
-                  _encodeSessionData(
-                    active: snapshot.activeDungeonSession,
-                    offlineActivity: snapshot.offlineActivity,
-                    consecutiveDefeats: snapshot.session.consecutiveDefeats,
-                    lastFailedDungeonId: snapshot.session.lastFailedDungeonId,
-                  ),
-                ),
+              rewardStateJson: Value(
+                jsonEncode(_encodeRewardState(dungeon.rewardState)),
               ),
             ),
           );
+    }
 
-      if (snapshot.claimedEventIds.isNotEmpty) {
-        await db.batch((b) {
-          b.insertAll(db.claimedRewards, [
-            for (final eventId in snapshot.claimedEventIds)
-              ClaimedRewardsCompanion.insert(
-                playerId: pid,
-                eventId: eventId,
-                claimedAtMs: savedAtMs,
+    await db
+        .into(db.cycleProgresses)
+        .insertOnConflictUpdate(
+          CycleProgressesCompanion.insert(
+            playerId: pid,
+            ascensionRank: Value(prepared.safeAscensionRank),
+            highestAscensionRank: Value(prepared.safeHighestAscensionRank),
+            lastNormalDungeonId: Value(prepared.safeLastNormalId),
+            updatedAtMs: savedAtMs,
+          ),
+        );
+
+    for (final purchase in snapshot.shopPurchases.entries) {
+      final entryId = purchase.key.trim();
+      if (entryId.isEmpty || purchase.value < 0) continue;
+      await db
+          .into(db.shopPurchases)
+          .insertOnConflictUpdate(
+            ShopPurchasesCompanion.insert(
+              playerId: pid,
+              entryId: entryId,
+              purchasedCount: Value(purchase.value),
+            ),
+          );
+    }
+
+    await _replaceCurrencies(pid: pid, currencies: snapshot.currencies);
+
+    await db
+        .into(db.gameSessions)
+        .insertOnConflictUpdate(
+          GameSessionsCompanion.insert(
+            id: pid,
+            playerId: pid,
+            lastActiveAtMs: math.max(0, activeAtMs),
+            lastSavedAtMs: math.max(0, savedAtMs),
+            lastOfflineClaimAtMs: math.max(0, lastOfflineClaimAtMs),
+            autoSkillEnabled: snapshot.session.autoSkillEnabled,
+            sessionDataJson: Value(
+              jsonEncode(
+                _encodeSessionData(
+                  active: snapshot.activeDungeonSession,
+                  offlineActivity: snapshot.offlineActivity,
+                  consecutiveDefeats: snapshot.session.consecutiveDefeats,
+                  lastFailedDungeonId: snapshot.session.lastFailedDungeonId,
+                ),
               ),
-          ], mode: InsertMode.insertOrIgnore);
-        });
+            ),
+          ),
+        );
+
+    if (snapshot.claimedEventIds.isNotEmpty) {
+      await db.batch((b) {
+        b.insertAll(db.claimedRewards, [
+          for (final eventId in snapshot.claimedEventIds)
+            ClaimedRewardsCompanion.insert(
+              playerId: pid,
+              eventId: eventId,
+              claimedAtMs: savedAtMs,
+            ),
+        ], mode: InsertMode.insertOrIgnore);
+      });
+    }
+
+    if (clockState.lastSeenAtMs > 0 ||
+        clockState.forwardJumpCount > 0 ||
+        clockState.maxForwardJumpMs > 0) {
+      await db
+          .into(db.clockStates)
+          .insertOnConflictUpdate(
+            ClockStatesCompanion.insert(
+              playerId: pid,
+              lastSeenAtMs: Value(math.max(0, clockState.lastSeenAtMs)),
+              forwardJumpCount: Value(math.max(0, clockState.forwardJumpCount)),
+              maxForwardJumpMs: Value(math.max(0, clockState.maxForwardJumpMs)),
+            ),
+          );
+    }
+
+    for (final q in snapshot.periodicQuestStates) {
+      final qid = q.questId.trim();
+      final pkey = q.periodKey.trim();
+      if (qid.isEmpty || pkey.isEmpty) continue;
+      await db
+          .into(db.periodicQuestStates)
+          .insertOnConflictUpdate(
+            PeriodicQuestStatesCompanion.insert(
+              playerId: pid,
+              questId: qid,
+              periodKey: pkey,
+              completedAtMs: math.max(0, q.completedAtMs),
+            ),
+          );
+    }
+
+    for (final p in snapshot.eventShopPurchases) {
+      final entryId = p.entryId.trim();
+      final periodKey = p.periodKey.trim();
+      if (entryId.isEmpty || periodKey.isEmpty || p.purchasedCount < 0) {
+        continue;
       }
-    });
+      await db
+          .into(db.eventShopPurchases)
+          .insertOnConflictUpdate(
+            EventShopPurchasesCompanion.insert(
+              playerId: pid,
+              entryId: entryId,
+              periodKey: periodKey,
+              purchasedCount: Value(p.purchasedCount),
+            ),
+          );
+    }
   }
 
   @override
@@ -724,6 +1012,64 @@ class DriftPlayerSaveRepository
           if (r.purchasedCount > 0) r.entryId: r.purchasedCount,
       };
 
+      final currencyRows = await (db.select(
+        db.currencies,
+      )..where((t) => t.playerId.equals(playerId))).get();
+      final currencies = <String, int>{};
+      for (final r in currencyRows) {
+        if (r.amount < 0) {
+          _warn(
+            'Saldo currency "${r.currencyId}" negatif (${r.amount}); dijepit ke 0.',
+          );
+          continue;
+        }
+        if (r.amount > 0) {
+          final maxAmount = config.currencies[r.currencyId]?.maxAmount;
+          currencies[r.currencyId] = maxAmount != null
+              ? math.min(r.amount, maxAmount)
+              : r.amount;
+        }
+      }
+
+      final clockRow = await (db.select(
+        db.clockStates,
+      )..where((t) => t.playerId.equals(playerId))).getSingleOrNull();
+      final clockState = clockRow == null
+          ? const ClockState()
+          : ClockState(
+              lastSeenAtMs: math.max(0, clockRow.lastSeenAtMs),
+              forwardJumpCount: math.max(0, clockRow.forwardJumpCount),
+              maxForwardJumpMs: math.max(0, clockRow.maxForwardJumpMs),
+            );
+
+      final questRows = await (db.select(
+        db.periodicQuestStates,
+      )..where((t) => t.playerId.equals(playerId))).get();
+      final periodicQuestStates = <PeriodicQuestState>[
+        for (final r in questRows)
+          if (r.questId.trim().isNotEmpty && r.periodKey.trim().isNotEmpty)
+            PeriodicQuestState(
+              questId: r.questId.trim(),
+              periodKey: r.periodKey.trim(),
+              completedAtMs: math.max(0, r.completedAtMs),
+            ),
+      ];
+
+      final eventPurchaseRows = await (db.select(
+        db.eventShopPurchases,
+      )..where((t) => t.playerId.equals(playerId))).get();
+      final eventShopPurchases = <EventShopPurchaseRecord>[
+        for (final r in eventPurchaseRows)
+          if (r.entryId.trim().isNotEmpty &&
+              r.periodKey.trim().isNotEmpty &&
+              r.purchasedCount > 0)
+            EventShopPurchaseRecord(
+              entryId: r.entryId.trim(),
+              periodKey: r.periodKey.trim(),
+              purchasedCount: r.purchasedCount,
+            ),
+      ];
+
       return PlayerSaveSnapshot(
         playerId: playerId,
         character: PlayerCharacterSnapshot(
@@ -751,6 +1097,14 @@ class DriftPlayerSaveRepository
         activeDungeonSession: activeDungeonSession,
         offlineActivity: decodedSessionData.offlineActivity,
         shopPurchases: Map.unmodifiable(shopPurchases),
+        eventShopPurchases: List<EventShopPurchaseRecord>.unmodifiable(
+          eventShopPurchases,
+        ),
+        currencies: Map.unmodifiable(currencies),
+        clockState: clockState,
+        periodicQuestStates: List<PeriodicQuestState>.unmodifiable(
+          periodicQuestStates,
+        ),
       );
     });
   }
@@ -777,7 +1131,7 @@ class DriftPlayerSaveRepository
       cycleProgress.lastNormalDungeonId,
       rawHighestRank: cycleProgress.highestAscensionRank,
     );
-    final nowMs = math.max(0, DateTime.now().millisecondsSinceEpoch);
+    final nowMs = math.max(0, clock.nowMs);
     await db.transaction(() async {
       await _ensurePlayerRowExists(nowMs);
       await db
@@ -806,10 +1160,7 @@ class DriftPlayerSaveRepository
       cycleProgress.lastNormalDungeonId,
       rawHighestRank: cycleProgress.highestAscensionRank,
     );
-    final safeUpdatedAtMs = math.max(
-      0,
-      updatedAtMs ?? DateTime.now().millisecondsSinceEpoch,
-    );
+    final safeUpdatedAtMs = math.max(0, updatedAtMs ?? clock.nowMs);
     final normalizedClaimId = claimEventId?.trim();
 
     await db.transaction(() async {
@@ -894,10 +1245,7 @@ class DriftPlayerSaveRepository
       equipped: equipped,
       stacks: inventory.stacks,
     );
-    final safeUpdatedAtMs = math.max(
-      0,
-      updatedAtMs ?? DateTime.now().millisecondsSinceEpoch,
-    );
+    final safeUpdatedAtMs = math.max(0, updatedAtMs ?? clock.nowMs);
     final normalizedActionId = actionId?.trim();
     final claimKey =
         (normalizedActionId != null && normalizedActionId.isNotEmpty)
@@ -959,6 +1307,215 @@ class DriftPlayerSaveRepository
             );
       }
     });
+  }
+
+  // ---- EventShopPurchaseRepository (pembelian Event Shop atomik) ----
+
+  @override
+  Future<List<EventShopPurchaseRecord>> loadEventShopPurchases() async {
+    final rows = await (db.select(
+      db.eventShopPurchases,
+    )..where((t) => t.playerId.equals(playerId))).get();
+    return List<EventShopPurchaseRecord>.unmodifiable([
+      for (final row in rows)
+        if (row.entryId.trim().isNotEmpty &&
+            row.periodKey.trim().isNotEmpty &&
+            row.purchasedCount > 0)
+          EventShopPurchaseRecord(
+            entryId: row.entryId.trim(),
+            periodKey: row.periodKey.trim(),
+            purchasedCount: row.purchasedCount,
+          ),
+    ]);
+  }
+
+  @override
+  Future<void> saveEventShopTransaction({
+    required PlayerProgress progress,
+    required InventorySnapshot inventory,
+    required Map<EquipmentSlot, EquipmentInstance> equipped,
+    required Map<String, int> currencies,
+    required EventShopPurchaseRecord purchase,
+    String? actionId,
+    int? updatedAtMs,
+  }) async {
+    _validateProgress(progress);
+    final entryId = purchase.entryId.trim();
+    final periodKey = purchase.periodKey.trim();
+    if (entryId.isEmpty || periodKey.isEmpty || purchase.purchasedCount < 0) {
+      throw StateError('Data EventShopPurchaseRecord tidak valid.');
+    }
+    for (final c in currencies.entries) {
+      final cid = c.key.trim();
+      if (cid.isEmpty || c.value < 0) {
+        throw StateError('Saldo currency "$cid" tidak valid (${c.value}).');
+      }
+      if (config.currencies.isNotEmpty && !config.currencies.containsKey(cid)) {
+        throw StateError('Unknown currency "$cid".');
+      }
+    }
+    final allEquipment = _collectAndValidateEquipment(
+      bagEquipment: inventory.equipment,
+      equipped: equipped,
+      stacks: inventory.stacks,
+    );
+    final safeUpdatedAtMs = math.max(0, updatedAtMs ?? clock.nowMs);
+    final normalizedActionId = actionId?.trim();
+    final claimKey =
+        (normalizedActionId != null && normalizedActionId.isNotEmpty)
+        ? 'eventshop:$normalizedActionId:$periodKey'
+        : null;
+
+    await db.transaction(() async {
+      await _ensurePlayerRowExists(safeUpdatedAtMs);
+
+      if (claimKey != null) {
+        final existingClaim =
+            await (db.select(db.claimedRewards)..where(
+                  (t) =>
+                      t.playerId.equals(playerId) & t.eventId.equals(claimKey),
+                ))
+                .getSingleOrNull();
+        if (existingClaim != null) {
+          return;
+        }
+        await db
+            .into(db.claimedRewards)
+            .insert(
+              ClaimedRewardsCompanion.insert(
+                playerId: playerId,
+                eventId: claimKey,
+                claimedAtMs: safeUpdatedAtMs,
+              ),
+            );
+      }
+
+      await (db.update(db.players)..where((t) => t.id.equals(playerId))).write(
+        PlayersCompanion(
+          equipmentCounter: Value(math.max(0, inventory.equipmentCounter)),
+          lastSavedAtMs: Value(safeUpdatedAtMs),
+        ),
+      );
+
+      await _replaceInventoryAndEquipmentRows(
+        pid: playerId,
+        stacks: inventory.stacks,
+        allEquipment: allEquipment,
+        equipped: equipped,
+      );
+
+      await _replaceCurrencies(pid: playerId, currencies: currencies);
+
+      await db
+          .into(db.eventShopPurchases)
+          .insertOnConflictUpdate(
+            EventShopPurchasesCompanion.insert(
+              playerId: playerId,
+              entryId: entryId,
+              periodKey: periodKey,
+              purchasedCount: Value(purchase.purchasedCount),
+            ),
+          );
+    });
+  }
+
+  Future<void> _replaceCurrencies({
+    required String pid,
+    required Map<String, int> currencies,
+  }) async {
+    await (db.delete(db.currencies)..where((t) => t.playerId.equals(pid))).go();
+    for (final currency in currencies.entries) {
+      final cid = currency.key.trim();
+      if (cid.isEmpty || currency.value <= 0) continue;
+      final maxAmount = config.currencies[cid]?.maxAmount;
+      final clamped = maxAmount != null
+          ? math.min(currency.value, maxAmount)
+          : currency.value;
+      if (clamped <= 0) continue;
+      await db
+          .into(db.currencies)
+          .insertOnConflictUpdate(
+            CurrenciesCompanion.insert(
+              playerId: pid,
+              currencyId: cid,
+              amount: Value(clamped),
+            ),
+          );
+    }
+  }
+
+  // ---- ClockStateRepository & ClaimedRewardsPruningRepository ----
+
+  @override
+  Future<ClockState> loadClockState() async {
+    final row = await (db.select(
+      db.clockStates,
+    )..where((t) => t.playerId.equals(playerId))).getSingleOrNull();
+    if (row == null) return const ClockState();
+    return ClockState(
+      lastSeenAtMs: math.max(0, row.lastSeenAtMs),
+      forwardJumpCount: math.max(0, row.forwardJumpCount),
+      maxForwardJumpMs: math.max(0, row.maxForwardJumpMs),
+    );
+  }
+
+  @override
+  Future<void> saveClockState(ClockState state) async {
+    final safeLastSeen = math.max(0, state.lastSeenAtMs);
+    await db.transaction(() async {
+      await _ensurePlayerRowExists(safeLastSeen);
+      await db
+          .into(db.clockStates)
+          .insertOnConflictUpdate(
+            ClockStatesCompanion.insert(
+              playerId: playerId,
+              lastSeenAtMs: Value(safeLastSeen),
+              forwardJumpCount: Value(math.max(0, state.forwardJumpCount)),
+              maxForwardJumpMs: Value(math.max(0, state.maxForwardJumpMs)),
+            ),
+          );
+    });
+  }
+
+  @override
+  Future<int> pruneClaimedRewards({
+    required int cutoffMs,
+    String? activeRunId,
+    Set<String> activePeriodKeys = const {},
+  }) async {
+    const pruner = ClaimedRewardsPruner();
+    final candidates =
+        await (db.select(db.claimedRewards)..where(
+              (t) =>
+                  t.playerId.equals(playerId) &
+                  t.claimedAtMs.isSmallerThanValue(cutoffMs),
+            ))
+            .get();
+    final toDelete = <String>[
+      for (final row in candidates)
+        if (pruner.shouldPrune(
+          eventId: row.eventId,
+          claimedAtMs: row.claimedAtMs,
+          cutoffMs: cutoffMs,
+          activeRunId: activeRunId,
+          activePeriodKeys: activePeriodKeys,
+        ))
+          row.eventId,
+    ];
+    if (toDelete.isEmpty) return 0;
+
+    const batchSize = 500;
+    await db.transaction(() async {
+      for (var i = 0; i < toDelete.length; i += batchSize) {
+        final end = math.min(i + batchSize, toDelete.length);
+        final chunk = toDelete.sublist(i, end);
+        await (db.delete(db.claimedRewards)..where(
+              (t) => t.playerId.equals(playerId) & t.eventId.isIn(chunk),
+            ))
+            .go();
+      }
+    });
+    return toDelete.length;
   }
 
   List<EquipmentInstance> _collectAndValidateEquipment({
@@ -1167,6 +1724,9 @@ class DriftPlayerSaveRepository
     'hp': s.hp,
     'atk': s.atk,
     'def': s.def,
+    'hpPct': s.hpPct,
+    'atkPct': s.atkPct,
+    'defPct': s.defPct,
     'critRate': s.critRate,
     'critDamage': s.critDamage,
     'attackSpeed': s.attackSpeed,
@@ -1195,6 +1755,9 @@ class DriftPlayerSaveRepository
         hp: numOr('hp', 0),
         atk: numOr('atk', 0),
         def: numOr('def', 0),
+        hpPct: numOr('hpPct', 0),
+        atkPct: numOr('atkPct', 0),
+        defPct: numOr('defPct', 0),
         critRate: numOr('critRate', 0),
         critDamage: numOr('critDamage', 0),
         attackSpeed: numOr('attackSpeed', 0),
@@ -1284,6 +1847,11 @@ class DriftPlayerSaveRepository
         'reviveCooldownTicks': math.max(0, active.reviveCooldownTicks),
         'playerStatus': active.playerStatus.name,
         'cycleRank': math.max(0, active.cycleRank),
+        if (active.bossEventId != null && active.bossEventId!.trim().isNotEmpty)
+          'bossEventId': active.bossEventId!.trim(),
+        if (active.periodKeyAtStart != null &&
+            active.periodKeyAtStart!.trim().isNotEmpty)
+          'periodKeyAtStart': active.periodKeyAtStart!.trim(),
       };
     }
 
@@ -1460,8 +2028,27 @@ class DriftPlayerSaveRepository
       return null;
     }
 
-    // Validasi silang terhadap config.dungeons hanya jika katalog dungeon tersedia.
-    if (config.dungeons.isNotEmpty) {
+    final rawBossEventId = inner['bossEventId'];
+    final bossEventId =
+        rawBossEventId is String && rawBossEventId.trim().isNotEmpty
+        ? rawBossEventId.trim()
+        : null;
+    final rawPeriodKeyAtStart = inner['periodKeyAtStart'];
+    final periodKeyAtStart =
+        rawPeriodKeyAtStart is String && rawPeriodKeyAtStart.trim().isNotEmpty
+        ? rawPeriodKeyAtStart.trim()
+        : null;
+
+    // Validasi silang terhadap config.dungeons atau config.bossEvents.
+    if (bossEventId != null) {
+      if (config.bossEvents != null &&
+          config.bossEvents!.findBossById(bossEventId) == null) {
+        _warn(
+          'Sesi merujuk bossEventId tidak dikenal ("$bossEventId"); diarahkan ke Town.',
+        );
+        return null;
+      }
+    } else if (config.dungeons.isNotEmpty) {
       final dungeon = config.dungeons[dungeonId];
       final room = dungeon?.roomById(currentRoomId);
       if (dungeon == null || room == null) {
@@ -1512,6 +2099,8 @@ class DriftPlayerSaveRepository
       reviveCooldownTicks: reviveTicks,
       playerStatus: playerStatus,
       cycleRank: sessionCycleRank,
+      bossEventId: bossEventId,
+      periodKeyAtStart: periodKeyAtStart,
     );
   }
 
@@ -1678,4 +2267,26 @@ class DriftPlayerSaveRepository
           : null,
     );
   }
+}
+
+class _PreparedSnapshotWrite {
+  const _PreparedSnapshotWrite({
+    required this.snapshot,
+    required this.pid,
+    required this.progress,
+    required this.allEquipment,
+    required this.specId,
+    required this.safeLastNormalId,
+    required this.safeAscensionRank,
+    required this.safeHighestAscensionRank,
+  });
+
+  final PlayerSaveSnapshot snapshot;
+  final String pid;
+  final PlayerProgress progress;
+  final List<EquipmentInstance> allEquipment;
+  final String? specId;
+  final String? safeLastNormalId;
+  final int safeAscensionRank;
+  final int safeHighestAscensionRank;
 }

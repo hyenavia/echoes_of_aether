@@ -45,6 +45,23 @@ class StatBar extends StatelessWidget {
     kind: StatBarKind.exp,
   );
 
+  factory StatBar.progress({
+    Key? key,
+    required String label,
+    required num current,
+    required num max,
+    Color? barColor,
+    double height = 8,
+  }) => StatBar(
+    key: key,
+    label: label,
+    current: current,
+    max: max,
+    kind: StatBarKind.custom,
+    barColor: barColor,
+    height: height,
+  );
+
   final String label;
   final num current;
   final num max;
@@ -88,7 +105,11 @@ class StatBar extends StatelessWidget {
                 textAlign: TextAlign.end,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall,
+                style: AppTypography.numeric(
+                  theme.textTheme.labelSmall,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           ],
@@ -102,6 +123,75 @@ class StatBar extends StatelessWidget {
               value: ratio,
               backgroundColor: AppColors.deepForest,
               valueColor: AlwaysStoppedAnimation<Color>(fillColor),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bar progres generik untuk progres dungeon, cooldown, dan quest/achievement.
+class ProgressBar extends StatelessWidget {
+  const ProgressBar({
+    super.key,
+    required this.value,
+    this.label,
+    this.trailingText,
+    this.color = AppColors.aetherBlue,
+    this.height = 8,
+  });
+
+  final double value;
+  final String? label;
+  final String? trailingText;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final clamped = value.clamp(0.0, 1.0);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (label != null || trailingText != null) ...[
+          Row(
+            children: [
+              if (label != null)
+                Expanded(
+                  child: Text(
+                    label!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              if (trailingText != null)
+                Text(
+                  trailingText!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.numeric(
+                    theme.textTheme.labelSmall,
+                    color: color,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+        ],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: SizedBox(
+            height: height,
+            child: LinearProgressIndicator(
+              value: clamped,
+              backgroundColor: AppColors.deepForest,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
         ),

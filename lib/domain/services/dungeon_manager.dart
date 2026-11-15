@@ -1,11 +1,13 @@
 import '../entities/dungeon_definition.dart';
 import '../entities/dungeon_session.dart';
+import '../entities/enemy_definition.dart';
 import '../entities/grid_point.dart';
 import '../entities/player_save_snapshot.dart';
 import '../entities/player_status.dart';
 import '../entities/room_encounter.dart';
 import 'difficulty_service.dart';
 import 'encounter_tracker.dart';
+import 'game_clock.dart';
 import 'navigation_grid.dart';
 import 'room_completion_evaluator.dart';
 
@@ -126,9 +128,10 @@ class DungeonManager {
     this.completionEvaluator = const RoomCompletionEvaluator(),
     this.autoCompleteOnEncounter = false,
     String Function()? runIdGenerator,
+    GameClock clock = const SystemGameClock(),
     this.difficultyService,
   }) : _dungeons = Map.unmodifiable(dungeons),
-       _runIdGenerator = runIdGenerator ?? _defaultRunId {
+       _runIdGenerator = runIdGenerator ?? (() => _defaultRunId(clock)) {
     if (autoCompleteOnEncounter) {
       encounterTracker?.addListener(handleEncounterEvent);
     }
@@ -136,8 +139,8 @@ class DungeonManager {
 
   static int _runSequence = 0;
 
-  static String _defaultRunId() =>
-      'run_${DateTime.now().microsecondsSinceEpoch}_${++_runSequence}';
+  static String _defaultRunId(GameClock clock) =>
+      'run_${clock.nowMs}_${++_runSequence}';
 
   final Map<String, DungeonDefinition> _dungeons;
   final EncounterTracker? encounterTracker;
@@ -210,6 +213,7 @@ class DungeonManager {
     String? runId,
     String? startRoomId,
     int cycleRank = 0,
+    DifficultyProfile? difficultyProfileOverride,
   }) {
     if (hasActiveSession) {
       throw StateError(
@@ -248,7 +252,12 @@ class DungeonManager {
     _lastPlayerCell = null;
     _lastEvaluation = null;
     final effectiveRank = cycleRank < 0 ? 0 : cycleRank;
-    _applyDifficultyForRun(dungeon, effectiveRank);
+    if (difficultyProfileOverride != null) {
+      _activeDifficultyProfile = difficultyProfileOverride;
+      encounterTracker?.setDifficultyProfile(difficultyProfileOverride);
+    } else {
+      _applyDifficultyForRun(dungeon, effectiveRank);
+    }
     _session = DungeonSession(
       runId: resolvedRunId,
       dungeonId: dungeon.id,
@@ -264,6 +273,74 @@ class DungeonManager {
     return _session!;
   }
 
+  /// Memulai run Boss Event (Daily/Weekly) dari [DungeonDefinition] runtime,
+  /// mendaftarkan monster boss ke [encounterTracker], serta menerapkan
+  /// [difficultyProfile] boss.
+  DungeonSession startBossDungeon({
+    required DungeonDefinition bossDungeon,
+    required EnemyDefinition bossMonster,
+    required DifficultyProfile difficultyProfile,
+    required String bossEventId,
+    required String periodKeyAtStart,
+    int cycleRank = 0,
+    String? runId,
+  }) {
+    if (hasActiveSession) {
+      throw StateError(
+        'Sesi dungeon "${_session!.dungeonId}" (${_session!.runId}) masih aktif.',
+      );
+    }
+    if (!bossDungeon.isBossEvent) {
+      throw ArgumentError.value(
+        bossDungeon.kind,
+        'bossDungeon.kind',
+        'Harus bertipe bossDaily atau bossWeekly.',
+      );
+    }
+
+    final initialRoomId = bossDungeon.startRoomId;
+    final initialRoom = bossDungeon.roomById(initialRoomId);
+    final initialIndex = bossDungeon.indexOfRoom(initialRoomId);
+    if (initialRoom == null || initialIndex < 0) {
+      throw ArgumentError.value(
+        initialRoomId,
+        'startRoomId',
+        'Room awal tidak valid untuk boss dungeon "${bossDungeon.id}".',
+      );
+    }
+
+    final resolvedRunId = (runId != null && runId.trim().isNotEmpty)
+        ? runId
+        : _runIdGenerator();
+
+    encounterTracker?.registerRuntimeMonster(bossMonster);
+    _activeDungeon = bossDungeon;
+    _activeRoom = null;
+    _activeGrid = null;
+    _preparedSpawns = const [];
+    _lastPlayerCell = null;
+    _lastEvaluation = null;
+    final effectiveRank = cycleRank < 0 ? 0 : cycleRank;
+    _activeDifficultyProfile = difficultyProfile;
+    encounterTracker?.setDifficultyProfile(difficultyProfile);
+
+    _session = DungeonSession(
+      runId: resolvedRunId,
+      dungeonId: bossDungeon.id,
+      currentRoomId: initialRoomId,
+      currentRoomIndex: initialIndex,
+      cycleRank: effectiveRank,
+      status: DungeonSessionStatus.notStarted,
+      roomLifecycle: RoomLifecycleState.notLoaded,
+      bossEventId: bossEventId,
+      periodKeyAtStart: periodKeyAtStart,
+    ).transitionSession(DungeonSessionStatus.inProgress);
+
+    _emit(DungeonStartedEvent(_session!, bossDungeon));
+    loadRoom(initialRoomId);
+    return _session!;
+  }
+
   /// Memulihkan sesi dungeon `inProgress` (atau `roomCompleted` ke room
   /// berikutnya yang belum selesai) ke awal room terakhir yang tersimpan.
   ///
@@ -274,6 +351,9 @@ class DungeonManager {
   DungeonSession? restoreSession(
     ActiveDungeonSessionSnapshot saved, {
     int? cycleRank,
+    DungeonDefinition? runtimeDungeon,
+    EnemyDefinition? runtimeBossMonster,
+    DifficultyProfile? runtimeDifficultyProfile,
   }) {
     if (hasActiveSession) {
       throw StateError(
@@ -284,7 +364,7 @@ class DungeonManager {
       return null;
     }
 
-    final dungeon = _dungeons[saved.dungeonId];
+    final dungeon = runtimeDungeon ?? _dungeons[saved.dungeonId];
     if (dungeon == null) {
       return null;
     }
@@ -330,7 +410,15 @@ class DungeonManager {
     _transitionInProgress = false;
     final rawRank = cycleRank ?? saved.cycleRank;
     final effectiveRank = rawRank < 0 ? 0 : rawRank;
-    _applyDifficultyForRun(dungeon, effectiveRank);
+    if (runtimeBossMonster != null) {
+      encounterTracker?.registerRuntimeMonster(runtimeBossMonster);
+    }
+    if (runtimeDifficultyProfile != null) {
+      _activeDifficultyProfile = runtimeDifficultyProfile;
+      encounterTracker?.setDifficultyProfile(runtimeDifficultyProfile);
+    } else {
+      _applyDifficultyForRun(dungeon, effectiveRank);
+    }
 
     _session = DungeonSession(
       runId: saved.runId,
@@ -342,6 +430,8 @@ class DungeonManager {
       roomLifecycle: RoomLifecycleState.notLoaded,
       clearedRoomIds: Set<String>.unmodifiable(saved.clearedRoomIds),
       completionRewardClaimed: saved.completionRewardClaimed,
+      bossEventId: saved.bossEventId,
+      periodKeyAtStart: saved.periodKeyAtStart,
     );
 
     _emit(DungeonStartedEvent(_session!, dungeon));
@@ -375,6 +465,8 @@ class DungeonManager {
       reviveCooldownTicks: reviveCooldownTicks < 0 ? 0 : reviveCooldownTicks,
       playerStatus: playerStatus,
       cycleRank: current.cycleRank < 0 ? 0 : current.cycleRank,
+      bossEventId: current.bossEventId,
+      periodKeyAtStart: current.periodKeyAtStart,
     );
   }
 

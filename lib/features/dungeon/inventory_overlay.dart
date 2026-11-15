@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_tokens.dart';
+import '../../app/theme/echoes_theme.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/item_definition.dart';
 import '../shared/widgets/shared_widgets.dart';
@@ -53,15 +54,17 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
           child: PanelFrame(
+            showCornerOrnaments: true,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              AppSpacing.sm,
+              AppSpacing.sm + 2,
               AppSpacing.md,
               AppSpacing.lg,
             ),
@@ -83,19 +86,43 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
                   children: [
                     Row(
                       children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 18,
+                          color: ext.gold,
+                        ),
+                        const SizedBox(width: AppSpacing.xs + 2),
                         Expanded(
-                          child: Text(
-                            'Tas',
-                            style: theme.textTheme.titleMedium,
+                          child: Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.xs,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                'Tas',
+                                style: AppTypography.headingSerif(
+                                  theme.textTheme.titleMedium,
+                                  color: ext.gold,
+                                ),
+                              ),
+                              ResourceChip(
+                                icon: Icons.layers_outlined,
+                                label: 'Item',
+                                value: '${list.length}',
+                                accentColor: ext.expBar,
+                              ),
+                            ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: widget.onClose,
-                          icon: const Icon(Icons.close),
+                        AppIconButton(
+                          icon: Icons.close,
+                          semanticLabel: 'Tutup',
                           tooltip: 'Tutup',
+                          onPressed: widget.onClose,
                         ),
                       ],
                     ),
+                    const SizedBox(height: AppSpacing.xs),
                     buildItemFilterBar(
                       categories: const [
                         ItemCategoryFilter.all,
@@ -141,22 +168,30 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
                     const SizedBox(height: AppSpacing.xs),
                     SectionHeader(
                       title: 'Isi Tas',
+                      useSerif: true,
                       trailing: Text(
                         '${filtered.length} jenis',
-                        style: theme.textTheme.labelSmall,
+                        style: AppTypography.numeric(
+                          theme.textTheme.labelSmall,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                     Flexible(
                       child: list.isEmpty
-                          ? const EmptyState(
-                              icon: Icons.inventory_2_outlined,
-                              title: 'Belum ada item.',
-                              subtitle: 'Material dan item dari dungeon akan tersimpan di sini.',
+                          ? const SingleChildScrollView(
+                              child: EmptyState(
+                                icon: Icons.inventory_2_outlined,
+                                title: 'Belum ada item.',
+                                subtitle: 'Material dan item dari dungeon akan tersimpan di sini.',
+                              ),
                             )
                           : filtered.isEmpty
-                          ? const EmptyState(
-                              icon: Icons.filter_alt_off_outlined,
-                              title: 'Tidak ada item yang sesuai filter.',
+                          ? const SingleChildScrollView(
+                              child: EmptyState(
+                                icon: Icons.filter_alt_off_outlined,
+                                title: 'Tidak ada item yang sesuai filter.',
+                              ),
                             )
                           : ListView.separated(
                               shrinkWrap: true,
@@ -174,7 +209,10 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
                                   ),
                                   trailing: Text(
                                     'x${e.quantity}',
-                                    style: theme.textTheme.titleSmall,
+                                    style: AppTypography.numeric(
+                                      theme.textTheme.titleSmall,
+                                      color: ext.gold,
+                                    ),
                                   ),
                                 );
                               },

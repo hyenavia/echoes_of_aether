@@ -82,6 +82,23 @@ class JsonReader {
     return value;
   }
 
+  bool boolean(
+    Map<String, dynamic> map,
+    String where,
+    String key, {
+    bool? fallback,
+  }) {
+    final value = map[key];
+    if (value == null) {
+      if (fallback != null) return fallback;
+      throw ConfigException('$file: $where."$key" wajib diisi.');
+    }
+    if (value is! bool) {
+      throw ConfigException('$file: $where."$key" harus berupa boolean.');
+    }
+    return value;
+  }
+
   double number(
     Map<String, dynamic> map,
     String where,

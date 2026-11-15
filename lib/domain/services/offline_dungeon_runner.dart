@@ -58,6 +58,7 @@ class OfflineDungeonRunRequest {
     this.initialSkillCooldownTicks = const {},
     this.startingAttemptIndex = 1,
     this.cycleRank = 0,
+    this.difficultyProfileOverride,
   });
 
   static const int defaultMaxIterations = 50000;
@@ -79,6 +80,7 @@ class OfflineDungeonRunRequest {
   final Map<String, int> initialSkillCooldownTicks;
   final int startingAttemptIndex;
   final int cycleRank;
+  final DifficultyProfile? difficultyProfileOverride;
 }
 
 /// Hasil satu batch simulasi dari [OfflineDungeonRunner].
@@ -256,6 +258,13 @@ class OfflineDungeonRunner {
     if (request.mode == OfflineActivityMode.continueDungeon &&
         !dungeonDef.isNormal &&
         !allowManualAscension) {
+      final manualOnlyReason = switch (dungeonDef.kind) {
+        DungeonKind.bossDaily || DungeonKind.bossWeekly =>
+          'Boss Event ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
+        DungeonKind.ascension =>
+          'Ascension Dungeon ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
+        DungeonKind.normal => '',
+      };
       return OfflineDungeonRunOutcome(
         stopReason: OfflineDungeonStopReason.invalidSetup,
         updatedDungeonProgress: request.dungeonProgress,
@@ -264,24 +273,29 @@ class OfflineDungeonRunner {
         nextAttemptIndex: request.startingAttemptIndex,
         updatedActiveDungeonSession: request.activeDungeonSession,
         remainingHp: request.initialHp,
-        failureReason:
-            'Ascension Dungeon ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
+        failureReason: manualOnlyReason,
       );
     }
 
     if (request.mode == OfflineActivityMode.autoFarming &&
         (!dungeonDef.isNormal ||
             request.dungeonProgress.clearedInCycleRank != request.cycleRank)) {
+      final autoFarmReason = switch (dungeonDef.kind) {
+        DungeonKind.bossDaily || DungeonKind.bossWeekly =>
+          'Auto Farming menolak Boss Event ("${request.dungeonId}"); hanya dungeon normal yang didukung.',
+        DungeonKind.ascension =>
+          'Auto Farming hanya mendukung dungeon normal ("${request.dungeonId}").',
+        DungeonKind.normal =>
+          'Dungeon "${request.dungeonId}" belum diselesaikan pada siklus saat ini '
+              '(syarat clearedInCycleRank == ${request.cycleRank} untuk Auto Farming).',
+      };
       return OfflineDungeonRunOutcome(
         stopReason: OfflineDungeonStopReason.invalidSetup,
         updatedDungeonProgress: request.dungeonProgress,
         remainingSkillCooldownTicks: const {},
         remainingReviveCooldownTicks: 0,
         nextAttemptIndex: request.startingAttemptIndex,
-        failureReason: !dungeonDef.isNormal
-            ? 'Auto Farming hanya mendukung dungeon normal ("${request.dungeonId}").'
-            : 'Dungeon "${request.dungeonId}" belum diselesaikan pada siklus saat ini '
-                  '(syarat clearedInCycleRank == ${request.cycleRank} untuk Auto Farming).',
+        failureReason: autoFarmReason,
       );
     }
 
@@ -303,10 +317,9 @@ class OfflineDungeonRunner {
     final safeMaxIterations = math.max(1, request.maxIterations);
     final rng = math.Random(request.simulationSeed);
     final difficultyService = DifficultyService(request.config.difficulty);
-    final difficultyProfile = difficultyService.profileFor(
-      dungeonDef,
-      request.cycleRank,
-    );
+    final difficultyProfile =
+        request.difficultyProfileOverride ??
+        difficultyService.profileFor(dungeonDef, request.cycleRank);
     final tracker = EncounterTracker(
       monsterCatalog: request.config.monsters,
       difficultyProfile: difficultyProfile,
@@ -351,7 +364,10 @@ class OfflineDungeonRunner {
               'ActiveDungeonSession tidak dapat dipulihkan untuk ${request.dungeonId}.';
           break;
         }
-        session = manager.restoreSession(saved);
+        session = manager.restoreSession(
+          saved,
+          runtimeDifficultyProfile: request.difficultyProfileOverride,
+        );
         if (session == null) {
           stopReason = OfflineDungeonStopReason.invalidSetup;
           failureReason =
@@ -402,6 +418,7 @@ class OfflineDungeonRunner {
           request.dungeonId,
           runId: nextRunId,
           cycleRank: request.cycleRank,
+          difficultyProfileOverride: request.difficultyProfileOverride,
         );
         stats.runsAttempted++;
         runInitialHp = null;

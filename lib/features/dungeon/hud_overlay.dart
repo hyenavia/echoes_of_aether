@@ -7,26 +7,30 @@ import '../../core/utils/number_formatter.dart';
 import '../../game/hud/hud_state.dart';
 import '../shared/widgets/shared_widgets.dart';
 
-/// HUD Dungeon ringkas dan anti-tumpang-tindih:
-/// - Atas: Status Hero & Room di kiri, Boss HP Bar di kanan (atau tersusun
-///   vertikal otomatis pada layar sangat sempit < 340dp).
-/// - Kiri bawah: Feed ringkas skill, transisi room, dan loot drop.
+/// HUD Dungeon bertema Living Aether Camp:
+/// - Atas: Status Hero & Room di kiri, Boss Encounter Plate di kanan (atau
+///   tersusun vertikal otomatis pada layar sangat sempit < 340dp).
+/// - Kiri bawah: Feed ringkas transisi room, skill aktif/cooldown, dan loot.
 class HudOverlay extends StatelessWidget {
   const HudOverlay({super.key, required this.state});
 
   final ValueListenable<HudState> state;
 
-  static const TextStyle _text = TextStyle(fontSize: 11, color: Colors.white);
+  static const TextStyle _baseText = TextStyle(
+    fontSize: 11,
+    color: AppColors.textPrimary,
+  );
 
   @override
   Widget build(BuildContext context) {
     final ext = EchoesTheme.of(context);
+    final theme = Theme.of(context);
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
           final stackTopVertically = maxWidth < 340;
-          final feedMaxWidth = (maxWidth * 0.48).clamp(130.0, 240.0);
+          final feedMaxWidth = (maxWidth * 0.48).clamp(136.0, 248.0);
 
           return ValueListenableBuilder<HudState>(
             valueListenable: state,
@@ -38,12 +42,16 @@ class HudOverlay extends StatelessWidget {
                   s.skillCooldownText.isNotEmpty ||
                   s.lastLoot.isNotEmpty;
 
-              final heroPanel = _buildHeroPanel(ext, s, hasBoss: hasBoss);
-              final bossPanel = hasBoss ? _buildBossPanel(ext, s) : null;
+              final heroPanel = _buildHeroPanel(
+                theme,
+                ext,
+                s,
+                hasBoss: hasBoss,
+              );
+              final bossPanel = hasBoss ? _buildBossPanel(theme, ext, s) : null;
 
               return Stack(
                 children: [
-                  // Top area: Hero status + Boss HP bar arranged without overlap
                   Align(
                     alignment: Alignment.topCenter,
                     child: Padding(
@@ -55,7 +63,7 @@ class HudOverlay extends StatelessWidget {
                               children: [
                                 ConstrainedBox(
                                   constraints: const BoxConstraints(
-                                    maxWidth: 220,
+                                    maxWidth: 228,
                                   ),
                                   child: heroPanel,
                                 ),
@@ -63,7 +71,7 @@ class HudOverlay extends StatelessWidget {
                                   const SizedBox(height: AppSpacing.xs + 2),
                                   ConstrainedBox(
                                     constraints: const BoxConstraints(
-                                      maxWidth: 220,
+                                      maxWidth: 228,
                                     ),
                                     child: bossPanel,
                                   ),
@@ -77,7 +85,7 @@ class HudOverlay extends StatelessWidget {
                                   flex: 5,
                                   child: ConstrainedBox(
                                     constraints: const BoxConstraints(
-                                      maxWidth: 192,
+                                      maxWidth: 204,
                                     ),
                                     child: heroPanel,
                                   ),
@@ -90,7 +98,7 @@ class HudOverlay extends StatelessWidget {
                                       alignment: Alignment.topRight,
                                       child: ConstrainedBox(
                                         constraints: const BoxConstraints(
-                                          maxWidth: 210,
+                                          maxWidth: 220,
                                         ),
                                         child: bossPanel,
                                       ),
@@ -102,8 +110,6 @@ class HudOverlay extends StatelessWidget {
                             ),
                     ),
                   ),
-
-                  // Bottom-left: Compact Combat & Loot Feed
                   if (hasFeed)
                     Align(
                       alignment: Alignment.bottomLeft,
@@ -111,66 +117,7 @@ class HudOverlay extends StatelessWidget {
                         padding: const EdgeInsets.all(AppSpacing.sm),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: feedMaxWidth),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: AppSpacing.xs + 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.backgroundDark.withValues(
-                                alpha: 0.80,
-                              ),
-                              borderRadius: BorderRadius.circular(AppRadius.sm),
-                              border: Border.all(
-                                color: AppColors.panelBorder.withValues(
-                                  alpha: 0.65,
-                                ),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (s.transitionMessage.isNotEmpty)
-                                  Text(
-                                    s.transitionMessage,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: _text.copyWith(
-                                      fontSize: 10,
-                                      color: ext.success,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                if (s.lastSkill.isNotEmpty ||
-                                    s.skillCooldownText.isNotEmpty)
-                                  Text(
-                                    [
-                                      if (s.lastSkill.isNotEmpty)
-                                        'Skill: ${s.lastSkill}',
-                                      if (s.skillCooldownText.isNotEmpty)
-                                        s.skillCooldownText,
-                                    ].join(' • '),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: _text.copyWith(
-                                      fontSize: 10,
-                                      color: ext.expBar,
-                                    ),
-                                  ),
-                                if (s.lastLoot.isNotEmpty)
-                                  Text(
-                                    '+ ${s.lastLoot}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: _text.copyWith(
-                                      fontSize: 10,
-                                      color: ext.gold,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                          child: _buildCombatFeed(ext, s),
                         ),
                       ),
                     ),
@@ -184,19 +131,23 @@ class HudOverlay extends StatelessWidget {
   }
 
   Widget _buildHeroPanel(
+    ThemeData theme,
     EchoesThemeExtension ext,
     HudState s, {
     required bool hasBoss,
   }) {
+    final borderColor = s.isFinalBoss
+        ? ext.rank
+        : (hasBoss ? ext.hpBar : ext.panelBorder);
     return PanelFrame(
+      key: const ValueKey<String>('hud_hero_panel'),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.xs + 2,
       ),
-      backgroundColor: AppColors.backgroundDark.withValues(alpha: 0.82),
-      borderColor: s.isFinalBoss
-          ? ext.rank
-          : (hasBoss ? ext.hpBar : ext.panelBorder),
+      backgroundColor: AppColors.midnightForest.withValues(alpha: 0.86),
+      borderColor: borderColor,
+      showCornerOrnaments: s.isElite || hasBoss,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,10 +159,12 @@ class HudOverlay extends StatelessWidget {
                   : s.roomName,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: _text.copyWith(
-                fontSize: 10,
+              style: AppTypography.headingSerif(
+                (theme.textTheme.labelSmall ?? _baseText).copyWith(
+                  fontSize: 10.5,
+                ),
                 color: ext.gold,
-                fontWeight: FontWeight.w700,
+                letterSpacing: 0.25,
               ),
             ),
             const SizedBox(height: 3),
@@ -236,15 +189,22 @@ class HudOverlay extends StatelessWidget {
                   'Lv ${NumberFormatter.format(s.level)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: _text.copyWith(fontWeight: FontWeight.w700),
+                  style: AppTypography.numeric(
+                    _baseText,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
+              Icon(Icons.monetization_on_outlined, size: 11, color: ext.gold),
+              const SizedBox(width: 2),
               Text(
                 'Gold ${NumberFormatter.format(s.gold)}',
-                style: _text.copyWith(
+                style: AppTypography.numeric(
+                  _baseText,
+                  fontSize: 10,
                   color: ext.gold,
                   fontWeight: FontWeight.w600,
-                  fontSize: 10,
                 ),
               ),
             ],
@@ -262,32 +222,54 @@ class HudOverlay extends StatelessWidget {
             Wrap(
               spacing: AppSpacing.xs + 2,
               runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (s.totalEnemies > 0)
                   Text(
                     'Musuh: ${s.activeEnemies}/${s.totalEnemies}',
-                    style: _text.copyWith(fontSize: 10),
+                    style: AppTypography.numeric(
+                      _baseText,
+                      fontSize: 10,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 if (s.exitRequired || s.exitUnlocked)
-                  Text(
-                    s.exitUnlocked ? 'Exit: Terbuka' : 'Exit: Terkunci',
-                    style: _text.copyWith(
-                      fontSize: 10,
-                      color: s.exitUnlocked ? ext.expBar : ext.warning,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (s.exitUnlocked ? ext.expBar : ext.warning)
+                          .withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(
+                        color: (s.exitUnlocked ? ext.expBar : ext.warning)
+                            .withValues(alpha: 0.55),
+                      ),
+                    ),
+                    child: Text(
+                      s.exitUnlocked ? 'Exit: Terbuka' : 'Exit: Terkunci',
+                      style: _baseText.copyWith(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: s.exitUnlocked ? ext.expBar : ext.warning,
+                      ),
                     ),
                   ),
               ],
             ),
           ],
           if (s.roomStatus.isNotEmpty) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               'Status: ${s.roomStatus}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: _text.copyWith(
+              style: _baseText.copyWith(
                 fontSize: 10,
                 color: s.exitUnlocked ? ext.success : AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -296,37 +278,149 @@ class HudOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildBossPanel(EchoesThemeExtension ext, HudState s) {
+  Widget _buildBossPanel(
+    ThemeData theme,
+    EchoesThemeExtension ext,
+    HudState s,
+  ) {
+    final bossAccent = s.isFinalBoss ? ext.rank : ext.hpBar;
     return PanelFrame(
+      key: const ValueKey<String>('hud_boss_panel'),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs + 1,
+        vertical: AppSpacing.xs + 2,
       ),
-      backgroundColor: AppColors.backgroundDark.withValues(alpha: 0.86),
-      borderColor: s.isFinalBoss ? ext.rank : ext.hpBar,
+      backgroundColor: AppColors.midnightForest.withValues(alpha: 0.90),
+      borderColor: bossAccent,
+      showCornerOrnaments: true,
+      boxShadow: AppShadows.glow(bossAccent, alpha: 0.22),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            s.isFinalBoss ? 'FINAL BOSS: ${s.bossName}' : 'BOSS: ${s.bossName}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: _text.copyWith(
-              fontSize: 10,
-              color: s.isFinalBoss ? ext.rank : ext.hpBar,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                s.isFinalBoss
+                    ? Icons.auto_awesome
+                    : Icons.local_fire_department_outlined,
+                size: 12,
+                color: bossAccent,
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  s.isFinalBoss
+                      ? 'FINAL BOSS: ${s.bossName}'
+                      : 'BOSS: ${s.bossName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.headingSerif(
+                    (theme.textTheme.labelSmall ?? _baseText).copyWith(
+                      fontSize: 10.5,
+                    ),
+                    color: bossAccent,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           StatBar(
             label: s.isFinalBoss ? 'FINAL' : 'BOSS',
             current: s.bossHp,
             max: s.bossMaxHp,
-            barColor: s.isFinalBoss ? ext.rank : ext.hpBar,
-            height: 6,
+            barColor: bossAccent,
+            height: 7,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCombatFeed(EchoesThemeExtension ext, HudState s) {
+    return Container(
+      key: const ValueKey<String>('hud_combat_feed'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs + 2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.midnightForest.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: ext.panelBorder.withValues(alpha: 0.68)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (s.transitionMessage.isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.route_outlined, size: 11, color: ext.success),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    s.transitionMessage,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _baseText.copyWith(
+                      fontSize: 10,
+                      color: ext.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (s.lastSkill.isNotEmpty || s.skillCooldownText.isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_fix_high_outlined, size: 11, color: ext.expBar),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    [
+                      if (s.lastSkill.isNotEmpty) 'Skill: ${s.lastSkill}',
+                      if (s.skillCooldownText.isNotEmpty) s.skillCooldownText,
+                    ].join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.numeric(
+                      _baseText,
+                      fontSize: 10,
+                      color: ext.expBar,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (s.lastLoot.isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.inventory_2_outlined, size: 11, color: ext.gold),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    '+ ${s.lastLoot}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _baseText.copyWith(
+                      fontSize: 10,
+                      color: ext.gold,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -346,7 +440,7 @@ class _EncounterBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: color.withValues(alpha: 0.7)),
+        border: Border.all(color: color.withValues(alpha: 0.72)),
       ),
       child: Text(
         label,
@@ -354,6 +448,7 @@ class _EncounterBadge extends StatelessWidget {
           fontSize: 9,
           fontWeight: FontWeight.w700,
           color: color,
+          letterSpacing: 0.3,
         ),
       ),
     );

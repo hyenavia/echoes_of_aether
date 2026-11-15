@@ -32,6 +32,7 @@ class ItemConfigParser {
             : _rarity(_r.string(map, where, 'rarity'), where),
         maxStack: _r.integer(map, where, 'max_stack', min: 1, fallback: 999),
         sellValue: _r.integer(map, where, 'sell_value', min: 0, fallback: 0),
+        sellable: _r.boolean(map, where, 'sellable', fallback: true),
         equipment: _equipment(map, where, category),
       );
     }
@@ -61,7 +62,12 @@ class ItemConfigParser {
 
     final w = '$where.equipment';
     final data = _r.asMap(raw, w);
-    _r.ensureKnownKeys(data, w, {'slot', 'weapon_type', 'stats'});
+    _r.ensureKnownKeys(data, w, {
+      'slot',
+      'weapon_type',
+      'stats',
+      'fixed_stats',
+    });
 
     final slot = _slot(_r.string(data, w, 'slot'), w);
     final weaponType = data['weapon_type'] == null
@@ -75,7 +81,13 @@ class ItemConfigParser {
 
     final sw = '$w.stats';
     final stats = StatBonusParser.parse(_r, _r.asMap(data['stats'], sw), sw);
-    return EquipmentData(slot: slot, baseStats: stats, weaponType: weaponType);
+    final fixedStats = _r.boolean(data, w, 'fixed_stats', fallback: false);
+    return EquipmentData(
+      slot: slot,
+      baseStats: stats,
+      weaponType: weaponType,
+      fixedStats: fixedStats,
+    );
   }
 
   EquipmentSlot _slot(String raw, String where) => switch (raw) {

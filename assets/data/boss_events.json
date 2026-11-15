@@ -1,0 +1,60 @@
+{
+  "daily": {
+    "quest_id": "daily_boss",
+    "power_factor": 1.25,
+    "reward": {
+      "currency": { "aether_shard": 10 },
+      "exp": 120,
+      "gold": 60
+    },
+    "pool": [
+      {
+        "id": "daily_ash_tyrant",
+        "name": "Ash Tyrant",
+        "sprite_ref": "ancient_heart_guardian",
+        "sprite_tint": "#C86432",
+        "base_stats": { "hp": 510, "atk": 24, "def": 7 }
+      },
+      {
+        "id": "daily_prism_warden",
+        "name": "Prism Warden",
+        "sprite_ref": "ancient_heart_guardian",
+        "sprite_tint": "#4FC3F7",
+        "base_stats": { "hp": 520, "atk": 23, "def": 8 }
+      },
+      {
+        "id": "daily_crypt_sentinel",
+        "name": "Crypt Sentinel",
+        "sprite_ref": "ancient_heart_guardian",
+        "sprite_tint": "#BA68C8",
+        "base_stats": { "hp": 500, "atk": 25, "def": 7 }
+      }
+    ]
+  },
+  "weekly": {
+    "quest_id": "weekly_boss",
+    "power_factor": 1.5,
+    "reward": {
+      "currency": { "aether_shard": 50 },
+      "exp": 600,
+      "gold": 300
+    },
+    "pool": [
+      {
+        "id": "weekly_crimson_sovereign",
+        "name": "Crimson Sovereign",
+        "sprite_ref": "ancient_heart_guardian",
+        "sprite_tint": "#EF5350",
+        "base_stats": { "hp": 460, "atk": 22, "def": 7 }
+      },
+      {
+        "id": "weekly_solar_archon",
+        "name": "Solar Archon",
+        "sprite_ref": "ancient_heart_guardian",
+        "sprite_tint": "#FFD54F",
+        "base_stats": { "hp": 480, "atk": 23, "def": 8 }
+      }
+    ]
+  },
+  "arena_map_ref": "ancient_heart_map"
+}

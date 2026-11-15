@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:echoes_of_aether/domain/entities/progression_config.dart';
 import 'package:echoes_of_aether/domain/services/difficulty_service.dart';
 import 'package:echoes_of_aether/domain/services/dungeon_progression_service.dart';
+import 'package:echoes_of_aether/domain/services/period_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/src/balance_simulator.dart';
@@ -501,5 +502,471 @@ void main() {
         }
       }
     });
+  });
+
+  group('M12 Stage 6 — Boss Events Balance & Quest Reward Verification', () {
+    test('Rank 0 seluruh pool Daily & Weekly Boss memenuhi target win rate (-10, Rec, +10) di Dungeon 1..5', () {
+      final normals =
+          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+            ..sort((a, b) => a.order.compareTo(b.order));
+      final bossEvents = sim.config.bossEvents!;
+
+      for (final period in [Period.daily, Period.weekly]) {
+        final pool = period == Period.daily
+            ? bossEvents.daily.pool
+            : bossEvents.weekly.pool;
+        final recTarget = period == Period.daily ? 0.85 : 0.80;
+
+        for (final boss in pool) {
+          for (final d in normals) {
+            final rec = d.recommendedLevel;
+            final low = math.max(1, rec - 10);
+            final high = rec + 10;
+
+            final mLow = sim.simulateBossScenario(
+              period: period,
+              boss: boss,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Under(-10)',
+              playerLevel: low,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: 0,
+                playerLevel: low,
+              ),
+              cycleRank: 0,
+              seedCount: 20,
+            );
+            final mRec = sim.simulateBossScenario(
+              period: period,
+              boss: boss,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Rec',
+              playerLevel: rec,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: 0,
+                playerLevel: rec,
+              ),
+              cycleRank: 0,
+              seedCount: 20,
+            );
+            final mHigh = sim.simulateBossScenario(
+              period: period,
+              boss: boss,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Over(+10)',
+              playerLevel: high,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: 0,
+                playerLevel: high,
+              ),
+              cycleRank: 0,
+              seedCount: 20,
+            );
+
+            expect(
+              mLow.winRate,
+              lessThan(0.50),
+              reason: '${boss.id}@${d.id} Rank 0 (-10 Lv $low) harus < 50%.',
+            );
+            expect(
+              mRec.winRate,
+              greaterThanOrEqualTo(recTarget),
+              reason:
+                  '${boss.id}@${d.id} Rank 0 (Rec Lv $rec) harus >= ${(recTarget * 100).round()}%.',
+            );
+            expect(
+              mHigh.winRate,
+              greaterThanOrEqualTo(0.99),
+              reason: '${boss.id}@${d.id} Rank 0 (+10 Lv $high) harus >= 99%.',
+            );
+            expect(mRec.avgDurationSeconds.isFinite, isTrue);
+            expect(mRec.avgDurationSeconds, greaterThan(0));
+          }
+        }
+      }
+    });
+
+    test('Rank 1, 5, 10, 50 Daily & Weekly Boss di Dungeon 1..5 memenuhi target Rec/+10 tanpa overflow/NaN', () {
+      final normals =
+          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+            ..sort((a, b) => a.order.compareTo(b.order));
+      final dungeonProg = DungeonProgressionService(sim.config.difficulty);
+
+      for (final period in [Period.daily, Period.weekly]) {
+        final recTarget = period == Period.daily ? 0.85 : 0.80;
+        for (final rank in const [1, 5, 10, 50]) {
+          for (final d in normals) {
+            final rec = dungeonProg.recommendedLevel(d, rank);
+            final high = rec + 10;
+
+            final mRec = sim.simulateBossScenario(
+              period: period,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Rec-R$rank',
+              playerLevel: rec,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: rank,
+                playerLevel: rec,
+              ),
+              cycleRank: rank,
+              seedCount: 15,
+            );
+            final mHigh = sim.simulateBossScenario(
+              period: period,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Over-R$rank',
+              playerLevel: high,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: rank,
+                playerLevel: high,
+              ),
+              cycleRank: rank,
+              seedCount: 15,
+            );
+
+            expect(mRec.winRate, greaterThanOrEqualTo(recTarget));
+            expect(mHigh.winRate, greaterThanOrEqualTo(0.99));
+            expect(mRec.avgDurationSeconds.isFinite, isTrue);
+            expect(mRec.avgDurationSeconds, greaterThan(0));
+            expect(mRec.maxPlayerHitOnBoss, greaterThan(0));
+            expect(
+              mRec.maxPlayerHitOnBoss,
+              lessThanOrEqualTo(DifficultyService.kMaxScaledValue),
+            );
+            expect(mRec.minBossHitOnPlayer, greaterThan(0));
+            expect(
+              mRec.minBossHitOnPlayer,
+              lessThanOrEqualTo(DifficultyService.kMaxScaledValue),
+            );
+          }
+        }
+      }
+    });
+
+    test('Hadiah Boss Quest tidak melebihi 1 jam farming di dungeon acuan & shard mingguan = 120', () {
+      final rows = sim.simulateBossQuestComparison(
+        ranks: const [0, 1, 5, 10, 50],
+        seedCount: 10,
+      );
+      expect(rows, hasLength(25));
+      for (final row in rows) {
+        expect(row.farmingGoldPerHour.isFinite, isTrue);
+        expect(row.farmingExpPerHour.isFinite, isTrue);
+        expect(
+          row.dailyExceedsFarmingHour,
+          isFalse,
+          reason:
+              'Daily Quest di ${row.referenceDungeonId} Rank ${row.cycleRank} melebihi 1 jam farming.',
+        );
+        expect(
+          row.weeklyExceedsFarmingHour,
+          isFalse,
+          reason:
+              'Weekly Quest di ${row.referenceDungeonId} Rank ${row.cycleRank} melebihi 1 jam farming.',
+        );
+        expect(row.weeklyAetherShardIncome, 120);
+      }
+    });
+  });
+
+  group('M12 Stage 6 — Boss Events Balance & Quest Reward Verification', () {
+    test('Rank 0 seluruh pool Daily & Weekly Boss memenuhi target win rate (-10, Rec, +10) di Dungeon 1..5', () {
+      final normals =
+          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+            ..sort((a, b) => a.order.compareTo(b.order));
+      final bossEvents = sim.config.bossEvents!;
+
+      for (final period in [Period.daily, Period.weekly]) {
+        final pool = period == Period.daily
+            ? bossEvents.daily.pool
+            : bossEvents.weekly.pool;
+        final recTarget = period == Period.daily ? 0.85 : 0.80;
+
+        for (final boss in pool) {
+          for (final d in normals) {
+            final rec = d.recommendedLevel;
+            final low = math.max(1, rec - 10);
+            final high = rec + 10;
+
+            final mLow = sim.simulateBossScenario(
+              period: period,
+              boss: boss,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Under(-10)',
+              playerLevel: low,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: 0,
+                playerLevel: low,
+              ),
+              cycleRank: 0,
+              seedCount: 20,
+            );
+            final mRec = sim.simulateBossScenario(
+              period: period,
+              boss: boss,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Rec',
+              playerLevel: rec,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: 0,
+                playerLevel: rec,
+              ),
+              cycleRank: 0,
+              seedCount: 20,
+            );
+            final mHigh = sim.simulateBossScenario(
+              period: period,
+              boss: boss,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Over(+10)',
+              playerLevel: high,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: 0,
+                playerLevel: high,
+              ),
+              cycleRank: 0,
+              seedCount: 20,
+            );
+
+            expect(
+              mLow.winRate,
+              lessThan(0.50),
+              reason: '${boss.id}@${d.id} Rank 0 (-10 Lv $low) harus < 50%.',
+            );
+            expect(
+              mRec.winRate,
+              greaterThanOrEqualTo(recTarget),
+              reason:
+                  '${boss.id}@${d.id} Rank 0 (Rec Lv $rec) harus >= ${(recTarget * 100).round()}%.',
+            );
+            expect(
+              mHigh.winRate,
+              greaterThanOrEqualTo(0.99),
+              reason: '${boss.id}@${d.id} Rank 0 (+10 Lv $high) harus >= 99%.',
+            );
+            expect(mRec.avgDurationSeconds.isFinite, isTrue);
+            expect(mRec.avgDurationSeconds, greaterThan(0));
+          }
+        }
+      }
+    });
+
+    test('Rank 1, 5, 10, 50 Daily & Weekly Boss di Dungeon 1..5 memenuhi target Rec/+10 tanpa overflow/NaN', () {
+      final normals =
+          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+            ..sort((a, b) => a.order.compareTo(b.order));
+      final dungeonProg = DungeonProgressionService(sim.config.difficulty);
+
+      for (final period in [Period.daily, Period.weekly]) {
+        final recTarget = period == Period.daily ? 0.85 : 0.80;
+        for (final rank in const [1, 5, 10, 50]) {
+          for (final d in normals) {
+            final rec = dungeonProg.recommendedLevel(d, rank);
+            final high = rec + 10;
+
+            final mRec = sim.simulateBossScenario(
+              period: period,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Rec-R$rank',
+              playerLevel: rec,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: rank,
+                playerLevel: rec,
+              ),
+              cycleRank: rank,
+              seedCount: 15,
+            );
+            final mHigh = sim.simulateBossScenario(
+              period: period,
+              referenceDungeonId: d.id,
+              scenarioLabel: 'Over-R$rank',
+              playerLevel: high,
+              gearProfile: sim.rankTierGearProfile(
+                d,
+                cycleRank: rank,
+                playerLevel: high,
+              ),
+              cycleRank: rank,
+              seedCount: 15,
+            );
+
+            expect(mRec.winRate, greaterThanOrEqualTo(recTarget));
+            expect(mHigh.winRate, greaterThanOrEqualTo(0.99));
+            expect(mRec.avgDurationSeconds.isFinite, isTrue);
+            expect(mRec.avgDurationSeconds, greaterThan(0));
+            expect(mRec.maxPlayerHitOnBoss, greaterThan(0));
+            expect(
+              mRec.maxPlayerHitOnBoss,
+              lessThanOrEqualTo(DifficultyService.kMaxScaledValue),
+            );
+            expect(mRec.minBossHitOnPlayer, greaterThan(0));
+            expect(
+              mRec.minBossHitOnPlayer,
+              lessThanOrEqualTo(DifficultyService.kMaxScaledValue),
+            );
+          }
+        }
+      }
+    });
+
+    test('Hadiah Boss Quest tidak melebihi 1 jam farming di dungeon acuan & shard mingguan = 120', () {
+      final rows = sim.simulateBossQuestComparison(
+        ranks: const [0, 1, 5, 10, 50],
+        seedCount: 10,
+      );
+      expect(rows, hasLength(25));
+      for (final row in rows) {
+        expect(row.farmingGoldPerHour.isFinite, isTrue);
+        expect(row.farmingExpPerHour.isFinite, isTrue);
+        expect(
+          row.dailyExceedsFarmingHour,
+          isFalse,
+          reason:
+              'Daily Quest di ${row.referenceDungeonId} Rank ${row.cycleRank} melebihi 1 jam farming.',
+        );
+        expect(
+          row.weeklyExceedsFarmingHour,
+          isFalse,
+          reason:
+              'Weekly Quest di ${row.referenceDungeonId} Rank ${row.cycleRank} melebihi 1 jam farming.',
+        );
+        expect(row.weeklyAetherShardIncome, 120);
+      }
+    });
+  });
+
+  group('M13 Stage 4 — Shard Economy, Pct Caps & Event Set Impact', () {
+    late BalanceSimulator sim;
+
+    setUpAll(() {
+      final config = BalanceSimulator.loadRealConfig();
+      sim = BalanceSimulator(config);
+    });
+
+    test('Ekonomi shard (harian, 3x/minggu, hanya weekly) sehat dan total persen kombinasi item legal di bawah cap', () {
+      final econ = sim.simulateEventShopEconomy();
+      expect(econ.dailyShard, 10);
+      expect(econ.weeklyShard, 50);
+      expect(econ.cycleWeeks, 4);
+      expect(econ.cadences, hasLength(3));
+
+      for (final c in econ.cadences) {
+        expect(c.buysAllInSingleCycle, isFalse);
+        expect(c.impossibleForLegendary, isFalse);
+        expect(c.weeksForOneEpic.isFinite, isTrue);
+        expect(c.weeksForOneLegendary.isFinite, isTrue);
+      }
+      // Tidak ada kombinasi item legal yang mencapai/melampaui pct_caps
+      expect(econ.pctCapCheck.isBelowAllCaps, isTrue);
+      expect(
+        econ.pctCapCheck.maxLegalHpPct,
+        lessThan(econ.pctCapCheck.capHpPct),
+      );
+      expect(
+        econ.pctCapCheck.maxLegalAtkPct,
+        lessThan(econ.pctCapCheck.capAtkPct),
+      );
+      expect(
+        econ.pctCapCheck.maxLegalDefPct,
+        lessThan(econ.pctCapCheck.capDefPct),
+      );
+    });
+
+    test('Dampak 4-slot Event Set penuh (Epic & Legendary) di D1..D5, Daily/Weekly Boss, Ascension Rank 0..50 aman tanpa overflow/NaN', () {
+      final rows = sim.simulateEventSetImpact(
+        ranks: const [0, 1, 5, 10, 50],
+        seedCount: 5,
+      );
+      expect(rows, hasLength(50)); // 5 ranks * (5 normal + 1 asc + 4 boss)
+      for (final r in rows) {
+        expect(
+          r.allFiniteAndSafe,
+          isTrue,
+          reason: 'Overflow/NaN di ${r.targetId} Rank ${r.cycleRank}',
+        );
+        expect(r.epicWinRate, greaterThanOrEqualTo(0.80));
+        expect(r.legendaryWinRate, greaterThanOrEqualTo(0.85));
+        // Pada Rank >= 1 Legendary Event Set memberi kenaikan DMG & EHP positif
+        if (r.cycleRank >= 1) {
+          expect(r.legendaryDamageDeltaPct, greaterThan(0.0));
+          expect(r.legendaryToughnessDeltaPct, greaterThan(0.0));
+        }
+      }
+    });
+  });
+
+  group('M13 Stage 4 — Shard Economy, Pct Caps & Event Set Impact', () {
+    late BalanceSimulator sim;
+
+    setUpAll(() {
+      final config = BalanceSimulator.loadRealConfig();
+      sim = BalanceSimulator(config);
+    });
+
+    test(
+      'Ekonomi shard (harian, 3x/minggu, hanya weekly) sehat dan total persen kombinasi item legal di bawah cap',
+      () {
+        final econ = sim.simulateEventShopEconomy();
+        expect(econ.dailyShard, 10);
+        expect(econ.weeklyShard, 50);
+        expect(econ.cycleWeeks, 4);
+        expect(econ.cadences, hasLength(3));
+
+        for (final c in econ.cadences) {
+          expect(c.buysAllInSingleCycle, isFalse);
+          expect(c.impossibleForLegendary, isFalse);
+          expect(c.weeksForOneEpic.isFinite, isTrue);
+          expect(c.weeksForOneLegendary.isFinite, isTrue);
+        }
+        // Tidak ada kombinasi item legal yang mencapai/melampaui pct_caps
+        expect(econ.pctCapCheck.isBelowAllCaps, isTrue);
+        expect(
+          econ.pctCapCheck.maxLegalHpPct,
+          lessThan(econ.pctCapCheck.capHpPct),
+        );
+        expect(
+          econ.pctCapCheck.maxLegalAtkPct,
+          lessThan(econ.pctCapCheck.capAtkPct),
+        );
+        expect(
+          econ.pctCapCheck.maxLegalDefPct,
+          lessThan(econ.pctCapCheck.capDefPct),
+        );
+      },
+    );
+
+    test(
+      'Dampak 4-slot Event Set penuh (Epic & Legendary) di D1..D5, Daily/Weekly Boss, Ascension Rank 0..50 aman tanpa overflow/NaN',
+      () {
+        final rows = sim.simulateEventSetImpact(
+          ranks: const [0, 1, 5, 10, 50],
+          seedCount: 5,
+        );
+        expect(rows, hasLength(50)); // 5 ranks * (5 normal + 1 asc + 4 boss)
+        for (final r in rows) {
+          expect(
+            r.allFiniteAndSafe,
+            isTrue,
+            reason: 'Overflow/NaN di ${r.targetId} Rank ${r.cycleRank}',
+          );
+          expect(r.epicWinRate, greaterThanOrEqualTo(0.80));
+          expect(r.legendaryWinRate, greaterThanOrEqualTo(0.85));
+          // Pada Rank >= 1 Legendary Event Set memberi kenaikan DMG & EHP positif
+          if (r.cycleRank >= 1) {
+            expect(r.legendaryDamageDeltaPct, greaterThan(0.0));
+            expect(r.legendaryToughnessDeltaPct, greaterThan(0.0));
+          }
+        }
+      },
+    );
   });
 }

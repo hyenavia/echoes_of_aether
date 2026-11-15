@@ -43,129 +43,234 @@ class OfflineSummaryOverlay extends StatelessWidget {
 
     return Positioned.fill(
       child: ColoredBox(
-        color: const Color(0x99000000),
+        color: AppColors.midnightForest.withValues(alpha: 0.78),
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 420, maxHeight: 560),
               child: PanelFrame(
-                padding: const EdgeInsets.all(AppSpacing.xl),
+                showCornerOrnaments: true,
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 borderColor: ext.gold,
+                boxShadow: AppShadows.glow(ext.gold, alpha: 0.24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Ringkasan Offline',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: ext.gold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${_modeLabel(summary.mode)}'
-                      '${dungeonName != null ? ' • $dungeonName' : ''}',
-                      style: theme.textTheme.titleSmall,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${_stateLabel(summary.finalState)} • '
-                      'Durasi: ${_formatDurationMs(summary.effectiveElapsedMs)}'
-                      '${summary.cappedAtMaxDuration ? ' (maks 8 jam)' : ''}',
-                      style: theme.textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
-                    if (summary.failureReason != null &&
-                        summary.failureReason!.trim().isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                        ),
-                        child: Text(
-                          summary.failureReason!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onErrorContainer,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.deepForest,
+                            border: Border.all(
+                              color: ext.gold.withValues(alpha: 0.6),
+                            ),
+                            boxShadow: AppShadows.glow(ext.gold, alpha: 0.18),
                           ),
-                          textAlign: TextAlign.center,
+                          child: Icon(
+                            Icons.nights_stay_outlined,
+                            size: 18,
+                            color: ext.gold,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Flexible(
+                          child: Text(
+                            'Ringkasan Offline',
+                            style: AppTypography.headingSerif(
+                              theme.textTheme.titleLarge,
+                              color: ext.gold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              '${_modeLabel(summary.mode)}'
+                              '${dungeonName != null ? ' • $dungeonName' : ''}',
+                              style: theme.textTheme.titleSmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_stateLabel(summary.finalState)} • '
+                              'Durasi: ${_formatDurationMs(summary.effectiveElapsedMs)}'
+                              '${summary.cappedAtMaxDuration ? ' (maks 8 jam)' : ''}',
+                              style: AppTypography.numeric(
+                                theme.textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (summary.failureReason != null &&
+                                summary.failureReason!.trim().isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.sm,
+                                  ),
+                                  border: Border.all(
+                                    color: theme.colorScheme.error.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  summary.failureReason!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onErrorContainer,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: AppSpacing.sm),
+                            if (summary.runsAttempted > 0 ||
+                                summary.roomsCleared > 0 ||
+                                summary.encountersCleared > 0) ...[
+                              const SectionHeader(
+                                title: 'Aktivitas',
+                                useSerif: true,
+                              ),
+                              PanelFrame(
+                                backgroundColor: AppColors.surfaceDark,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.xs + 2,
+                                ),
+                                child: Column(
+                                  children: [
+                                    _MetricRow(
+                                      label: 'Run',
+                                      value:
+                                          '${summary.runsCompleted}/${summary.runsAttempted} selesai'
+                                          '${summary.runsFailed > 0 ? ' (${summary.runsFailed} gagal)' : ''}',
+                                    ),
+                                    _MetricRow(
+                                      label: 'Progres',
+                                      value:
+                                          '${summary.roomsCleared} room • '
+                                          '${summary.encountersCleared} encounter',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (summary.expGained > 0 ||
+                                summary.goldGained > 0 ||
+                                summary.levelsGained > 0) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              const SectionHeader(
+                                title: 'Hadiah',
+                                useSerif: true,
+                              ),
+                              PanelFrame(
+                                backgroundColor: AppColors.surfaceDark,
+                                borderColor: ext.gold.withValues(alpha: 0.4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.xs + 2,
+                                ),
+                                child: _MetricRow(
+                                  label: 'Hadiah Utama',
+                                  value:
+                                      '+${NumberFormatter.format(summary.expGained)} EXP • '
+                                      '+${NumberFormatter.format(summary.goldGained)} Gold'
+                                      '${summary.levelsGained > 0 ? ' (+${NumberFormatter.format(summary.levelsGained)} Lv)' : ''}',
+                                ),
+                              ),
+                            ],
+                            if (stackEntries.isNotEmpty ||
+                                summary.addedEquipmentCount > 0) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              PanelFrame(
+                                backgroundColor: AppColors.surfaceDark,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.xs + 2,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (stackEntries.isNotEmpty) ...[
+                                      Text(
+                                        'Item Diperoleh:',
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(color: ext.gold),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      for (final entry in stackEntries)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 2,
+                                          ),
+                                          child: Text(
+                                            '• ${items[entry.key]?.name ?? entry.key} x${entry.value}',
+                                            style: AppTypography.numeric(
+                                              theme.textTheme.bodySmall,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                    if (summary.addedEquipmentCount > 0) ...[
+                                      if (stackEntries.isNotEmpty)
+                                        const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        'Equipment masuk tas: +${summary.addedEquipmentCount}',
+                                        style: AppTypography.numeric(
+                                          theme.textTheme.bodySmall?.copyWith(
+                                            color: AppColors.aetherBlue,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (!summary.hasRewards) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                'Tidak ada hadiah baru yang diperoleh.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                            if (hasOverflow) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                'Catatan: sebagian drop tidak masuk karena batas tas'
+                                '${summary.droppedEquipmentCount > 0 ? ' (${summary.droppedEquipmentCount} equipment terlewat)' : ''}.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                     const SizedBox(height: AppSpacing.md),
-                    if (summary.runsAttempted > 0 ||
-                        summary.roomsCleared > 0 ||
-                        summary.encountersCleared > 0) ...[
-                      const SectionHeader(title: 'Aktivitas'),
-                      _MetricRow(
-                        label: 'Run',
-                        value:
-                            '${summary.runsCompleted}/${summary.runsAttempted} selesai'
-                            '${summary.runsFailed > 0 ? ' (${summary.runsFailed} gagal)' : ''}',
-                      ),
-                      _MetricRow(
-                        label: 'Progres',
-                        value:
-                            '${summary.roomsCleared} room • '
-                            '${summary.encountersCleared} encounter',
-                      ),
-                    ],
-                    if (summary.expGained > 0 ||
-                        summary.goldGained > 0 ||
-                        summary.levelsGained > 0) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      const SectionHeader(title: 'Hadiah'),
-                      _MetricRow(
-                        label: 'Hadiah Utama',
-                        value:
-                            '+${NumberFormatter.format(summary.expGained)} EXP • '
-                            '+${NumberFormatter.format(summary.goldGained)} Gold'
-                            '${summary.levelsGained > 0 ? ' (+${NumberFormatter.format(summary.levelsGained)} Lv)' : ''}',
-                      ),
-                    ],
-                    if (stackEntries.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Item Diperoleh:',
-                        style: theme.textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      for (final entry in stackEntries)
-                        Text(
-                          '• ${items[entry.key]?.name ?? entry.key} x${entry.value}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                    ],
-                    if (summary.addedEquipmentCount > 0) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Equipment masuk tas: +${summary.addedEquipmentCount}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                    if (!summary.hasRewards) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Tidak ada hadiah baru yang diperoleh.',
-                        style: theme.textTheme.bodySmall,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    if (hasOverflow) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Catatan: sebagian drop tidak masuk karena batas tas'
-                        '${summary.droppedEquipmentCount > 0 ? ' (${summary.droppedEquipmentCount} equipment terlewat)' : ''}.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.lg),
                     PrimaryButton(
                       label: 'Tutup & Simpan',
                       onPressed: onAcknowledge,
@@ -240,9 +345,19 @@ class _MetricRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 96,
-            child: Text(label, style: theme.textTheme.labelMedium),
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
-          Expanded(child: Text(value, style: theme.textTheme.bodySmall)),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTypography.numeric(theme.textTheme.bodySmall),
+            ),
+          ),
         ],
       ),
     );

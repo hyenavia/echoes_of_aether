@@ -228,4 +228,77 @@ void main() {
       expect(avgMs, lessThan(16.6));
     },
   );
+
+  testWidgets(
+    'Stage 5 QA: AppIconButton, EchoesBottomNavigation, LoadingState, EmptyState, EchoesDialog, dan AppNotificationBanner bebas overflow & memenuhi target sentuh >= 44dp',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 568));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: EchoesTheme.dark(),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 568),
+              textScaler: TextScaler.linear(1.5),
+            ),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    AppIconButton(
+                      icon: Icons.settings_outlined,
+                      semanticLabel: 'Buka Pengaturan',
+                      onPressed: () {},
+                    ),
+                    const LoadingState(title: 'Menyiapkan Camp Aether...'),
+                    const EmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      title: 'Tas kosong',
+                      subtitle: 'Kumpulkan drop dari dungeon.',
+                    ),
+                    const AppNotificationBanner(
+                      message: 'Berhasil masuk ke Camp.',
+                    ),
+                    const EchoesDialog(
+                      title: 'Konfirmasi',
+                      child: Text('Simpan progres permainan?'),
+                    ),
+                  ],
+                ),
+              ),
+              bottomNavigationBar: EchoesBottomNavigation(
+                currentIndex: 0,
+                onSelected: (_) {},
+                items: const [
+                  EchoesNavItem(
+                    label: 'Adventure',
+                    icon: Icons.explore_outlined,
+                  ),
+                  EchoesNavItem(label: 'Hero', icon: Icons.person_outline),
+                  EchoesNavItem(label: 'Bag', icon: Icons.backpack_outlined),
+                  EchoesNavItem(label: 'Shop', icon: Icons.storefront_outlined),
+                  EchoesNavItem(
+                    label: 'Settings',
+                    icon: Icons.settings_outlined,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      final iconBtnSize = tester.getSize(find.byType(AppIconButton));
+      expect(iconBtnSize.width, greaterThanOrEqualTo(44));
+      expect(iconBtnSize.height, greaterThanOrEqualTo(44));
+      expect(find.bySemanticsLabel('Buka Pengaturan'), findsWidgets);
+
+      final navSize = tester.getSize(find.byType(EchoesBottomNavigation));
+      expect(navSize.height, greaterThanOrEqualTo(44));
+
+      await tester.binding.setSurfaceSize(null);
+    },
+  );
 }

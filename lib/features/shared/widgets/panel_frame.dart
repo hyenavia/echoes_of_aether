@@ -13,6 +13,9 @@ class PanelFrame extends StatelessWidget {
     this.backgroundColor,
     this.gradient,
     this.showCornerOrnaments = false,
+    this.borderRadius = AppRadius.md,
+    this.elevation = AppElevation.panel,
+    this.boxShadow,
   });
 
   final Widget child;
@@ -21,25 +24,32 @@ class PanelFrame extends StatelessWidget {
   final Color? backgroundColor;
   final Gradient? gradient;
   final bool showCornerOrnaments;
+  final double borderRadius;
+  final double elevation;
+  final List<BoxShadow>? boxShadow;
 
   @override
   Widget build(BuildContext context) {
     final ext = EchoesTheme.of(context);
     final outerBorder = borderColor ?? ext.panelBorder;
-    return Material(
+    final panel = Material(
       color: backgroundColor ?? ext.panelBackground,
-      elevation: AppElevation.panel,
+      elevation: elevation,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: outerBorder, width: 1.5),
+        borderRadius: BorderRadius.circular(borderRadius),
+        side: AppBorders.panel(color: outerBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: Container(
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           gradient: gradient,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: ext.panelInnerBorder, width: 1),
+          borderRadius: BorderRadius.circular(
+            (borderRadius - 4).clamp(AppRadius.sm, AppRadius.xl),
+          ),
+          border: Border.fromBorderSide(
+            AppBorders.inner(color: ext.panelInnerBorder),
+          ),
         ),
         child: showCornerOrnaments
             ? CustomPaint(
@@ -50,6 +60,15 @@ class PanelFrame extends StatelessWidget {
               )
             : Padding(padding: padding, child: child),
       ),
+    );
+
+    if (boxShadow == null || boxShadow!.isEmpty) return panel;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: boxShadow,
+      ),
+      child: panel,
     );
   }
 }

@@ -180,6 +180,90 @@ class ShopPurchases extends Table {
   List<String> get customConstraints => ['CHECK (purchased_count >= 0)'];
 }
 
+/// State pengaman jam perangkat per pemain (M12 Stage 1, schema v6).
+class ClockStates extends Table {
+  TextColumn get playerId =>
+      text().references(Players, #id, onDelete: KeyAction.cascade)();
+  IntColumn get lastSeenAtMs => integer().withDefault(const Constant(0))();
+  IntColumn get forwardJumpCount => integer().withDefault(const Constant(0))();
+  IntColumn get maxForwardJumpMs => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {playerId};
+}
+
+/// Saldo mata uang khusus (mis. Aether Shard) per pemain (M12 Stage 1, schema v6).
+class Currencies extends Table {
+  TextColumn get playerId =>
+      text().references(Players, #id, onDelete: KeyAction.cascade)();
+  TextColumn get currencyId => text()();
+  IntColumn get amount => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {playerId, currencyId};
+
+  @override
+  List<String> get customConstraints => ['CHECK (amount >= 0)'];
+}
+
+/// Status penyelesaian quest periodik (Daily/Weekly Boss) (M12 Stage 1, schema v6).
+class PeriodicQuestStates extends Table {
+  TextColumn get playerId =>
+      text().references(Players, #id, onDelete: KeyAction.cascade)();
+  TextColumn get questId => text()();
+  TextColumn get periodKey => text()();
+  IntColumn get completedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {playerId, questId, periodKey};
+}
+
+/// Riwayat pembelian Event Shop per periode per pemain (M13 Stage 1, schema v7).
+class EventShopPurchases extends Table {
+  TextColumn get playerId =>
+      text().references(Players, #id, onDelete: KeyAction.cascade)();
+  TextColumn get entryId => text()();
+  TextColumn get periodKey => text()();
+  IntColumn get purchasedCount => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {playerId, entryId, periodKey};
+
+  @override
+  List<String> get customConstraints => ['CHECK (purchased_count >= 0)'];
+}
+
+/// State sinkronisasi Cloud Save per pemain pada perangkat ini (M14 Stage 1, schema v8).
+class CloudSyncStates extends Table {
+  TextColumn get playerId => text()();
+  TextColumn get deviceId => text()();
+  IntColumn get lastSyncedRevision =>
+      integer().withDefault(const Constant(0))();
+  TextColumn get lastSyncedBlobSha256 => text().nullable()();
+  IntColumn get lastSyncAtMs => integer().nullable()();
+  TextColumn get lastRejectCode => text().nullable()();
+  IntColumn get lastRejectAtMs => integer().nullable()();
+  IntColumn get serverOffsetMs => integer().nullable()();
+  IntColumn get serverOffsetAtMs => integer().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {playerId};
+
+  @override
+  List<String> get customConstraints => ['CHECK (last_synced_revision >= 0)'];
+}
+
+/// Cadangan lokal terkompresi sebelum pemulihan dari cloud (M14 Stage 1, schema v8).
+/// Hanya maksimal 3 baris terbaru yang dipertahankan oleh [LocalBackupService].
+class LocalSaveBackups extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get createdAtMs => integer()();
+  TextColumn get reason => text()();
+  IntColumn get schemaVersion => integer()();
+  TextColumn get blobSha256 => text()();
+  BlobColumn get payload => blob().named('blob')();
+}
+
 @DriftDatabase(
   tables: [
     GameSettings,
@@ -193,6 +277,12 @@ class ShopPurchases extends Table {
     GameSessions,
     ClaimedRewards,
     ShopPurchases,
+    ClockStates,
+    Currencies,
+    PeriodicQuestStates,
+    EventShopPurchases,
+    CloudSyncStates,
+    LocalSaveBackups,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -200,7 +290,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? _openDefaultConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -252,6 +342,18 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 5) {
           await m.createTable(shopPurchases);
+        }
+        if (from < 6) {
+          await m.createTable(clockStates);
+          await m.createTable(currencies);
+          await m.createTable(periodicQuestStates);
+        }
+        if (from < 7) {
+          await m.createTable(eventShopPurchases);
+        }
+        if (from < 8) {
+          await m.createTable(cloudSyncStates);
+          await m.createTable(localSaveBackups);
         }
       });
     },

@@ -17,6 +17,7 @@ class ItemDefinition {
     this.rarity = ItemRarity.common,
     this.maxStack = 999,
     this.sellValue = 0,
+    this.sellable = true,
     this.equipment,
   });
 
@@ -30,6 +31,9 @@ class ItemDefinition {
 
   /// Harga jual (gold). Dipakai saat sistem toko tersedia.
   final int sellValue;
+
+  /// Apakah item boleh dijual ke toko reguler (`false` untuk item event M13).
+  final bool sellable;
 
   /// Hanya terisi untuk kategori equipment.
   final EquipmentData? equipment;

@@ -170,10 +170,11 @@ abstract final class EchoesTheme {
 
     return base.copyWith(
       textTheme: base.textTheme.copyWith(
-        titleLarge: base.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.4,
-          color: AppColors.textPrimary,
+        displaySmall: AppTypography.headingSerif(base.textTheme.displaySmall),
+        headlineSmall: AppTypography.headingSerif(base.textTheme.headlineSmall),
+        titleLarge: AppTypography.headingSerif(
+          base.textTheme.titleLarge,
+          letterSpacing: 0.45,
         ),
         titleMedium: base.textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.w700,
@@ -186,7 +187,7 @@ abstract final class EchoesTheme {
         ),
         labelLarge: base.textTheme.labelLarge?.copyWith(
           fontWeight: FontWeight.w600,
-          color: AppColors.warmGold,
+          color: AppColors.antiqueGold,
         ),
         bodyMedium: base.textTheme.bodyMedium?.copyWith(
           color: AppColors.textPrimary,
@@ -200,12 +201,12 @@ abstract final class EchoesTheme {
         elevation: AppElevation.panel,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          side: const BorderSide(color: AppColors.panelBorder, width: 1.5),
+          side: AppBorders.panel(),
         ),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.panelInnerBorder,
-        thickness: 1,
+        thickness: AppBorders.thin,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -217,7 +218,7 @@ abstract final class EchoesTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          side: const BorderSide(color: AppColors.panelBorder),
+          side: AppBorders.panel(),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
@@ -225,10 +226,10 @@ abstract final class EchoesTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
-        indicatorColor: AppColors.warmGold.withValues(alpha: 0.16),
+        indicatorColor: AppColors.antiqueGold.withValues(alpha: 0.16),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: AppColors.warmGold, size: 22);
+            return const IconThemeData(color: AppColors.antiqueGold, size: 22);
           }
           return const IconThemeData(color: AppColors.textSecondary, size: 20);
         }),
@@ -237,7 +238,7 @@ abstract final class EchoesTheme {
             return const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.warmGold,
+              color: AppColors.antiqueGold,
               letterSpacing: 0.2,
             );
           }
@@ -252,26 +253,83 @@ abstract final class EchoesTheme {
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return AppColors.warmGold.withValues(alpha: 0.18);
+              return AppColors.antiqueGold.withValues(alpha: 0.18);
             }
             return AppColors.surfaceDark;
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return AppColors.warmGold;
+              return AppColors.antiqueGold;
             }
             return AppColors.textSecondary;
           }),
-          side: WidgetStateProperty.all(
-            const BorderSide(color: AppColors.panelBorder),
-          ),
+          side: WidgetStateProperty.all(AppBorders.panel()),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: AppColors.surfaceDark,
         selectedColor: AppColors.aetherBlue.withValues(alpha: 0.2),
-        side: const BorderSide(color: AppColors.panelInnerBorder),
+        side: AppBorders.inner(),
         labelStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.deepTeal,
+        elevation: AppElevation.overlay,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: AppBorders.panel(
+            color: AppColors.antiqueGold.withValues(alpha: 0.55),
+          ),
+        ),
+        titleTextStyle: AppTypography.headingSerif(
+          base.textTheme.titleLarge,
+          color: AppColors.antiqueGold,
+        ),
+        contentTextStyle: base.textTheme.bodyMedium?.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: AppColors.surfaceDark,
+        elevation: AppElevation.overlay,
+        modalBackgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+          side: AppBorders.panel(),
+        ),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: AppColors.midnightForest,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(
+            color: AppColors.antiqueGold.withValues(alpha: 0.5),
+            width: AppBorders.thin,
+          ),
+        ),
+        textStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+        waitDuration: AppDurations.slow,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.panelElevated,
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: AppBorders.panel(
+            color: AppColors.aetherBlue.withValues(alpha: 0.6),
+          ),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.aetherBlue,
+        linearTrackColor: AppColors.midnightForest,
+        circularTrackColor: AppColors.midnightForest,
       ),
     );
   }

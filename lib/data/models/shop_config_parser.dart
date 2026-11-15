@@ -108,39 +108,54 @@ class ShopConfigParser {
     );
   }
 
-  PurchaseRequirement _parseRequirement(Map<String, dynamic> map, String path) {
-    final type = _requireNonEmptyString(map['type'], '$path.type');
+  PurchaseRequirement _parseRequirement(
+    Map<String, dynamic> map,
+    String path,
+  ) => parseRequirement(map, path);
+
+  /// Mem-parse satu item array `requirements` pada konfigurasi shop/event shop.
+  static PurchaseRequirement parseRequirement(
+    Map<String, dynamic> map,
+    String path, {
+    String fileName = 'shop.json',
+  }) {
+    final type = requireNonEmptyString(
+      map['type'],
+      '$path.type',
+      fileName: fileName,
+    );
     switch (type) {
       case 'min_level':
-        _rejectUnknownKeys(map, const {'type', 'value'}, 'shop.json: $path');
+        rejectUnknownKeys(map, const {'type', 'value'}, '$fileName: $path');
         final value = map['value'];
         if (value is! int || value < 1) {
           throw ConfigException(
-            'shop.json: $path.value (min_level) harus integer >= 1.',
+            '$fileName: $path.value (min_level) harus integer >= 1.',
           );
         }
         return MinLevelRequirement(value);
       case 'dungeon_cleared':
-        _rejectUnknownKeys(map, const {
+        rejectUnknownKeys(map, const {
           'type',
           'dungeon_id',
-        }, 'shop.json: $path');
-        final dungeonId = _requireNonEmptyString(
+        }, '$fileName: $path');
+        final dungeonId = requireNonEmptyString(
           map['dungeon_id'],
           '$path.dungeon_id',
+          fileName: fileName,
         );
         return DungeonClearedRequirement(dungeonId);
       case 'min_ascension_rank':
-        _rejectUnknownKeys(map, const {'type', 'value'}, 'shop.json: $path');
+        rejectUnknownKeys(map, const {'type', 'value'}, '$fileName: $path');
         final value = map['value'];
         if (value is! int || value < 0) {
           throw ConfigException(
-            'shop.json: $path.value (min_ascension_rank) harus integer >= 0.',
+            '$fileName: $path.value (min_ascension_rank) harus integer >= 0.',
           );
         }
         return MinAscensionRankRequirement(value);
       default:
-        throw ConfigException('shop.json: $path.type tidak dikenal ("$type").');
+        throw ConfigException('$fileName: $path.type tidak dikenal ("$type").');
     }
   }
 
@@ -235,16 +250,29 @@ class ShopConfigParser {
     }
   }
 
-  String _requireNonEmptyString(Object? value, String path) {
+  String _requireNonEmptyString(Object? value, String path) =>
+      requireNonEmptyString(value, path);
+
+  void _rejectUnknownKeys(
+    Map<String, dynamic> map,
+    Set<String> allowed,
+    String context,
+  ) => rejectUnknownKeys(map, allowed, context);
+
+  static String requireNonEmptyString(
+    Object? value,
+    String path, {
+    String fileName = 'shop.json',
+  }) {
     if (value is! String || value.trim().isEmpty) {
       throw ConfigException(
-        'shop.json: $path harus berupa string tidak kosong.',
+        '$fileName: $path harus berupa string tidak kosong.',
       );
     }
     return value.trim();
   }
 
-  void _rejectUnknownKeys(
+  static void rejectUnknownKeys(
     Map<String, dynamic> map,
     Set<String> allowed,
     String context,

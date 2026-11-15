@@ -11,8 +11,11 @@ String _n(double value) {
 String describeEquipmentStats(EquipmentStats s) {
   final parts = <String>[
     if (s.hp != 0) 'HP +${_n(s.hp)}',
+    if (s.hpPct != 0) 'HP +${_n(s.hpPct * 100)}%',
     if (s.atk != 0) 'ATK +${_n(s.atk)}',
+    if (s.atkPct != 0) 'ATK +${_n(s.atkPct * 100)}%',
     if (s.def != 0) 'DEF +${_n(s.def)}',
+    if (s.defPct != 0) 'DEF +${_n(s.defPct * 100)}%',
     if (s.critRate != 0) 'CRIT +${_n(s.critRate * 100)}%',
     if (s.critDamage != 0) 'CRIT DMG +${_n(s.critDamage * 100)}%',
     if (s.attackSpeed != 0) 'ASPD +${_n(s.attackSpeed)}',
@@ -51,8 +54,23 @@ List<EquipmentStatDelta> computeEquipmentStatDeltas(
 ) {
   return <EquipmentStatDelta>[
     (label: 'HP', delta: candidate.hp - current.hp, isPercent: false),
+    (
+      label: 'HP',
+      delta: (candidate.hpPct - current.hpPct) * 100,
+      isPercent: true,
+    ),
     (label: 'ATK', delta: candidate.atk - current.atk, isPercent: false),
+    (
+      label: 'ATK',
+      delta: (candidate.atkPct - current.atkPct) * 100,
+      isPercent: true,
+    ),
     (label: 'DEF', delta: candidate.def - current.def, isPercent: false),
+    (
+      label: 'DEF',
+      delta: (candidate.defPct - current.defPct) * 100,
+      isPercent: true,
+    ),
     (
       label: 'CRIT',
       delta: (candidate.critRate - current.critRate) * 100,

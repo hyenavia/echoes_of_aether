@@ -32,6 +32,8 @@ class DungeonSession {
     this.roomLifecycle = RoomLifecycleState.notLoaded,
     this.clearedRoomIds = const {},
     this.completionRewardClaimed = false,
+    this.bossEventId,
+    this.periodKeyAtStart,
   });
 
   final String runId;
@@ -43,6 +45,10 @@ class DungeonSession {
   final RoomLifecycleState roomLifecycle;
   final Set<String> clearedRoomIds;
   final bool completionRewardClaimed;
+  final String? bossEventId;
+  final String? periodKeyAtStart;
+
+  bool get isBossEvent => bossEventId != null && bossEventId!.trim().isNotEmpty;
 
   bool get isTerminal =>
       status == DungeonSessionStatus.completed ||
@@ -124,6 +130,8 @@ class DungeonSession {
       clearedRoomIds: clearedRoomIds ?? this.clearedRoomIds,
       completionRewardClaimed:
           completionRewardClaimed ?? this.completionRewardClaimed,
+      bossEventId: bossEventId,
+      periodKeyAtStart: periodKeyAtStart,
     );
   }
 
@@ -144,6 +152,8 @@ class DungeonSession {
       roomLifecycle: next,
       clearedRoomIds: clearedRoomIds,
       completionRewardClaimed: completionRewardClaimed,
+      bossEventId: bossEventId,
+      periodKeyAtStart: periodKeyAtStart,
     );
   }
 
@@ -167,6 +177,8 @@ class DungeonSession {
       clearedRoomIds: clearedRoomIds ?? this.clearedRoomIds,
       completionRewardClaimed:
           completionRewardClaimed ?? this.completionRewardClaimed,
+      bossEventId: bossEventId,
+      periodKeyAtStart: periodKeyAtStart,
     );
   }
 }

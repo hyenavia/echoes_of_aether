@@ -26,11 +26,13 @@ class EquipmentFactory {
       definitionId: definition.id,
       slot: data.slot,
       rarity: definition.rarity,
-      rolledStats: data.baseStats.roll(
-        random,
-        config.rollVariance,
-        rollBonus: rollBonus,
-      ),
+      rolledStats: data.fixedStats
+          ? data.baseStats
+          : data.baseStats.roll(
+              random,
+              config.rollVariance,
+              rollBonus: rollBonus,
+            ),
     );
   }
 }

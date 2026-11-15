@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
@@ -17,6 +19,7 @@ import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/entities/shop_config.dart';
 import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_progression_service.dart';
+import '../../domain/services/event_shop_service.dart';
 import '../../domain/services/shop_service.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
@@ -69,6 +72,11 @@ class TownHubView extends StatefulWidget {
     this.onShopSellEquipment,
     this.onShopSellMaterialBulk,
     this.onShopSellBatch,
+    this.eventShopData,
+    this.onEventShopBuy,
+    this.aetherShard = 0,
+    this.onOpenBossEvents,
+    this.onRequestNotificationPermission,
   });
 
   static const int underLevelWarningDelta = 5;
@@ -112,6 +120,11 @@ class TownHubView extends StatefulWidget {
     Map<String, int> materialQuantities,
   )?
   onShopSellBatch;
+  final EventShopViewData? eventShopData;
+  final Future<EventShopBuyResult> Function(String entryId)? onEventShopBuy;
+  final int aetherShard;
+  final VoidCallback? onOpenBossEvents;
+  final Future<bool> Function()? onRequestNotificationPermission;
 
   @override
   State<TownHubView> createState() => _TownHubViewState();
@@ -124,6 +137,13 @@ class _TownHubViewState extends State<TownHubView> {
   void _selectTab(TownTab tab) {
     setState(() {
       _selectedTab = tab;
+    });
+  }
+
+  void _openBagSubTab(int subTab) {
+    setState(() {
+      _bagSubTab = subTab;
+      _selectedTab = TownTab.bag;
     });
   }
 
@@ -197,9 +217,9 @@ class _TownHubViewState extends State<TownHubView> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 1040),
             child: ValueListenableBuilder<CharacterSnapshot>(
               valueListenable: widget.views.characterView,
               builder: (context, charSnap, _) => TownTopBar(
@@ -207,6 +227,7 @@ class _TownHubViewState extends State<TownHubView> {
                 currentExp: widget.character.currentExp,
                 expToNext: widget.character.expToNext,
                 gold: widget.character.gold,
+                aetherShard: widget.aetherShard,
                 ascensionRank: widget.cycleProgress.ascensionRank,
                 specializationName: widget.character.specialization?.name,
                 maxHp: widget.character.stats.maxHp,
@@ -256,6 +277,8 @@ class _TownHubViewState extends State<TownHubView> {
                       onSellEquipment: widget.onShopSellEquipment!,
                       onSellMaterialBulk: widget.onShopSellMaterialBulk!,
                       onSellBatch: widget.onShopSellBatch,
+                      eventShopData: widget.eventShopData,
+                      onBuyEventItem: widget.onEventShopBuy,
                       onClose: () => _selectTab(TownTab.adventure),
                     )
                   : const Center(
@@ -267,6 +290,8 @@ class _TownHubViewState extends State<TownHubView> {
                       settings: widget.settings!,
                       onChanged: widget.onSettingsChanged!,
                       onTestSfx: widget.onTestSfx,
+                      onRequestNotificationPermission:
+                          widget.onRequestNotificationPermission,
                       onClose: () => _selectTab(TownTab.adventure),
                     )
                   : const Center(
@@ -276,45 +301,37 @@ class _TownHubViewState extends State<TownHubView> {
                     ),
           },
         ),
-        Container(
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: AppColors.panelBorder, width: 1),
+        EchoesBottomNavigation(
+          key: const Key('town_bottom_nav'),
+          currentIndex: _selectedTab.index,
+          onSelected: (index) => _selectTab(TownTab.values[index]),
+          items: const [
+            EchoesNavItem(
+              label: 'Adventure',
+              icon: Icons.explore_outlined,
+              activeIcon: Icons.explore,
             ),
-          ),
-          child: NavigationBar(
-            key: const Key('town_bottom_nav'),
-            height: 60,
-            selectedIndex: _selectedTab.index,
-            onDestinationSelected: (index) => _selectTab(TownTab.values[index]),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.explore_outlined),
-                selectedIcon: Icon(Icons.explore),
-                label: 'Adventure',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Hero',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.inventory_2_outlined),
-                selectedIcon: Icon(Icons.inventory_2),
-                label: 'Bag',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.storefront_outlined),
-                selectedIcon: Icon(Icons.storefront),
-                label: 'Shop',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
-            ],
-          ),
+            EchoesNavItem(
+              label: 'Hero',
+              icon: Icons.person_outline,
+              activeIcon: Icons.person,
+            ),
+            EchoesNavItem(
+              label: 'Bag',
+              icon: Icons.inventory_2_outlined,
+              activeIcon: Icons.inventory_2,
+            ),
+            EchoesNavItem(
+              label: 'Shop',
+              icon: Icons.storefront_outlined,
+              activeIcon: Icons.storefront,
+            ),
+            EchoesNavItem(
+              label: 'Settings',
+              icon: Icons.settings_outlined,
+              activeIcon: Icons.settings,
+            ),
+          ],
         ),
       ],
     );
@@ -378,242 +395,503 @@ class _TownHubViewState extends State<TownHubView> {
     required bool selectedUnlockedNoLevel,
     required DeathLoopSuggestion? deathLoopSuggestion,
   }) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.shield_moon_outlined,
-                    size: 16,
-                    color: EchoesTheme.of(context).gold,
-                  ),
-                  const SizedBox(width: AppSpacing.xs + 2),
-                  Flexible(
-                    child: Text(
-                      'Town / Camp',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: EchoesTheme.of(context).gold,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ValueListenableBuilder<CharacterSnapshot>(
-                valueListenable: widget.views.characterView,
-                builder: (context, charSnap, _) {
-                  final specId = charSnap.specializationId;
-                  String? specName;
-                  if (specId != null) {
-                    for (final sp in charSnap.specializations) {
-                      if (sp.id == specId) {
-                        specName = sp.name;
-                        break;
-                      }
-                    }
-                  }
-                  return HeroShowcaseCard(
-                    level: charSnap.level,
-                    ascensionRank: widget.cycleProgress.ascensionRank,
-                    specializationId: specId,
-                    specializationName: specName,
-                    stats: charSnap.stats,
-                    onTap: () => _selectTab(TownTab.hero),
-                  );
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (widget.cycleProgress.highestAscensionRank >= 1) ...[
-                _buildCycleRankSwitcherCard(theme),
-                const SizedBox(height: AppSpacing.md),
-              ],
-              if (deathLoopSuggestion != null) ...[
-                _buildDeathLoopSuggestionCard(
-                  context,
-                  theme,
-                  deathLoopSuggestion,
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
-              ValueListenableBuilder<CharacterSnapshot>(
-                valueListenable: widget.views.characterView,
-                builder: (context, charSnap, _) {
-                  final selectedMeetsLevel =
-                      dungeon != null && charSnap.level >= selectedReqLevel;
-                  final selectedUnlocked =
-                      selectedUnlockedNoLevel && selectedMeetsLevel;
-                  final isUnderLeveled =
-                      dungeon != null &&
-                      selectedUnlocked &&
-                      (selectedRecLevel - charSnap.level) >=
-                          TownHubView.underLevelWarningDelta;
-                  final selectedLockReason = !selectedUnlockedNoLevel
-                      ? 'Terkunci — selesaikan dungeon sebelumnya pada siklus ini.'
-                      : (!selectedMeetsLevel
-                            ? 'Terkunci — butuh minimal Lv ${NumberFormatter.format(selectedReqLevel)} (saat ini Lv ${NumberFormatter.format(charSnap.level)}).'
-                            : null);
-                  final ext = EchoesTheme.of(context);
-                  final biomeStyle = dungeon != null
-                      ? BiomeStyle.resolve(
-                          dungeon.biome,
-                          isAscension: dungeon.isAscension,
-                        )
-                      : BiomeStyle.resolve('default');
-                  return PanelFrame(
-                    showCornerOrnaments: true,
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    borderColor: (dungeon?.isAscension ?? false)
-                        ? ext.rank
-                        : ext.gold,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [biomeStyle.backgroundTint, AppColors.panelDark],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.xs + 2),
-                              decoration: BoxDecoration(
-                                color: biomeStyle.accentColor.withValues(
-                                  alpha: 0.16,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.sm,
-                                ),
-                                border: Border.all(
-                                  color: biomeStyle.accentColor.withValues(
-                                    alpha: 0.45,
-                                  ),
-                                ),
-                              ),
-                              child: Icon(
-                                biomeStyle.icon,
-                                size: 18,
-                                color: biomeStyle.accentColor,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                dungeon?.name ?? 'Pilih Dungeon',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                            ),
-                            if (dungeon?.isAscension ?? false)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.sm,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: ext.rank.withValues(alpha: 0.16),
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.sm,
-                                  ),
-                                  border: Border.all(
-                                    color: ext.rank.withValues(alpha: 0.55),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Ascension',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: ext.rank,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs + 2),
-                        Text(
-                          dungeon == null
-                              ? 'Konfigurasi dungeon belum tersedia.'
-                              : 'Biome: ${dungeon.biome} • $totalRooms Room',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        if (dungeon != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Rekomendasi Lv ${NumberFormatter.format(selectedRecLevel)} • Siklus Rank ${widget.cycleProgress.ascensionRank}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          totalRooms > 0
-                              ? 'Progres room tertinggi: $clearedCount / $totalRooms'
-                              : 'Progres room tertinggi: $clearedCount',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        Text(
-                          'Total dungeon selesai: ${widget.dungeonProgress.clearsCount}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        if (selectedLockReason != null) ...[
-                          const SizedBox(height: 6),
-                          LockedBadge(label: selectedLockReason),
-                        ],
-                        if (isUnderLeveled) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Peringatan: Level karakter (${NumberFormatter.format(charSnap.level)}) jauh di bawah rekomendasi Lv ${NumberFormatter.format(selectedRecLevel)}.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: ext.warning,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: AppSpacing.md),
-                        PrimaryButton(
-                          expand: true,
-                          onPressed: (dungeon == null || !selectedUnlocked)
-                              ? null
-                              : widget.onEnterDungeon,
-                          icon: selectedUnlocked
-                              ? Icons.play_arrow
-                              : Icons.lock_outline,
-                          label: 'Masuk ${dungeon?.name ?? 'Dungeon'}',
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              if (catalog.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                _buildDungeonListCard(
-                  context,
-                  theme,
-                  catalog: catalog,
-                  progressMap: progressMap,
-                  progression: progression,
-                ),
-              ],
-              const SizedBox(height: AppSpacing.md),
-              _buildOfflineActivityCard(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 720;
+
+        final campHeader = _buildCampHeader(context, theme);
+
+        final heroShowcase = ValueListenableBuilder<CharacterSnapshot>(
+          valueListenable: widget.views.characterView,
+          builder: (context, charSnap, _) {
+            final specId = charSnap.specializationId;
+            String? specName;
+            if (specId != null) {
+              for (final sp in charSnap.specializations) {
+                if (sp.id == specId) {
+                  specName = sp.name;
+                  break;
+                }
+              }
+            }
+            return HeroShowcaseCard(
+              level: charSnap.level,
+              ascensionRank: widget.cycleProgress.ascensionRank,
+              specializationId: specId,
+              specializationName: specName,
+              stats: charSnap.stats,
+              onTap: () => _selectTab(TownTab.hero),
+            );
+          },
+        );
+
+        final quickAccess = _buildQuickAccessStrip(context, theme);
+
+        final activeAdventure = ValueListenableBuilder<CharacterSnapshot>(
+          valueListenable: widget.views.characterView,
+          builder: (context, charSnap, _) => _buildActiveAdventureCard(
+            context,
+            theme,
+            charSnap: charSnap,
+            dungeon: dungeon,
+            totalRooms: totalRooms,
+            clearedCount: clearedCount,
+            selectedRecLevel: selectedRecLevel,
+            selectedReqLevel: selectedReqLevel,
+            selectedUnlockedNoLevel: selectedUnlockedNoLevel,
+          ),
+        );
+
+        final dungeonCatalogCard = catalog.isNotEmpty
+            ? _buildDungeonListCard(
                 context,
                 theme,
                 catalog: catalog,
                 progressMap: progressMap,
                 progression: progression,
+              )
+            : null;
+
+        final offlineCard = _buildOfflineActivityCard(
+          context,
+          theme,
+          catalog: catalog,
+          progressMap: progressMap,
+          progression: progression,
+        );
+
+        if (isWide) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1040),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          campHeader,
+                          const SizedBox(height: AppSpacing.xs + 2),
+                          heroShowcase,
+                          const SizedBox(height: AppSpacing.xs + 2),
+                          quickAccess,
+                          if (widget.cycleProgress.highestAscensionRank >=
+                              1) ...[
+                            const SizedBox(height: AppSpacing.sm + 2),
+                            _buildCycleRankSwitcherCard(theme),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      flex: 6,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (deathLoopSuggestion != null) ...[
+                            _buildDeathLoopSuggestionCard(
+                              context,
+                              theme,
+                              deathLoopSuggestion,
+                            ),
+                            const SizedBox(height: AppSpacing.sm + 2),
+                          ],
+                          activeAdventure,
+                          if (dungeonCatalogCard != null) ...[
+                            const SizedBox(height: AppSpacing.md),
+                            dungeonCatalogCard,
+                          ],
+                          const SizedBox(height: AppSpacing.md),
+                          offlineCard,
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  campHeader,
+                  const SizedBox(height: AppSpacing.sm),
+                  heroShowcase,
+                  const SizedBox(height: AppSpacing.sm),
+                  quickAccess,
+                  const SizedBox(height: AppSpacing.md),
+                  if (widget.cycleProgress.highestAscensionRank >= 1) ...[
+                    _buildCycleRankSwitcherCard(theme),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  if (deathLoopSuggestion != null) ...[
+                    _buildDeathLoopSuggestionCard(
+                      context,
+                      theme,
+                      deathLoopSuggestion,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  activeAdventure,
+                  if (dungeonCatalogCard != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    dungeonCatalogCard,
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  offlineCard,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCampHeader(BuildContext context, ThemeData theme) {
+    final ext = EchoesTheme.of(context);
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.xs + 2,
+      runSpacing: AppSpacing.xs,
+      children: [
+        Icon(Icons.local_fire_department_outlined, size: 16, color: ext.gold),
+        Text(
+          'Town / Camp',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.headingSerif(
+            theme.textTheme.titleMedium,
+            color: ext.gold,
+            letterSpacing: 0.8,
           ),
         ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.aetherBlue.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: AppColors.aetherBlue.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Text(
+            'Living Aether Camp',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.aetherBlue,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickAccessStrip(BuildContext context, ThemeData theme) {
+    final actions =
+        <({Key key, String label, IconData icon, VoidCallback onTap})>[
+          (
+            key: const Key('quick_access_hero'),
+            label: 'Karakter',
+            icon: Icons.person_outline,
+            onTap: () => _selectTab(TownTab.hero),
+          ),
+          (
+            key: const Key('quick_access_equipment'),
+            label: 'Equip',
+            icon: Icons.shield_outlined,
+            onTap: () => _openBagSubTab(0),
+          ),
+          (
+            key: const Key('quick_access_bag'),
+            label: 'Inventori',
+            icon: Icons.inventory_2_outlined,
+            onTap: () => _openBagSubTab(1),
+          ),
+          (
+            key: const Key('quick_access_skills'),
+            label: 'Skill',
+            icon: Icons.auto_fix_high_outlined,
+            onTap: () => _selectTab(TownTab.hero),
+          ),
+          (
+            key: const Key('quick_access_shop'),
+            label: 'Toko',
+            icon: Icons.storefront_outlined,
+            onTap: () => _selectTab(TownTab.shop),
+          ),
+          if (widget.onOpenBossEvents != null)
+            (
+              key: const Key('quick_access_boss'),
+              label: 'Boss',
+              icon: Icons.whatshot_outlined,
+              onTap: widget.onOpenBossEvents!,
+            ),
+        ];
+
+    return PanelFrame(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs + 2,
+        vertical: AppSpacing.xs,
+      ),
+      backgroundColor: AppColors.surfaceDark,
+      borderColor: AppColors.panelBorder,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final veryNarrow = constraints.maxWidth < 240;
+          if (veryNarrow) {
+            return Wrap(
+              alignment: WrapAlignment.spaceEvenly,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                for (final a in actions)
+                  _QuickAccessButton(
+                    key: a.key,
+                    label: a.label,
+                    icon: a.icon,
+                    onTap: a.onTap,
+                    compact: true,
+                  ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                Expanded(
+                  child: _QuickAccessButton(
+                    key: actions[i].key,
+                    label: actions[i].label,
+                    icon: actions[i].icon,
+                    onTap: actions[i].onTap,
+                  ),
+                ),
+                if (i < actions.length - 1)
+                  const SizedBox(width: AppSpacing.xs),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildActiveAdventureCard(
+    BuildContext context,
+    ThemeData theme, {
+    required CharacterSnapshot charSnap,
+    required DungeonDefinition? dungeon,
+    required int totalRooms,
+    required int clearedCount,
+    required int selectedRecLevel,
+    required int selectedReqLevel,
+    required bool selectedUnlockedNoLevel,
+  }) {
+    final selectedMeetsLevel =
+        dungeon != null && charSnap.level >= selectedReqLevel;
+    final selectedUnlocked = selectedUnlockedNoLevel && selectedMeetsLevel;
+    final isUnderLeveled =
+        dungeon != null &&
+        selectedUnlocked &&
+        (selectedRecLevel - charSnap.level) >=
+            TownHubView.underLevelWarningDelta;
+    final selectedLockReason = !selectedUnlockedNoLevel
+        ? 'Terkunci — selesaikan dungeon sebelumnya pada siklus ini.'
+        : (!selectedMeetsLevel
+              ? 'Terkunci — butuh minimal Lv ${NumberFormatter.format(selectedReqLevel)} (saat ini Lv ${NumberFormatter.format(charSnap.level)}).'
+              : null);
+    final ext = EchoesTheme.of(context);
+    final biomeStyle = dungeon != null
+        ? BiomeStyle.resolve(dungeon.biome, isAscension: dungeon.isAscension)
+        : BiomeStyle.resolve('default');
+    final roomRatio = totalRooms > 0
+        ? (clearedCount / totalRooms).clamp(0.0, 1.0)
+        : 0.0;
+
+    final bannerHeight = math.max(
+      70.0,
+      MediaQuery.textScalerOf(context).scale(64),
+    );
+
+    return PanelFrame(
+      showCornerOrnaments: true,
+      padding: const EdgeInsets.all(AppSpacing.sm + 2),
+      borderColor: (dungeon?.isAscension ?? false) ? ext.rank : ext.gold,
+      boxShadow: AppShadows.panel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BiomeArtwork(
+            biomeId: dungeon?.biome ?? 'forgotten_forest',
+            isAscension: dungeon?.isAscension ?? false,
+            height: bannerHeight,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.midnightForest.withValues(
+                              alpha: 0.85,
+                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            border: Border.all(
+                              color: biomeStyle.accentColor.withValues(
+                                alpha: 0.55,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                biomeStyle.icon,
+                                size: 13,
+                                color: biomeStyle.accentColor,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Flexible(
+                                child: Text(
+                                  biomeStyle.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: biomeStyle.accentColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (dungeon?.isAscension ?? false) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.midnightForest.withValues(
+                              alpha: 0.85,
+                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            border: Border.all(
+                              color: ext.rank.withValues(alpha: 0.65),
+                            ),
+                          ),
+                          child: Text(
+                            'Ascension',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: ext.rank,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    dungeon?.name ?? 'Pilih Dungeon',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.headingSerif(
+                      theme.textTheme.titleLarge,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            dungeon == null
+                ? 'Konfigurasi dungeon belum tersedia.'
+                : 'Biome: ${dungeon.biome} • $totalRooms Room',
+            style: theme.textTheme.bodySmall,
+          ),
+          if (dungeon != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Rekomendasi Lv ${NumberFormatter.format(selectedRecLevel)} • Siklus Rank ${widget.cycleProgress.ascensionRank}',
+              style: AppTypography.numeric(
+                theme.textTheme.bodySmall,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            totalRooms > 0
+                ? 'Progres room tertinggi: $clearedCount / $totalRooms'
+                : 'Progres room tertinggi: $clearedCount',
+            style: theme.textTheme.bodyMedium,
+          ),
+          if (totalRooms > 0) ...[
+            const SizedBox(height: 4),
+            ProgressBar(
+              value: roomRatio,
+              color: biomeStyle.accentColor,
+              height: 6,
+            ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            'Total dungeon selesai: ${widget.dungeonProgress.clearsCount}',
+            style: theme.textTheme.bodySmall,
+          ),
+          if (selectedLockReason != null) ...[
+            const SizedBox(height: 6),
+            LockedBadge(label: selectedLockReason),
+          ],
+          if (isUnderLeveled) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Peringatan: Level karakter (${NumberFormatter.format(charSnap.level)}) jauh di bawah rekomendasi Lv ${NumberFormatter.format(selectedRecLevel)}.',
+              style: theme.textTheme.bodySmall?.copyWith(color: ext.warning),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          PrimaryButton(
+            expand: true,
+            onPressed: (dungeon == null || !selectedUnlocked)
+                ? null
+                : widget.onEnterDungeon,
+            icon: selectedUnlocked ? Icons.play_arrow : Icons.lock_outline,
+            label: 'Masuk ${dungeon?.name ?? 'Dungeon'}',
+          ),
+        ],
       ),
     );
   }
@@ -739,7 +1017,7 @@ class _TownHubViewState extends State<TownHubView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SectionHeader(title: 'Daftar Dungeon'),
+              const SectionHeader(title: 'Daftar Dungeon', useSerif: true),
               const SizedBox(height: 2),
               Text(
                 'Siklus Rank ${widget.cycleProgress.ascensionRank} • Selesaikan berurutan untuk membuka dungeon berikutnya.',
@@ -794,75 +1072,172 @@ class _TownHubViewState extends State<TownHubView> {
                       d.biome,
                       isAscension: d.isAscension,
                     );
+                    final totalRoomsInDungeon = d.roomOrder.length;
+                    final snapshot = progressMap[d.id];
+                    final clearedRoomsInDungeon = clearedInCycle
+                        ? totalRoomsInDungeon
+                        : (snapshot != null &&
+                                  snapshot.highestClearedRoomIndex >= 0
+                              ? (snapshot.highestClearedRoomIndex + 1).clamp(
+                                  0,
+                                  totalRoomsInDungeon > 0
+                                      ? totalRoomsInDungeon
+                                      : 999,
+                                )
+                              : 0);
+                    final roomProgress = totalRoomsInDungeon > 0
+                        ? (clearedRoomsInDungeon / totalRoomsInDungeon).clamp(
+                            0.0,
+                            1.0,
+                          )
+                        : 0.0;
 
                     return PanelFrame(
                       key: Key('dungeon_row_${d.id}'),
                       padding: const EdgeInsets.all(AppSpacing.sm + 2),
                       backgroundColor: AppColors.surfaceDark,
-                      gradient: isSelected
-                          ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                biomeStyle.backgroundTint,
-                                AppColors.surfaceDark,
-                              ],
-                            )
-                          : null,
                       borderColor: d.isAscension
                           ? ext.rank
                           : (isSelected ? ext.gold : ext.panelInnerBorder),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                biomeStyle.icon,
-                                size: 16,
-                                color: unlocked
-                                    ? biomeStyle.accentColor
-                                    : ext.locked,
+                          BiomeArtwork(
+                            biomeId: d.biome,
+                            isAscension: d.isAscension,
+                            height: math.max(
+                              78.0,
+                              MediaQuery.textScalerOf(context).scale(64),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.xs + 2,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.midnightForest
+                                                .withValues(alpha: 0.84),
+                                            borderRadius: BorderRadius.circular(
+                                              AppRadius.sm,
+                                            ),
+                                            border: Border.all(
+                                              color: biomeStyle.accentColor
+                                                  .withValues(alpha: 0.5),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                biomeStyle.icon,
+                                                size: 13,
+                                                color: unlocked
+                                                    ? biomeStyle.accentColor
+                                                    : ext.locked,
+                                              ),
+                                              const SizedBox(
+                                                width: AppSpacing.xs,
+                                              ),
+                                              Flexible(
+                                                child: Text(
+                                                  biomeStyle.label,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: theme
+                                                      .textTheme
+                                                      .labelSmall
+                                                      ?.copyWith(
+                                                        color: unlocked
+                                                            ? biomeStyle
+                                                                  .accentColor
+                                                            : ext.locked,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      if (!unlocked)
+                                        const LockedBadge(label: 'Terkunci')
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.sm,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.midnightForest
+                                                .withValues(alpha: 0.86),
+                                            borderRadius: BorderRadius.circular(
+                                              AppRadius.sm,
+                                            ),
+                                            border: Border.all(
+                                              color: statusColor.withValues(
+                                                alpha: 0.65,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            statusLabel,
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                                  color: statusColor,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '${d.order}. ${d.name}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.headingSerif(
+                                      theme.textTheme.titleMedium,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: AppSpacing.xs + 2),
-                              Expanded(
-                                child: Text(
-                                  '${d.order}. ${d.name}',
-                                  style: theme.textTheme.titleSmall,
-                                ),
-                              ),
-                              if (!unlocked)
-                                const LockedBadge(label: 'Terkunci')
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.sm,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(
-                                      AppRadius.sm,
-                                    ),
-                                    border: Border.all(
-                                      color: statusColor.withValues(alpha: 0.5),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    statusLabel,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: statusColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: AppSpacing.xs + 2),
                           Text(
                             'Rekomendasi Lv ${NumberFormatter.format(recLevel)} • Kesulitan ${diffMultiplier.toStringAsFixed(2)}x • ${d.roomOrder.length} Room',
-                            style: theme.textTheme.bodySmall,
+                            style: AppTypography.numeric(
+                              theme.textTheme.bodySmall,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
+                          if (totalRoomsInDungeon > 0) ...[
+                            const SizedBox(height: 5),
+                            ProgressBar(
+                              value: roomProgress,
+                              label: 'Progres Room',
+                              trailingText:
+                                  '$clearedRoomsInDungeon / $totalRoomsInDungeon',
+                              color: clearedInCycle
+                                  ? ext.success
+                                  : biomeStyle.accentColor,
+                              height: 5,
+                            ),
+                          ],
                           if (d.isAscension) ...[
                             const SizedBox(height: 4),
                             Text(
@@ -897,8 +1272,11 @@ class _TownHubViewState extends State<TownHubView> {
                           ],
                           if (unlocked) ...[
                             const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                            Wrap(
+                              alignment: WrapAlignment.end,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.xs,
                               children: [
                                 if (widget.onSelectDungeon != null)
                                   TextButton(
@@ -912,7 +1290,6 @@ class _TownHubViewState extends State<TownHubView> {
                                           : 'Pilih Target',
                                     ),
                                   ),
-                                const SizedBox(width: 8),
                                 FilledButton.tonal(
                                   key: Key('dungeon_enter_${d.id}'),
                                   onPressed: enterCallback,
@@ -942,7 +1319,7 @@ class _TownHubViewState extends State<TownHubView> {
     required DungeonProgressionService progression,
   }) {
     final normalCatalog = catalog.where((d) => d.isNormal).toList();
-    final ascensionCatalog = catalog.where((d) => !d.isNormal).toList();
+    final ascensionCatalog = catalog.where((d) => d.isAscension).toList();
     final activity = widget.offlineActivity;
     final isPausedSelected =
         activity.isPaused || activity.state == OfflineActivityState.inactive;
@@ -1066,6 +1443,74 @@ class _TownHubViewState extends State<TownHubView> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _QuickAccessButton extends StatelessWidget {
+  const _QuickAccessButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.compact = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: label,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: 44, minWidth: compact ? 64 : 0),
+        child: Material(
+          color: AppColors.deepTeal.withValues(alpha: 0.72),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            side: BorderSide(
+              color: AppColors.panelBorder.withValues(alpha: 0.8),
+              width: AppBorders.thin,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs + 2,
+                vertical: AppSpacing.xs + 2,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 16, color: AppColors.antiqueGold),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

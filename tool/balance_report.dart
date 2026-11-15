@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:echoes_of_aether/domain/services/dungeon_progression_service.dart';
+import 'package:echoes_of_aether/domain/services/period_service.dart';
+
 import 'src/balance_simulator.dart';
 
 void main(List<String> args) {
@@ -14,6 +17,14 @@ void main(List<String> args) {
   }
   if (args.contains('--economy')) {
     _printEconomyReport(sim);
+    return;
+  }
+  if (args.contains('--boss')) {
+    _printBossReport(sim, seedCount: 20);
+    return;
+  }
+  if (args.contains('--event')) {
+    _printEventReport(sim, seedCount: 15);
     return;
   }
 
@@ -376,5 +387,175 @@ void _printEconomyReport(BalanceSimulator sim) {
         '${fmtHrs(r.hoursForPriceOnline(legendaryPrice))} / ${fmtHrs(r.hoursForPriceOfflineTotal(legendaryPrice))} |',
       );
     }
+  }
+}
+
+void _printBossReport(BalanceSimulator sim, {int seedCount = 20}) {
+  const ranks = [0, 1, 5, 10, 50];
+  final normals = sim.config.dungeons.values.where((d) => d.isNormal).toList()
+    ..sort((a, b) => a.order.compareTo(b.order));
+  final dungeonProg = DungeonProgressionService(sim.config.difficulty);
+
+  stdout.writeln(
+    '=== Echoes of Aether — Boss Events Balance Simulator (M12 Stage 6) ===',
+  );
+  stdout.writeln('Seeds per scenario: $seedCount | Specialization: vanguard');
+  stdout.writeln('');
+  stdout.writeln(
+    '| Period | Boss | RefDungeon | Rank | RecLv | Win(-10) | Win(Rec) | Win(+10) | AvgWinDur(s) | MinHit->Boss | BossHit |',
+  );
+  stdout.writeln('|---|---|---|---|---|---|---|---|---|---|---|');
+
+  for (final period in [Period.daily, Period.weekly]) {
+    final pool = period == Period.daily
+        ? sim.config.bossEvents!.daily.pool
+        : sim.config.bossEvents!.weekly.pool;
+    for (final boss in pool) {
+      for (final rank in ranks) {
+        for (final d in normals) {
+          final rec = dungeonProg.recommendedLevel(d, rank);
+          final low = math.max(1, rec - 10);
+          final high = rec + 10;
+
+          final mLow = sim.simulateBossScenario(
+            period: period,
+            boss: boss,
+            referenceDungeonId: d.id,
+            scenarioLabel: 'Under(-10)',
+            playerLevel: low,
+            gearProfile: sim.rankTierGearProfile(
+              d,
+              cycleRank: rank,
+              playerLevel: low,
+            ),
+            cycleRank: rank,
+            seedCount: seedCount,
+          );
+          final mRec = sim.simulateBossScenario(
+            period: period,
+            boss: boss,
+            referenceDungeonId: d.id,
+            scenarioLabel: 'Rec',
+            playerLevel: rec,
+            gearProfile: sim.rankTierGearProfile(
+              d,
+              cycleRank: rank,
+              playerLevel: rec,
+            ),
+            cycleRank: rank,
+            seedCount: seedCount,
+          );
+          final mHigh = sim.simulateBossScenario(
+            period: period,
+            boss: boss,
+            referenceDungeonId: d.id,
+            scenarioLabel: 'Over(+10)',
+            playerLevel: high,
+            gearProfile: sim.rankTierGearProfile(
+              d,
+              cycleRank: rank,
+              playerLevel: high,
+            ),
+            cycleRank: rank,
+            seedCount: seedCount,
+          );
+
+          stdout.writeln(
+            '| ${period.name} | ${boss.id} | ${d.id} | $rank | $rec | '
+            '${(mLow.winRate * 100).toStringAsFixed(1)}% | '
+            '${(mRec.winRate * 100).toStringAsFixed(1)}% | '
+            '${(mHigh.winRate * 100).toStringAsFixed(1)}% | '
+            '${mRec.avgDurationSeconds.toStringAsFixed(1)} | '
+            '${mRec.maxPlayerHitOnBoss} | ${mRec.minBossHitOnPlayer} |',
+          );
+        }
+      }
+    }
+  }
+
+  stdout.writeln('');
+  stdout.writeln(
+    '=== Boss Quest Rewards vs 1h Online Farming (Dungeon 1..5, Rank 0,1,5,10,50) ===',
+  );
+  stdout.writeln(
+    '| Rank | RefDungeon | RecLv | Farm1h Gold | Farm1h EXP | Daily Gold | Daily EXP | Weekly Gold | Weekly EXP | Weekly Shards | Exceeds1hFarm |',
+  );
+  stdout.writeln('|---|---|---|---|---|---|---|---|---|---|---|');
+  final comparisons = sim.simulateBossQuestComparison(ranks: ranks);
+  for (final c in comparisons) {
+    final flag = (c.dailyExceedsFarmingHour || c.weeklyExceedsFarmingHour)
+        ? 'YES (Daily=${c.dailyExceedsFarmingHour}, Weekly=${c.weeklyExceedsFarmingHour})'
+        : 'no';
+    stdout.writeln(
+      '| ${c.cycleRank} | ${c.referenceDungeonId} | ${c.recommendedLevel} | '
+      '${c.farmingGoldPerHour.toStringAsFixed(1)} | ${c.farmingExpPerHour.toStringAsFixed(1)} | '
+      '${c.dailyQuestGold} | ${c.dailyQuestExp} | '
+      '${c.weeklyQuestGold} | ${c.weeklyQuestExp} | '
+      '${c.weeklyAetherShardIncome} | $flag |',
+    );
+  }
+}
+
+void _printEventReport(BalanceSimulator sim, {int seedCount = 15}) {
+  final econ = sim.simulateEventShopEconomy();
+  stdout.writeln(
+    '=== Echoes of Aether — Event Shop Shard Economy & Pct Caps (M13 Stage 4) ===',
+  );
+  stdout.writeln(
+    'Reward: Daily=${econ.dailyShard} Shard, Weekly=${econ.weeklyShard} Shard | '
+    'Cycle=${econ.cycleWeeks} weeks | Prices: Epic=${econ.epicPrice}, Leg=${econ.legendaryPrice} | '
+    'Full Epic=${econ.fullEpicSetCost}, Full Leg=${econ.fullLegendarySetCost}, Pool Total=${econ.totalPoolCost}',
+  );
+  stdout.writeln(
+    'Max Legal Pct Sums vs Caps: '
+    'HP=${(econ.pctCapCheck.maxLegalHpPct * 100).toStringAsFixed(1)}% / ${(econ.pctCapCheck.capHpPct * 100).toStringAsFixed(0)}%, '
+    'ATK=${(econ.pctCapCheck.maxLegalAtkPct * 100).toStringAsFixed(1)}% / ${(econ.pctCapCheck.capAtkPct * 100).toStringAsFixed(0)}%, '
+    'DEF=${(econ.pctCapCheck.maxLegalDefPct * 100).toStringAsFixed(1)}% / ${(econ.pctCapCheck.capDefPct * 100).toStringAsFixed(0)}% '
+    '(BelowAllCaps=${econ.pctCapCheck.isBelowAllCaps})',
+  );
+  stdout.writeln('');
+  stdout.writeln(
+    '| Cadence | Shard/wk | 1 Epic (wk) | 1 Leg (wk) | 4 Epic (wk) | 4 Leg (wk) | Full Pool (wk) | Flag |',
+  );
+  stdout.writeln('|---|---|---|---|---|---|---|---|');
+  for (final c in econ.cadences) {
+    final flags = <String>[
+      if (c.buysAllInSingleCycle) 'TOO_FAST',
+      if (c.impossibleForLegendary) 'IMPOSSIBLE',
+    ];
+    stdout.writeln(
+      '| ${c.cadenceName} | ${c.weeklyShardIncome} | '
+      '${c.weeksForOneEpic.toStringAsFixed(2)} | ${c.weeksForOneLegendary.toStringAsFixed(2)} | '
+      '${c.weeksForFullEpicSet.toStringAsFixed(2)} | ${c.weeksForFullLegendarySet.toStringAsFixed(2)} | '
+      '${c.weeksForFullPool.toStringAsFixed(2)} | ${flags.isEmpty ? "healthy" : flags.join(",")} |',
+    );
+  }
+
+  stdout.writeln('');
+  stdout.writeln(
+    '=== Event Set Impact (4-Slot Full Epic & Legendary vs Tier Baseline) ===',
+  );
+  stdout.writeln(
+    '| Target | Kind | Rank | Lv | Win(Base/Epic/Leg) | Dur(Base/Epic/Leg s) | Epic DMG/EHP Δ% | Leg DMG/EHP Δ% | Safe |',
+  );
+  stdout.writeln('|---|---|---|---|---|---|---|---|---|');
+  final rows = sim.simulateEventSetImpact(
+    ranks: const [0, 1, 5, 10, 50],
+    seedCount: seedCount,
+  );
+  for (final r in rows) {
+    String fmtPct(double p) => '${p >= 0 ? "+" : ""}${p.toStringAsFixed(1)}%';
+    stdout.writeln(
+      '| ${r.targetId} | ${r.targetKind} | ${r.cycleRank} | ${r.playerLevel} | '
+      '${(r.baseWinRate * 100).toStringAsFixed(0)}%/'
+      '${(r.epicWinRate * 100).toStringAsFixed(0)}%/'
+      '${(r.legendaryWinRate * 100).toStringAsFixed(0)}% | '
+      '${r.baseDurationSec.toStringAsFixed(1)}/'
+      '${r.epicDurationSec.toStringAsFixed(1)}/'
+      '${r.legendaryDurationSec.toStringAsFixed(1)} | '
+      '${fmtPct(r.epicDamageDeltaPct)} / ${fmtPct(r.epicToughnessDeltaPct)} | '
+      '${fmtPct(r.legendaryDamageDeltaPct)} / ${fmtPct(r.legendaryToughnessDeltaPct)} | '
+      '${r.allFiniteAndSafe} |',
+    );
   }
 }

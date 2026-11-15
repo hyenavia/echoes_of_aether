@@ -1,14 +1,18 @@
 import 'dart:convert';
 
 import '../../core/errors/config_exception.dart';
+import '../../domain/entities/cloud_config.dart';
 import '../../domain/entities/combat_stats.dart';
+import '../../domain/entities/currency_config.dart';
 import '../../domain/entities/damage_config.dart';
 import '../../domain/entities/difficulty_config.dart';
 import '../../domain/entities/dungeon_reward.dart';
 import '../../domain/entities/equipment_config.dart';
 import '../../domain/entities/farming_config.dart';
+import '../../domain/entities/notification_config.dart';
 import '../../domain/entities/progression_config.dart';
 import '../../domain/entities/revive_config.dart';
+import '../../domain/entities/time_config.dart';
 import '../../domain/services/damage_calculator.dart';
 
 /// Membaca dan memvalidasi game_config.json.
@@ -194,17 +198,57 @@ class GameConfigParser {
   EquipmentConfig parseEquipment(String source) {
     final root = _decodeRoot(source);
     if (root['equipment'] == null) return const EquipmentConfig();
+    const defaults = EquipmentConfig();
     final section = _section(root, 'equipment', 'equipment');
-    return EquipmentConfig(
-      rollVariance: _number(
-        section,
-        'equipment',
-        'roll_variance',
-        min: 0,
-        max: 0.5,
-        fallback: const EquipmentConfig().rollVariance,
-      ),
+    _rejectUnknownKeys(section, const {
+      'roll_variance',
+      'pct_caps',
+    }, 'equipment');
+    final rollVariance = _number(
+      section,
+      'equipment',
+      'roll_variance',
+      min: 0,
+      max: 0.5,
+      fallback: defaults.rollVariance,
     );
+    var pctCaps = defaults.pctCaps;
+    if (section.containsKey('pct_caps')) {
+      const capsWhere = 'equipment.pct_caps';
+      final capsMap = _section(section, 'pct_caps', capsWhere);
+      _rejectUnknownKeys(capsMap, const {
+        'hp_pct',
+        'atk_pct',
+        'def_pct',
+      }, capsWhere);
+      pctCaps = EquipmentPctCaps(
+        hpPct: _number(
+          capsMap,
+          capsWhere,
+          'hp_pct',
+          min: 0,
+          max: 5.0,
+          fallback: defaults.pctCaps.hpPct,
+        ),
+        atkPct: _number(
+          capsMap,
+          capsWhere,
+          'atk_pct',
+          min: 0,
+          max: 5.0,
+          fallback: defaults.pctCaps.atkPct,
+        ),
+        defPct: _number(
+          capsMap,
+          capsWhere,
+          'def_pct',
+          min: 0,
+          max: 5.0,
+          fallback: defaults.pctCaps.defPct,
+        ),
+      );
+    }
+    return EquipmentConfig(rollVariance: rollVariance, pctCaps: pctCaps);
   }
 
   /// Section "dungeon_completion" bersifat opsional; jika tidak ada, memakai default.
@@ -368,6 +412,272 @@ class GameConfigParser {
           ? defaults.deathLoopSuggestAfter
           : _int(section, w, 'death_loop_suggest_after', min: 1),
     );
+  }
+
+  static const Set<String> _timeKeys = {
+    'reset_hour',
+    'week_start',
+    'epoch_monday',
+    'forward_jump_record_threshold_hours',
+  };
+
+  static const Set<String> _claimedRewardsKeys = {'retention_days'};
+
+  /// Section "time" bersifat opsional; jika tidak ada, memakai default.
+  TimeConfig parseTime(String source) {
+    final root = _decodeRoot(source);
+    if (root['time'] == null) {
+      return const TimeConfig();
+    }
+    const defaults = TimeConfig();
+    const w = 'time';
+    final section = _section(root, w, w);
+    _rejectUnknownKeys(section, _timeKeys, w);
+
+    final resetHour = section.containsKey('reset_hour')
+        ? _intRange(section, w, 'reset_hour', min: 0, max: 23)
+        : defaults.resetHour;
+
+    final String weekStart;
+    if (section.containsKey('week_start')) {
+      final raw = section['week_start'];
+      if (raw is! String) {
+        throw ConfigException('$_file: $w."week_start" harus berupa teks.');
+      }
+      if (raw != 'monday') {
+        throw ConfigException(
+          '$_file: $w."week_start" tidak dikenal: "$raw". Nilai yang didukung: "monday".',
+        );
+      }
+      weekStart = raw;
+    } else {
+      weekStart = defaults.weekStart;
+    }
+
+    final String epochMonday;
+    if (section.containsKey('epoch_monday')) {
+      final raw = section['epoch_monday'];
+      if (raw is! String) {
+        throw ConfigException('$_file: $w."epoch_monday" harus berupa teks.');
+      }
+      final parsed = TimeConfig.tryParseDateUtc(raw);
+      if (parsed == null) {
+        throw ConfigException(
+          '$_file: $w."epoch_monday" tidak valid: "$raw" (harus YYYY-MM-DD).',
+        );
+      }
+      if (parsed.weekday != DateTime.monday) {
+        throw ConfigException(
+          '$_file: $w."epoch_monday" ($raw) harus hari Senin.',
+        );
+      }
+      epochMonday = raw.trim();
+    } else {
+      epochMonday = defaults.epochMonday;
+    }
+
+    final thresholdHours =
+        section.containsKey('forward_jump_record_threshold_hours')
+        ? _int(section, w, 'forward_jump_record_threshold_hours', min: 1)
+        : defaults.forwardJumpRecordThresholdHours;
+
+    return TimeConfig(
+      resetHour: resetHour,
+      weekStart: weekStart,
+      epochMonday: epochMonday,
+      forwardJumpRecordThresholdHours: thresholdHours,
+    );
+  }
+
+  /// Section "claimed_rewards" bersifat opsional; jika tidak ada, memakai default.
+  ClaimedRewardsConfig parseClaimedRewards(String source) {
+    final root = _decodeRoot(source);
+    if (root['claimed_rewards'] == null) {
+      return const ClaimedRewardsConfig();
+    }
+    const defaults = ClaimedRewardsConfig();
+    const w = 'claimed_rewards';
+    final section = _section(root, w, w);
+    _rejectUnknownKeys(section, _claimedRewardsKeys, w);
+
+    final retentionDays = section.containsKey('retention_days')
+        ? _int(section, w, 'retention_days', min: 1)
+        : defaults.retentionDays;
+
+    return ClaimedRewardsConfig(retentionDays: retentionDays);
+  }
+
+  /// Section "currencies" bersifat opsional; jika tidak ada, memakai default.
+  Map<String, CurrencyDefinition> parseCurrencies(String source) {
+    final root = _decodeRoot(source);
+    if (root['currencies'] == null) {
+      return CurrencyDefinition.defaults;
+    }
+    const w = 'currencies';
+    final section = _section(root, w, w);
+    if (section.isEmpty) {
+      throw const ConfigException('$_file: "$w" tidak boleh kosong.');
+    }
+    const allowedKeys = {'name', 'max_amount'};
+    final result = <String, CurrencyDefinition>{};
+    for (final entry in section.entries) {
+      final id = entry.key.trim();
+      if (id.isEmpty) {
+        throw const ConfigException(
+          '$_file: id mata uang pada "$w" tidak boleh kosong.',
+        );
+      }
+      final raw = entry.value;
+      if (raw is! Map<String, dynamic>) {
+        throw ConfigException('$_file: "$w.$id" harus berupa object.');
+      }
+      _rejectUnknownKeys(raw, allowedKeys, '$w.$id');
+
+      final rawName = raw['name'];
+      if (rawName is! String || rawName.trim().isEmpty) {
+        throw ConfigException(
+          '$_file: $w.$id."name" harus berupa teks non-kosong.',
+        );
+      }
+      final maxAmount = _int(raw, '$w.$id', 'max_amount', min: 1);
+      result[id] = CurrencyDefinition(
+        id: id,
+        name: rawName.trim(),
+        maxAmount: maxAmount,
+      );
+    }
+    return Map.unmodifiable(result);
+  }
+
+  NotificationConfig parseNotifications(String source) {
+    final root = _decodeRoot(source);
+    if (root['notifications'] == null) {
+      return const NotificationConfig();
+    }
+    const defaults = NotificationConfig();
+    const w = 'notifications';
+    final section = _section(root, w, w);
+    const allowedKeys = {
+      'daily_reminder_hour',
+      'weekly_reminder_weekday',
+      'weekly_reminder_hour',
+      'quiet_hours',
+      'max_per_day',
+    };
+    _rejectUnknownKeys(section, allowedKeys, w);
+
+    final dailyHour = section.containsKey('daily_reminder_hour')
+        ? _intRange(section, w, 'daily_reminder_hour', min: 0, max: 23)
+        : defaults.dailyReminderHour;
+    final weeklyHour = section.containsKey('weekly_reminder_hour')
+        ? _intRange(section, w, 'weekly_reminder_hour', min: 0, max: 23)
+        : defaults.weeklyReminderHour;
+
+    var weeklyWeekday = defaults.weeklyReminderWeekday;
+    if (section.containsKey('weekly_reminder_weekday')) {
+      final rawWeekday = section['weekly_reminder_weekday'];
+      if (rawWeekday is! String) {
+        throw const ConfigException(
+          '$_file: "$w.weekly_reminder_weekday" harus string.',
+        );
+      }
+      final parsed = NotificationConfig.parseWeekday(rawWeekday);
+      if (parsed == null) {
+        throw ConfigException(
+          '$_file: "$w.weekly_reminder_weekday" tidak dikenal ("$rawWeekday").',
+        );
+      }
+      weeklyWeekday = parsed;
+    }
+
+    var quietHours = defaults.quietHours;
+    if (section.containsKey('quiet_hours')) {
+      final rawQh = _section(section, 'quiet_hours', '$w.quiet_hours');
+      _rejectUnknownKeys(rawQh, const {'start', 'end'}, '$w.quiet_hours');
+      final start = rawQh.containsKey('start')
+          ? _intRange(rawQh, '$w.quiet_hours', 'start', min: 0, max: 23)
+          : defaults.quietHours.startHour;
+      final end = rawQh.containsKey('end')
+          ? _intRange(rawQh, '$w.quiet_hours', 'end', min: 0, max: 23)
+          : defaults.quietHours.endHour;
+      quietHours = QuietHoursConfig(startHour: start, endHour: end);
+    }
+
+    final maxPerDay = section.containsKey('max_per_day')
+        ? _int(section, w, 'max_per_day', min: 1)
+        : defaults.maxPerDay;
+
+    return NotificationConfig(
+      dailyReminderHour: dailyHour,
+      weeklyReminderWeekday: weeklyWeekday,
+      weeklyReminderHour: weeklyHour,
+      quietHours: quietHours,
+      maxPerDay: maxPerDay,
+    );
+  }
+
+  CloudConfig parseCloud(String source) {
+    final root = _decodeRoot(source);
+    if (root['cloud'] == null) {
+      return const CloudConfig();
+    }
+    const defaults = CloudConfig();
+    const w = 'cloud';
+    final section = _section(root, w, w);
+    const allowedKeys = {
+      'auto_sync_min_interval_minutes',
+      'reject_backoff_minutes',
+      'server_time_tolerance_minutes',
+    };
+    _rejectUnknownKeys(section, allowedKeys, w);
+
+    final autoSyncMinIntervalMinutes =
+        section.containsKey('auto_sync_min_interval_minutes')
+        ? _int(section, w, 'auto_sync_min_interval_minutes', min: 0)
+        : defaults.autoSyncMinIntervalMinutes;
+    final rejectBackoffMinutes = section.containsKey('reject_backoff_minutes')
+        ? _int(section, w, 'reject_backoff_minutes', min: 1)
+        : defaults.rejectBackoffMinutes;
+    final serverTimeToleranceMinutes =
+        section.containsKey('server_time_tolerance_minutes')
+        ? _int(section, w, 'server_time_tolerance_minutes', min: 0)
+        : defaults.serverTimeToleranceMinutes;
+
+    return CloudConfig(
+      autoSyncMinIntervalMinutes: autoSyncMinIntervalMinutes,
+      rejectBackoffMinutes: rejectBackoffMinutes,
+      serverTimeToleranceMinutes: serverTimeToleranceMinutes,
+    );
+  }
+
+  void _rejectUnknownKeys(
+    Map<String, dynamic> map,
+    Set<String> allowed,
+    String where,
+  ) {
+    for (final key in map.keys) {
+      if (!allowed.contains(key)) {
+        throw ConfigException(
+          '$_file: key tidak dikenal "$key" pada "$where".',
+        );
+      }
+    }
+  }
+
+  int _intRange(
+    Map<String, dynamic> map,
+    String where,
+    String key, {
+    required int min,
+    required int max,
+  }) {
+    final value = _int(map, where, key, min: min);
+    if (value > max) {
+      throw ConfigException(
+        '$_file: $where."$key" harus <= $max (nilai: $value).',
+      );
+    }
+    return value;
   }
 
   Map<String, dynamic> _decodeRoot(String source) {

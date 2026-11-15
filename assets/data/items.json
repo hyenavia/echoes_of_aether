@@ -266,6 +266,140 @@
       "rarity": "rare",
       "max_stack": 1,
       "sell_value": 0
+    },
+    {
+      "id": "event_dawn_blade",
+      "name": "Dawn Blade",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "fixed_stats": true,
+        "stats": {
+          "atk_pct": 0.1,
+          "crit_damage": 0.15
+        }
+      }
+    },
+    {
+      "id": "event_eclipse_blade",
+      "name": "Eclipse Blade",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "fixed_stats": true,
+        "stats": {
+          "atk_pct": 0.16,
+          "crit_rate": 0.05,
+          "crit_damage": 0.2
+        }
+      }
+    },
+    {
+      "id": "event_aegis_mail",
+      "name": "Aegis Mail",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "stats": {
+          "hp_pct": 0.12,
+          "def_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "event_bulwark_plate",
+      "name": "Bulwark Plate",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "stats": {
+          "hp_pct": 0.2,
+          "def_pct": 0.12
+        }
+      }
+    },
+    {
+      "id": "event_warden_helm",
+      "name": "Warden Helm",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "stats": {
+          "def_pct": 0.1,
+          "hp_pct": 0.06
+        }
+      }
+    },
+    {
+      "id": "event_crown_of_dusk",
+      "name": "Crown of Dusk",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "stats": {
+          "def_pct": 0.16,
+          "hp_pct": 0.1,
+          "skill_haste": 0.05
+        }
+      }
+    },
+    {
+      "id": "event_ember_ring",
+      "name": "Ember Ring",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "stats": {
+          "atk_pct": 0.06,
+          "crit_rate": 0.04,
+          "skill_haste": 0.05
+        }
+      }
+    },
+    {
+      "id": "event_aether_pendant",
+      "name": "Aether Pendant",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "stats": {
+          "atk_pct": 0.1,
+          "hp_pct": 0.08,
+          "crit_rate": 0.06
+        }
+      }
     }
   ]
 }

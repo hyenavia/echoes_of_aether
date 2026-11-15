@@ -33,6 +33,14 @@ class ResourceChip extends StatelessWidget {
     kind: ResourceChipKind.rank,
   );
 
+  factory ResourceChip.aetherShard(int amount, {Key? key}) => ResourceChip(
+    key: key,
+    label: 'Aether Shard:',
+    value: NumberFormatter.format(amount),
+    icon: Icons.diamond_outlined,
+    kind: ResourceChipKind.neutral,
+  );
+
   final String label;
   final String value;
   final IconData? icon;
@@ -72,8 +80,11 @@ class ResourceChip extends StatelessWidget {
               '$label $value',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium
-                  ?.copyWith(color: color, fontWeight: FontWeight.w700),
+              style: AppTypography.numeric(
+                Theme.of(context).textTheme.labelMedium,
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

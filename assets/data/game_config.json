@@ -24,7 +24,12 @@
     "per_level": { "hp": 15, "atk": 2, "def": 0.5 }
   },
   "equipment": {
-    "roll_variance": 0.15
+    "roll_variance": 0.15,
+    "pct_caps": {
+      "hp_pct": 0.6,
+      "atk_pct": 0.5,
+      "def_pct": 0.5
+    }
   },
   "difficulty": {
     "cycle_per_rank": 6.5,
@@ -44,9 +49,39 @@
   "farming": {
     "death_loop_suggest_after": 3
   },
+  "time": {
+    "reset_hour": 0,
+    "week_start": "monday",
+    "epoch_monday": "2026-11-16",
+    "forward_jump_record_threshold_hours": 48
+  },
+  "claimed_rewards": {
+    "retention_days": 14
+  },
+  "currencies": {
+    "aether_shard": {
+      "name": "Aether Shard",
+      "max_amount": 1000000
+    }
+  },
+  "notifications": {
+    "daily_reminder_hour": 18,
+    "weekly_reminder_weekday": "sunday",
+    "weekly_reminder_hour": 18,
+    "quiet_hours": {
+      "start": 23,
+      "end": 7
+    },
+    "max_per_day": 3
+  },
   "dungeon_completion": {
     "exp_reward": 120,
     "gold_reward": 50,
     "loot_table_id": "dungeon_clear_loot"
+  },
+  "cloud": {
+    "auto_sync_min_interval_minutes": 5,
+    "reject_backoff_minutes": 60,
+    "server_time_tolerance_minutes": 5
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../entities/boss_event.dart';
 import '../entities/combat_stats.dart';
 import '../entities/difficulty_config.dart';
 import '../entities/dungeon_definition.dart';
@@ -141,6 +142,37 @@ class DifficultyService {
       rewardMultiplier: rewardMultiplier,
       rareDropChanceMultiplier: rareDropChanceMultiplier,
       equipmentRollBonus: equipmentRollBonus,
+    );
+  }
+
+  /// Menghitung [DifficultyProfile] untuk Boss Event berdasarkan [reference]
+  /// (dungeon acuan dan rank terpilih) dengan mengalikan [powerFactor] pada
+  /// pengali stat (`hpMultiplier`, `atkMultiplier`, `defMultiplier`).
+  /// `rewardMultiplier` dan bonus drop tetap mengikuti profil acuan.
+  DifficultyProfile profileForBoss(
+    BossReference reference,
+    double powerFactor,
+  ) {
+    final base = profileFor(reference.dungeon, reference.cycleRank);
+    final safeFactor = (!powerFactor.isFinite || powerFactor <= 0)
+        ? 1.0
+        : powerFactor;
+    final safeMax = _resolvedMaxMultiplier();
+
+    double scaleStat(double value) {
+      final scaled = value * safeFactor;
+      if (!scaled.isFinite || scaled > safeMax) return safeMax;
+      return scaled;
+    }
+
+    return DifficultyProfile(
+      multiplier: base.multiplier,
+      hpMultiplier: scaleStat(base.hpMultiplier),
+      atkMultiplier: scaleStat(base.atkMultiplier),
+      defMultiplier: scaleStat(base.defMultiplier),
+      rewardMultiplier: base.rewardMultiplier,
+      rareDropChanceMultiplier: base.rareDropChanceMultiplier,
+      equipmentRollBonus: base.equipmentRollBonus,
     );
   }
 

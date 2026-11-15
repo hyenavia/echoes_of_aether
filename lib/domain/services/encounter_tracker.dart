@@ -23,7 +23,7 @@ class EncounterTracker {
     this.immediateSpawnPhase = ImmediateSpawnPhase.onRoomActivated,
     DifficultyProfile difficultyProfile = DifficultyProfile.identity,
     this.difficultyService = const DifficultyService(),
-  }) : _monsterCatalog = Map.unmodifiable(monsterCatalog),
+  }) : _monsterCatalog = {...monsterCatalog},
        _activeDifficultyProfile = difficultyProfile;
 
   final Map<String, EnemyDefinition> _monsterCatalog;
@@ -35,6 +35,11 @@ class EncounterTracker {
 
   void setDifficultyProfile(DifficultyProfile profile) {
     _activeDifficultyProfile = profile;
+  }
+
+  /// Mendaftarkan atau memperbarui definisi monster runtime (mis. boss event).
+  void registerRuntimeMonster(EnemyDefinition definition) {
+    _monsterCatalog[definition.id] = definition;
   }
 
   final List<EncounterEventListener> _listeners = [];

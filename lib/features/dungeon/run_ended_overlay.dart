@@ -21,52 +21,105 @@ class RunEndedOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ext = EchoesTheme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: PanelFrame(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            borderColor: ext.hpBar,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.heart_broken_outlined, size: 36, color: ext.hpBar),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Run berakhir',
-                  style: theme.textTheme.titleLarge?.copyWith(color: ext.hpBar),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                const Text(
-                  'Kamu kalah saat revive masih cooldown.',
-                  textAlign: TextAlign.center,
-                ),
-                if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xs),
+    return ColoredBox(
+      color: AppColors.midnightForest.withValues(alpha: 0.78),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: PanelFrame(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              borderColor: ext.hpBar,
+              showCornerOrnaments: true,
+              boxShadow: AppShadows.glow(ext.hpBar, alpha: 0.25),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          ext.hpBar.withValues(alpha: 0.28),
+                          AppColors.surfaceDark,
+                        ],
+                      ),
+                      border: Border.all(
+                        color: ext.hpBar.withValues(alpha: 0.75),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.heart_broken_outlined,
+                      size: 28,
+                      color: ext.hpBar,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
-                    subtitle!,
-                    style: theme.textTheme.bodySmall,
+                    'Run berakhir',
+                    style: AppTypography.headingSerif(
+                      theme.textTheme.headlineSmall ??
+                          theme.textTheme.titleLarge,
+                      color: ext.hpBar,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                ],
-                const SizedBox(height: AppSpacing.lg),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    if (onReturnToTown != null)
-                      SecondaryButton(
-                        label: 'Kembali ke Town',
-                        onPressed: onReturnToTown,
+                  const SizedBox(height: AppSpacing.sm),
+                  PanelFrame(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    backgroundColor: AppColors.surfaceDark,
+                    borderColor: ext.hpBar.withValues(alpha: 0.35),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Kamu kalah saat revive masih cooldown.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (subtitle != null &&
+                            subtitle!.trim().isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            subtitle!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      if (onReturnToTown != null)
+                        SecondaryButton(
+                          label: 'Kembali ke Town',
+                          icon: Icons.home_outlined,
+                          onPressed: onReturnToTown,
+                        ),
+                      PrimaryButton(
+                        label: 'Run baru',
+                        icon: Icons.replay,
+                        onPressed: onRetry,
                       ),
-                    PrimaryButton(label: 'Run baru', onPressed: onRetry),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

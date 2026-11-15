@@ -1,47 +1,15 @@
 import 'dart:math' as math;
 
-import '../entities/cycle_progress.dart';
 import '../entities/equipment.dart';
 import '../entities/inventory.dart';
 import '../entities/item_definition.dart';
 import '../entities/player_character.dart';
-import '../entities/player_save_snapshot.dart';
 import '../entities/shop_config.dart';
 import 'equipment_factory.dart';
+import 'requirement_evaluator.dart';
 
-/// Konteks pemain yang dipakai [ShopService] untuk mengevaluasi syarat beli
-/// dan batas pembelian tanpa bergantung pada layer aplikasi/UI.
-class ShopPlayerContext {
-  const ShopPlayerContext({
-    required this.playerLevel,
-    this.cycleProgress = const CycleProgress(),
-    this.dungeonProgresses = const {},
-    this.shopPurchases = const {},
-  });
-
-  final int playerLevel;
-  final CycleProgress cycleProgress;
-  final Map<String, DungeonProgressSnapshot> dungeonProgresses;
-  final Map<String, int> shopPurchases;
-
-  int get effectiveAscensionRank =>
-      math.max(cycleProgress.ascensionRank, cycleProgress.highestAscensionRank);
-
-  bool hasClearedDungeonLifetime(String dungeonId) =>
-      (dungeonProgresses[dungeonId]?.clearsCount ?? 0) > 0;
-
-  int purchasedCountFor(String entryId) =>
-      math.max(0, shopPurchases[entryId] ?? 0);
-}
-
-/// Hasil evaluasi seluruh [PurchaseRequirement] pada suatu [ShopEntry].
-class RequirementCheck {
-  const RequirementCheck({required this.failedRequirements});
-
-  final List<PurchaseRequirement> failedRequirements;
-
-  bool get isMet => failedRequirements.isEmpty;
-}
+export 'requirement_evaluator.dart'
+    show RequirementCheck, RequirementEvaluator, ShopPlayerContext;
 
 sealed class ShopBuyResult {
   const ShopBuyResult();
@@ -155,30 +123,14 @@ class ShopService {
   final Set<String> _internalProcessedActions = {};
 
   /// Mengevaluasi seluruh [PurchaseRequirement] pada [entry] untuk [context].
-  RequirementCheck check(ShopEntry entry, ShopPlayerContext context) {
-    final failed = <PurchaseRequirement>[];
-    for (final req in entry.requirements) {
-      switch (req) {
-        case MinLevelRequirement(:final minLevel):
-          if (context.playerLevel < minLevel) {
-            failed.add(req);
-          }
-        case DungeonClearedRequirement(:final dungeonId):
-          if (!context.hasClearedDungeonLifetime(dungeonId)) {
-            failed.add(req);
-          }
-        case MinAscensionRankRequirement(:final minRank):
-          if (context.effectiveAscensionRank < minRank) {
-            failed.add(req);
-          }
-      }
-    }
-    return RequirementCheck(failedRequirements: List.unmodifiable(failed));
-  }
+  RequirementCheck check(ShopEntry entry, ShopPlayerContext context) =>
+      RequirementEvaluator.evaluate(entry.requirements, context);
 
   /// Menghitung harga jual satuan yang aman terhadap exploit beli-jual:
-  /// tidak pernah melebihi `floor(price * maxSellRatio)` bila item dijual di shop.
+  /// mengembalikan `0` untuk item `sellable: false`, dan tidak pernah melebihi
+  /// `floor(price * maxSellRatio)` bila item dijual di shop.
   int effectiveSellUnitPrice(ItemDefinition definition) {
+    if (!definition.sellable) return 0;
     var safePrice = math.max(0, definition.sellValue);
     for (final entry in catalog.entries) {
       if (entry.itemId == definition.id) {
@@ -353,6 +305,12 @@ class ShopService {
     if (itemDef == null) {
       return ShopSellNotFound(targetId: instance.definitionId);
     }
+    if (!itemDef.sellable) {
+      return ShopSellNotSellable(
+        targetId: instanceId,
+        reason: 'Item tidak dapat dijual.',
+      );
+    }
 
     final sellPrice = effectiveSellUnitPrice(itemDef);
     if (sellPrice <= 0) {
@@ -412,6 +370,12 @@ class ShopService {
     final itemDef = items[itemId];
     if (itemDef == null) {
       return ShopSellNotFound(targetId: itemId);
+    }
+    if (!itemDef.sellable) {
+      return ShopSellNotSellable(
+        targetId: itemId,
+        reason: 'Item tidak dapat dijual.',
+      );
     }
 
     if (itemDef.isEquipment ||
@@ -551,6 +515,12 @@ class ShopService {
       if (itemDef == null) {
         return ShopSellNotFound(targetId: instance.definitionId);
       }
+      if (!itemDef.sellable) {
+        return ShopSellNotSellable(
+          targetId: instanceId,
+          reason: 'Item tidak dapat dijual.',
+        );
+      }
       final sellPrice = effectiveSellUnitPrice(itemDef);
       if (sellPrice <= 0) {
         return ShopSellNotSellable(
@@ -568,6 +538,12 @@ class ShopService {
       final itemDef = items[itemId];
       if (itemDef == null) {
         return ShopSellNotFound(targetId: itemId);
+      }
+      if (!itemDef.sellable) {
+        return ShopSellNotSellable(
+          targetId: itemId,
+          reason: 'Item tidak dapat dijual.',
+        );
       }
       if (itemDef.isEquipment ||
           itemDef.category == ItemCategory.questItem ||

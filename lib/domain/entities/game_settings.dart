@@ -5,6 +5,11 @@ class GameSettingsData {
     this.sfxEnabled = true,
     double bgmVolume = 0.45,
     double sfxVolume = 0.75,
+    this.notifyAutoFarmingFull = false,
+    this.notifyDailyBossReminder = false,
+    this.notifyWeeklyBossReminder = false,
+    this.notifyEventShopEnding = false,
+    this.notifyQuietHoursEnabled = true,
   }) : bgmVolume = bgmVolume < 0 ? 0.0 : (bgmVolume > 1 ? 1.0 : bgmVolume),
        sfxVolume = sfxVolume < 0 ? 0.0 : (sfxVolume > 1 ? 1.0 : sfxVolume);
 
@@ -12,17 +17,41 @@ class GameSettingsData {
   final bool sfxEnabled;
   final double bgmVolume;
   final double sfxVolume;
+  final bool notifyAutoFarmingFull;
+  final bool notifyDailyBossReminder;
+  final bool notifyWeeklyBossReminder;
+  final bool notifyEventShopEnding;
+  final bool notifyQuietHoursEnabled;
+
+  bool get anyNotificationCategoryEnabled =>
+      notifyAutoFarmingFull ||
+      notifyDailyBossReminder ||
+      notifyWeeklyBossReminder ||
+      notifyEventShopEnding;
 
   GameSettingsData copyWith({
     bool? bgmEnabled,
     bool? sfxEnabled,
     double? bgmVolume,
     double? sfxVolume,
+    bool? notifyAutoFarmingFull,
+    bool? notifyDailyBossReminder,
+    bool? notifyWeeklyBossReminder,
+    bool? notifyEventShopEnding,
+    bool? notifyQuietHoursEnabled,
   }) => GameSettingsData(
     bgmEnabled: bgmEnabled ?? this.bgmEnabled,
     sfxEnabled: sfxEnabled ?? this.sfxEnabled,
     bgmVolume: bgmVolume ?? this.bgmVolume,
     sfxVolume: sfxVolume ?? this.sfxVolume,
+    notifyAutoFarmingFull: notifyAutoFarmingFull ?? this.notifyAutoFarmingFull,
+    notifyDailyBossReminder:
+        notifyDailyBossReminder ?? this.notifyDailyBossReminder,
+    notifyWeeklyBossReminder:
+        notifyWeeklyBossReminder ?? this.notifyWeeklyBossReminder,
+    notifyEventShopEnding: notifyEventShopEnding ?? this.notifyEventShopEnding,
+    notifyQuietHoursEnabled:
+        notifyQuietHoursEnabled ?? this.notifyQuietHoursEnabled,
   );
 
   @override
@@ -32,7 +61,12 @@ class GameSettingsData {
           bgmEnabled == other.bgmEnabled &&
           sfxEnabled == other.sfxEnabled &&
           (bgmVolume - other.bgmVolume).abs() < 1e-6 &&
-          (sfxVolume - other.sfxVolume).abs() < 1e-6;
+          (sfxVolume - other.sfxVolume).abs() < 1e-6 &&
+          notifyAutoFarmingFull == other.notifyAutoFarmingFull &&
+          notifyDailyBossReminder == other.notifyDailyBossReminder &&
+          notifyWeeklyBossReminder == other.notifyWeeklyBossReminder &&
+          notifyEventShopEnding == other.notifyEventShopEnding &&
+          notifyQuietHoursEnabled == other.notifyQuietHoursEnabled;
 
   @override
   int get hashCode => Object.hash(
@@ -40,5 +74,10 @@ class GameSettingsData {
     sfxEnabled,
     bgmVolume.toStringAsFixed(3),
     sfxVolume.toStringAsFixed(3),
+    notifyAutoFarmingFull,
+    notifyDailyBossReminder,
+    notifyWeeklyBossReminder,
+    notifyEventShopEnding,
+    notifyQuietHoursEnabled,
   );
 }

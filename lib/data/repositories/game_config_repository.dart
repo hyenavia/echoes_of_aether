@@ -3,7 +3,9 @@ import 'package:flutter/services.dart' show AssetBundle, rootBundle;
 import '../../domain/entities/enemy_definition.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/repositories/game_config_repository.dart';
+import '../models/boss_events_config_parser.dart';
 import '../models/dungeon_config_parser.dart';
+import '../models/event_shop_config_parser.dart';
 import '../models/game_config_parser.dart';
 import '../models/game_config_validator.dart';
 import '../models/item_config_parser.dart';
@@ -29,7 +31,9 @@ class AssetGameConfigRepository implements GameConfigRepository {
   @override
   Future<GameConfig> loadGameConfig() async {
     final settings = await _read('game_config.json');
+    final dungeonsJson = await _read('dungeons.json');
     const parser = GameConfigParser();
+    const dungeonParser = DungeonConfigParser();
 
     final config = GameConfig(
       monsters: await loadMonsters(),
@@ -39,7 +43,12 @@ class AssetGameConfigRepository implements GameConfigRepository {
       revive: parser.parseRevive(settings),
       progression: parser.parseProgression(settings),
       equipment: parser.parseEquipment(settings),
+      time: parser.parseTime(settings),
+      claimedRewards: parser.parseClaimedRewards(settings),
+      currencies: parser.parseCurrencies(settings),
+      notifications: parser.parseNotifications(settings),
       dungeonCompletion: parser.parseDungeonCompletion(settings),
+      cloud: parser.parseCloud(settings),
       items: const ItemConfigParser().parse(await _read('items.json')),
       lootTables: const LootConfigParser().parse(
         await _read('loot_tables.json'),
@@ -48,13 +57,20 @@ class AssetGameConfigRepository implements GameConfigRepository {
       specializations: const SpecializationConfigParser().parse(
         await _read('specializations.json'),
       ),
-      dungeons: const DungeonConfigParser().parse(
-        await _read('dungeons.json'),
+      dungeons: dungeonParser.parse(
+        dungeonsJson,
         ascensionMultiplier: parser
             .parseDifficulty(settings)
             .ascensionMultiplier,
       ),
+      mapLayouts: dungeonParser.parseMaps(dungeonsJson),
+      bossEvents: const BossEventsConfigParser().parse(
+        await _read('boss_events.json'),
+      ),
       shop: const ShopConfigParser().parse(await _read('shop.json')),
+      eventShop: const EventShopConfigParser().parse(
+        await _read('event_shop.json'),
+      ),
     );
     const GameConfigValidator().validate(config);
     return config;

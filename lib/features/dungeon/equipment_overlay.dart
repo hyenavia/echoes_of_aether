@@ -63,15 +63,17 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440, maxHeight: 600),
           child: PanelFrame(
+            showCornerOrnaments: true,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              AppSpacing.sm,
+              AppSpacing.sm + 2,
               AppSpacing.md,
               AppSpacing.md,
             ),
@@ -97,16 +99,22 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
                   children: [
                     Row(
                       children: [
+                        Icon(Icons.shield_outlined, size: 18, color: ext.gold),
+                        const SizedBox(width: AppSpacing.xs + 2),
                         Expanded(
                           child: Text(
                             'Perlengkapan',
-                            style: theme.textTheme.titleMedium,
+                            style: AppTypography.headingSerif(
+                              theme.textTheme.titleMedium,
+                              color: ext.gold,
+                            ),
                           ),
                         ),
-                        IconButton(
-                          onPressed: widget.onClose,
-                          icon: const Icon(Icons.close),
+                        AppIconButton(
+                          icon: Icons.close,
+                          semanticLabel: 'Tutup',
                           tooltip: 'Tutup',
+                          onPressed: widget.onClose,
                         ),
                       ],
                     ),
@@ -116,20 +124,54 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const SectionHeader(title: 'Stat Tempur'),
+                            const SectionHeader(
+                              title: 'Stat Tempur',
+                              useSerif: true,
+                            ),
                             PanelFrame(
                               padding: const EdgeInsets.all(AppSpacing.sm),
                               backgroundColor: AppColors.surfaceDark,
-                              child: Text(
-                                describeCombatStats(s.stats),
-                                style: theme.textTheme.bodySmall,
+                              borderColor: ext.panelInnerBorder,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: AppSpacing.sm,
+                                    runSpacing: AppSpacing.xs,
+                                    children: [
+                                      _miniStatPill(
+                                        'HP',
+                                        '${s.stats.maxHp}',
+                                        ext.hpBar,
+                                      ),
+                                      _miniStatPill(
+                                        'ATK',
+                                        '${s.stats.atk}',
+                                        ext.gold,
+                                      ),
+                                      _miniStatPill(
+                                        'DEF',
+                                        '${s.stats.def}',
+                                        ext.expBar,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    describeCombatStats(s.stats),
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: AppSpacing.xs),
-                            const SectionHeader(title: 'Terpasang'),
+                            const SectionHeader(
+                              title: 'Terpasang',
+                              useSerif: true,
+                            ),
                             for (final slot in EquipmentSlot.values)
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
+                                padding: const EdgeInsets.only(bottom: 4),
                                 child: _equippedTile(
                                   context,
                                   s.equipped[slot],
@@ -139,6 +181,7 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
                             const SizedBox(height: AppSpacing.xs),
                             SectionHeader(
                               title: 'Tas perlengkapan (${s.bag.length})',
+                              useSerif: true,
                             ),
                             buildItemFilterBar(
                               categories: const [
@@ -239,29 +282,35 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
     );
   }
 
+  Widget _miniStatPill(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: color.withValues(alpha: 0.42)),
+      ),
+      child: Text(
+        '$label $value',
+        style: AppTypography.numeric(
+          const TextStyle(fontSize: 11),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   Widget _equippedTile(
     BuildContext context,
     EquipmentInstance? e,
     EquipmentSlot slot,
   ) {
-    final ext = EchoesTheme.of(context);
-    final theme = Theme.of(context);
     if (e == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 3,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: ext.panelInnerBorder),
-        ),
-        child: Text(
-          '${slotLabel(slot)}: Kosong',
-          style: theme.textTheme.bodySmall?.copyWith(color: ext.locked),
-        ),
-      );
+      return EquipmentSlotTile(slot: slot, slotLabel: slotLabel(slot));
     }
     return ItemCard(
       name: _name(e),
@@ -308,6 +357,7 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
       current?.rolledStats ?? EquipmentStats.zero,
     );
     return PanelFrame(
+      showCornerOrnaments: true,
       padding: const EdgeInsets.all(AppSpacing.sm),
       borderColor: ext.gold,
       backgroundColor: AppColors.surfaceDark,
@@ -319,7 +369,10 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
               Expanded(
                 child: Text(
                   'Perbandingan (${slotLabel(candidate.slot)})',
-                  style: theme.textTheme.labelLarge?.copyWith(color: ext.gold),
+                  style: AppTypography.headingSerif(
+                    theme.textTheme.labelLarge,
+                    color: ext.gold,
+                  ),
                 ),
               ),
               IconButton(

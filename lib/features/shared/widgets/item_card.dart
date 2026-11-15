@@ -5,6 +5,7 @@ import '../../../app/theme/echoes_theme.dart';
 import '../../../domain/entities/equipment.dart';
 import '../../../domain/entities/item_definition.dart';
 import 'locked_badge.dart';
+import 'rarity_border.dart';
 import 'rarity_label.dart';
 
 /// Kartu item bersama dengan warna rarity, ikon slot/kategori, nama, stat
@@ -21,6 +22,8 @@ class ItemCard extends StatelessWidget {
     this.quantity,
     this.isLocked = false,
     this.lockedReason,
+    this.isSelected = false,
+    this.useRarityGlow = false,
     this.trailing,
     this.onTap,
   });
@@ -34,6 +37,8 @@ class ItemCard extends StatelessWidget {
   final int? quantity;
   final bool isLocked;
   final String? lockedReason;
+  final bool isSelected;
+  final bool useRarityGlow;
   final Widget? trailing;
   final VoidCallback? onTap;
 
@@ -59,9 +64,6 @@ class ItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final ext = EchoesTheme.of(context);
     final rarityColor = ext.colorForRarity(rarity);
-    final borderColor = isLocked
-        ? ext.locked.withValues(alpha: 0.45)
-        : rarityColor.withValues(alpha: 0.65);
 
     final cardContent = LayoutBuilder(
       builder: (context, constraints) {
@@ -116,10 +118,12 @@ class ItemCard extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.all(AppSpacing.sm + 2),
-          decoration: BoxDecoration(
-            color: ext.panelBackground,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: borderColor, width: 1.5),
+          decoration: RarityBorder.decoration(
+            context,
+            rarity: rarity,
+            isSelected: isSelected,
+            isLocked: isLocked,
+            useGlow: useRarityGlow,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

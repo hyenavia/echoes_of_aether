@@ -4232,6 +4232,2297 @@ class ShopPurchasesCompanion extends UpdateCompanion<ShopPurchase> {
   }
 }
 
+class $ClockStatesTable extends ClockStates
+    with TableInfo<$ClockStatesTable, ClockState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ClockStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<String> playerId = GeneratedColumn<String>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES players (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _lastSeenAtMsMeta = const VerificationMeta(
+    'lastSeenAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> lastSeenAtMs = GeneratedColumn<int>(
+    'last_seen_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _forwardJumpCountMeta = const VerificationMeta(
+    'forwardJumpCount',
+  );
+  @override
+  late final GeneratedColumn<int> forwardJumpCount = GeneratedColumn<int>(
+    'forward_jump_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _maxForwardJumpMsMeta = const VerificationMeta(
+    'maxForwardJumpMs',
+  );
+  @override
+  late final GeneratedColumn<int> maxForwardJumpMs = GeneratedColumn<int>(
+    'max_forward_jump_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    playerId,
+    lastSeenAtMs,
+    forwardJumpCount,
+    maxForwardJumpMs,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'clock_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ClockState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('last_seen_at_ms')) {
+      context.handle(
+        _lastSeenAtMsMeta,
+        lastSeenAtMs.isAcceptableOrUnknown(
+          data['last_seen_at_ms']!,
+          _lastSeenAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('forward_jump_count')) {
+      context.handle(
+        _forwardJumpCountMeta,
+        forwardJumpCount.isAcceptableOrUnknown(
+          data['forward_jump_count']!,
+          _forwardJumpCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('max_forward_jump_ms')) {
+      context.handle(
+        _maxForwardJumpMsMeta,
+        maxForwardJumpMs.isAcceptableOrUnknown(
+          data['max_forward_jump_ms']!,
+          _maxForwardJumpMsMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playerId};
+  @override
+  ClockState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ClockState(
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}player_id'],
+      )!,
+      lastSeenAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_seen_at_ms'],
+      )!,
+      forwardJumpCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}forward_jump_count'],
+      )!,
+      maxForwardJumpMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_forward_jump_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $ClockStatesTable createAlias(String alias) {
+    return $ClockStatesTable(attachedDatabase, alias);
+  }
+}
+
+class ClockState extends DataClass implements Insertable<ClockState> {
+  final String playerId;
+  final int lastSeenAtMs;
+  final int forwardJumpCount;
+  final int maxForwardJumpMs;
+  const ClockState({
+    required this.playerId,
+    required this.lastSeenAtMs,
+    required this.forwardJumpCount,
+    required this.maxForwardJumpMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['player_id'] = Variable<String>(playerId);
+    map['last_seen_at_ms'] = Variable<int>(lastSeenAtMs);
+    map['forward_jump_count'] = Variable<int>(forwardJumpCount);
+    map['max_forward_jump_ms'] = Variable<int>(maxForwardJumpMs);
+    return map;
+  }
+
+  ClockStatesCompanion toCompanion(bool nullToAbsent) {
+    return ClockStatesCompanion(
+      playerId: Value(playerId),
+      lastSeenAtMs: Value(lastSeenAtMs),
+      forwardJumpCount: Value(forwardJumpCount),
+      maxForwardJumpMs: Value(maxForwardJumpMs),
+    );
+  }
+
+  factory ClockState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ClockState(
+      playerId: serializer.fromJson<String>(json['playerId']),
+      lastSeenAtMs: serializer.fromJson<int>(json['lastSeenAtMs']),
+      forwardJumpCount: serializer.fromJson<int>(json['forwardJumpCount']),
+      maxForwardJumpMs: serializer.fromJson<int>(json['maxForwardJumpMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playerId': serializer.toJson<String>(playerId),
+      'lastSeenAtMs': serializer.toJson<int>(lastSeenAtMs),
+      'forwardJumpCount': serializer.toJson<int>(forwardJumpCount),
+      'maxForwardJumpMs': serializer.toJson<int>(maxForwardJumpMs),
+    };
+  }
+
+  ClockState copyWith({
+    String? playerId,
+    int? lastSeenAtMs,
+    int? forwardJumpCount,
+    int? maxForwardJumpMs,
+  }) => ClockState(
+    playerId: playerId ?? this.playerId,
+    lastSeenAtMs: lastSeenAtMs ?? this.lastSeenAtMs,
+    forwardJumpCount: forwardJumpCount ?? this.forwardJumpCount,
+    maxForwardJumpMs: maxForwardJumpMs ?? this.maxForwardJumpMs,
+  );
+  ClockState copyWithCompanion(ClockStatesCompanion data) {
+    return ClockState(
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      lastSeenAtMs: data.lastSeenAtMs.present
+          ? data.lastSeenAtMs.value
+          : this.lastSeenAtMs,
+      forwardJumpCount: data.forwardJumpCount.present
+          ? data.forwardJumpCount.value
+          : this.forwardJumpCount,
+      maxForwardJumpMs: data.maxForwardJumpMs.present
+          ? data.maxForwardJumpMs.value
+          : this.maxForwardJumpMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ClockState(')
+          ..write('playerId: $playerId, ')
+          ..write('lastSeenAtMs: $lastSeenAtMs, ')
+          ..write('forwardJumpCount: $forwardJumpCount, ')
+          ..write('maxForwardJumpMs: $maxForwardJumpMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(playerId, lastSeenAtMs, forwardJumpCount, maxForwardJumpMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ClockState &&
+          other.playerId == this.playerId &&
+          other.lastSeenAtMs == this.lastSeenAtMs &&
+          other.forwardJumpCount == this.forwardJumpCount &&
+          other.maxForwardJumpMs == this.maxForwardJumpMs);
+}
+
+class ClockStatesCompanion extends UpdateCompanion<ClockState> {
+  final Value<String> playerId;
+  final Value<int> lastSeenAtMs;
+  final Value<int> forwardJumpCount;
+  final Value<int> maxForwardJumpMs;
+  final Value<int> rowid;
+  const ClockStatesCompanion({
+    this.playerId = const Value.absent(),
+    this.lastSeenAtMs = const Value.absent(),
+    this.forwardJumpCount = const Value.absent(),
+    this.maxForwardJumpMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ClockStatesCompanion.insert({
+    required String playerId,
+    this.lastSeenAtMs = const Value.absent(),
+    this.forwardJumpCount = const Value.absent(),
+    this.maxForwardJumpMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : playerId = Value(playerId);
+  static Insertable<ClockState> custom({
+    Expression<String>? playerId,
+    Expression<int>? lastSeenAtMs,
+    Expression<int>? forwardJumpCount,
+    Expression<int>? maxForwardJumpMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playerId != null) 'player_id': playerId,
+      if (lastSeenAtMs != null) 'last_seen_at_ms': lastSeenAtMs,
+      if (forwardJumpCount != null) 'forward_jump_count': forwardJumpCount,
+      if (maxForwardJumpMs != null) 'max_forward_jump_ms': maxForwardJumpMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ClockStatesCompanion copyWith({
+    Value<String>? playerId,
+    Value<int>? lastSeenAtMs,
+    Value<int>? forwardJumpCount,
+    Value<int>? maxForwardJumpMs,
+    Value<int>? rowid,
+  }) {
+    return ClockStatesCompanion(
+      playerId: playerId ?? this.playerId,
+      lastSeenAtMs: lastSeenAtMs ?? this.lastSeenAtMs,
+      forwardJumpCount: forwardJumpCount ?? this.forwardJumpCount,
+      maxForwardJumpMs: maxForwardJumpMs ?? this.maxForwardJumpMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playerId.present) {
+      map['player_id'] = Variable<String>(playerId.value);
+    }
+    if (lastSeenAtMs.present) {
+      map['last_seen_at_ms'] = Variable<int>(lastSeenAtMs.value);
+    }
+    if (forwardJumpCount.present) {
+      map['forward_jump_count'] = Variable<int>(forwardJumpCount.value);
+    }
+    if (maxForwardJumpMs.present) {
+      map['max_forward_jump_ms'] = Variable<int>(maxForwardJumpMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ClockStatesCompanion(')
+          ..write('playerId: $playerId, ')
+          ..write('lastSeenAtMs: $lastSeenAtMs, ')
+          ..write('forwardJumpCount: $forwardJumpCount, ')
+          ..write('maxForwardJumpMs: $maxForwardJumpMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CurrenciesTable extends Currencies
+    with TableInfo<$CurrenciesTable, Currency> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CurrenciesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<String> playerId = GeneratedColumn<String>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES players (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _currencyIdMeta = const VerificationMeta(
+    'currencyId',
+  );
+  @override
+  late final GeneratedColumn<String> currencyId = GeneratedColumn<String>(
+    'currency_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<int> amount = GeneratedColumn<int>(
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [playerId, currencyId, amount];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'currencies';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Currency> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('currency_id')) {
+      context.handle(
+        _currencyIdMeta,
+        currencyId.isAcceptableOrUnknown(data['currency_id']!, _currencyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_currencyIdMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playerId, currencyId};
+  @override
+  Currency map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Currency(
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}player_id'],
+      )!,
+      currencyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency_id'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount'],
+      )!,
+    );
+  }
+
+  @override
+  $CurrenciesTable createAlias(String alias) {
+    return $CurrenciesTable(attachedDatabase, alias);
+  }
+}
+
+class Currency extends DataClass implements Insertable<Currency> {
+  final String playerId;
+  final String currencyId;
+  final int amount;
+  const Currency({
+    required this.playerId,
+    required this.currencyId,
+    required this.amount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['player_id'] = Variable<String>(playerId);
+    map['currency_id'] = Variable<String>(currencyId);
+    map['amount'] = Variable<int>(amount);
+    return map;
+  }
+
+  CurrenciesCompanion toCompanion(bool nullToAbsent) {
+    return CurrenciesCompanion(
+      playerId: Value(playerId),
+      currencyId: Value(currencyId),
+      amount: Value(amount),
+    );
+  }
+
+  factory Currency.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Currency(
+      playerId: serializer.fromJson<String>(json['playerId']),
+      currencyId: serializer.fromJson<String>(json['currencyId']),
+      amount: serializer.fromJson<int>(json['amount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playerId': serializer.toJson<String>(playerId),
+      'currencyId': serializer.toJson<String>(currencyId),
+      'amount': serializer.toJson<int>(amount),
+    };
+  }
+
+  Currency copyWith({String? playerId, String? currencyId, int? amount}) =>
+      Currency(
+        playerId: playerId ?? this.playerId,
+        currencyId: currencyId ?? this.currencyId,
+        amount: amount ?? this.amount,
+      );
+  Currency copyWithCompanion(CurrenciesCompanion data) {
+    return Currency(
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      currencyId: data.currencyId.present
+          ? data.currencyId.value
+          : this.currencyId,
+      amount: data.amount.present ? data.amount.value : this.amount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Currency(')
+          ..write('playerId: $playerId, ')
+          ..write('currencyId: $currencyId, ')
+          ..write('amount: $amount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(playerId, currencyId, amount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Currency &&
+          other.playerId == this.playerId &&
+          other.currencyId == this.currencyId &&
+          other.amount == this.amount);
+}
+
+class CurrenciesCompanion extends UpdateCompanion<Currency> {
+  final Value<String> playerId;
+  final Value<String> currencyId;
+  final Value<int> amount;
+  final Value<int> rowid;
+  const CurrenciesCompanion({
+    this.playerId = const Value.absent(),
+    this.currencyId = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CurrenciesCompanion.insert({
+    required String playerId,
+    required String currencyId,
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : playerId = Value(playerId),
+       currencyId = Value(currencyId);
+  static Insertable<Currency> custom({
+    Expression<String>? playerId,
+    Expression<String>? currencyId,
+    Expression<int>? amount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playerId != null) 'player_id': playerId,
+      if (currencyId != null) 'currency_id': currencyId,
+      if (amount != null) 'amount': amount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CurrenciesCompanion copyWith({
+    Value<String>? playerId,
+    Value<String>? currencyId,
+    Value<int>? amount,
+    Value<int>? rowid,
+  }) {
+    return CurrenciesCompanion(
+      playerId: playerId ?? this.playerId,
+      currencyId: currencyId ?? this.currencyId,
+      amount: amount ?? this.amount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playerId.present) {
+      map['player_id'] = Variable<String>(playerId.value);
+    }
+    if (currencyId.present) {
+      map['currency_id'] = Variable<String>(currencyId.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<int>(amount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CurrenciesCompanion(')
+          ..write('playerId: $playerId, ')
+          ..write('currencyId: $currencyId, ')
+          ..write('amount: $amount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PeriodicQuestStatesTable extends PeriodicQuestStates
+    with TableInfo<$PeriodicQuestStatesTable, PeriodicQuestState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PeriodicQuestStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<String> playerId = GeneratedColumn<String>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES players (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _questIdMeta = const VerificationMeta(
+    'questId',
+  );
+  @override
+  late final GeneratedColumn<String> questId = GeneratedColumn<String>(
+    'quest_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _periodKeyMeta = const VerificationMeta(
+    'periodKey',
+  );
+  @override
+  late final GeneratedColumn<String> periodKey = GeneratedColumn<String>(
+    'period_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _completedAtMsMeta = const VerificationMeta(
+    'completedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> completedAtMs = GeneratedColumn<int>(
+    'completed_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    playerId,
+    questId,
+    periodKey,
+    completedAtMs,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'periodic_quest_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PeriodicQuestState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('quest_id')) {
+      context.handle(
+        _questIdMeta,
+        questId.isAcceptableOrUnknown(data['quest_id']!, _questIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_questIdMeta);
+    }
+    if (data.containsKey('period_key')) {
+      context.handle(
+        _periodKeyMeta,
+        periodKey.isAcceptableOrUnknown(data['period_key']!, _periodKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_periodKeyMeta);
+    }
+    if (data.containsKey('completed_at_ms')) {
+      context.handle(
+        _completedAtMsMeta,
+        completedAtMs.isAcceptableOrUnknown(
+          data['completed_at_ms']!,
+          _completedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_completedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playerId, questId, periodKey};
+  @override
+  PeriodicQuestState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PeriodicQuestState(
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}player_id'],
+      )!,
+      questId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quest_id'],
+      )!,
+      periodKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period_key'],
+      )!,
+      completedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}completed_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $PeriodicQuestStatesTable createAlias(String alias) {
+    return $PeriodicQuestStatesTable(attachedDatabase, alias);
+  }
+}
+
+class PeriodicQuestState extends DataClass
+    implements Insertable<PeriodicQuestState> {
+  final String playerId;
+  final String questId;
+  final String periodKey;
+  final int completedAtMs;
+  const PeriodicQuestState({
+    required this.playerId,
+    required this.questId,
+    required this.periodKey,
+    required this.completedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['player_id'] = Variable<String>(playerId);
+    map['quest_id'] = Variable<String>(questId);
+    map['period_key'] = Variable<String>(periodKey);
+    map['completed_at_ms'] = Variable<int>(completedAtMs);
+    return map;
+  }
+
+  PeriodicQuestStatesCompanion toCompanion(bool nullToAbsent) {
+    return PeriodicQuestStatesCompanion(
+      playerId: Value(playerId),
+      questId: Value(questId),
+      periodKey: Value(periodKey),
+      completedAtMs: Value(completedAtMs),
+    );
+  }
+
+  factory PeriodicQuestState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PeriodicQuestState(
+      playerId: serializer.fromJson<String>(json['playerId']),
+      questId: serializer.fromJson<String>(json['questId']),
+      periodKey: serializer.fromJson<String>(json['periodKey']),
+      completedAtMs: serializer.fromJson<int>(json['completedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playerId': serializer.toJson<String>(playerId),
+      'questId': serializer.toJson<String>(questId),
+      'periodKey': serializer.toJson<String>(periodKey),
+      'completedAtMs': serializer.toJson<int>(completedAtMs),
+    };
+  }
+
+  PeriodicQuestState copyWith({
+    String? playerId,
+    String? questId,
+    String? periodKey,
+    int? completedAtMs,
+  }) => PeriodicQuestState(
+    playerId: playerId ?? this.playerId,
+    questId: questId ?? this.questId,
+    periodKey: periodKey ?? this.periodKey,
+    completedAtMs: completedAtMs ?? this.completedAtMs,
+  );
+  PeriodicQuestState copyWithCompanion(PeriodicQuestStatesCompanion data) {
+    return PeriodicQuestState(
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      questId: data.questId.present ? data.questId.value : this.questId,
+      periodKey: data.periodKey.present ? data.periodKey.value : this.periodKey,
+      completedAtMs: data.completedAtMs.present
+          ? data.completedAtMs.value
+          : this.completedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeriodicQuestState(')
+          ..write('playerId: $playerId, ')
+          ..write('questId: $questId, ')
+          ..write('periodKey: $periodKey, ')
+          ..write('completedAtMs: $completedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(playerId, questId, periodKey, completedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PeriodicQuestState &&
+          other.playerId == this.playerId &&
+          other.questId == this.questId &&
+          other.periodKey == this.periodKey &&
+          other.completedAtMs == this.completedAtMs);
+}
+
+class PeriodicQuestStatesCompanion extends UpdateCompanion<PeriodicQuestState> {
+  final Value<String> playerId;
+  final Value<String> questId;
+  final Value<String> periodKey;
+  final Value<int> completedAtMs;
+  final Value<int> rowid;
+  const PeriodicQuestStatesCompanion({
+    this.playerId = const Value.absent(),
+    this.questId = const Value.absent(),
+    this.periodKey = const Value.absent(),
+    this.completedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PeriodicQuestStatesCompanion.insert({
+    required String playerId,
+    required String questId,
+    required String periodKey,
+    required int completedAtMs,
+    this.rowid = const Value.absent(),
+  }) : playerId = Value(playerId),
+       questId = Value(questId),
+       periodKey = Value(periodKey),
+       completedAtMs = Value(completedAtMs);
+  static Insertable<PeriodicQuestState> custom({
+    Expression<String>? playerId,
+    Expression<String>? questId,
+    Expression<String>? periodKey,
+    Expression<int>? completedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playerId != null) 'player_id': playerId,
+      if (questId != null) 'quest_id': questId,
+      if (periodKey != null) 'period_key': periodKey,
+      if (completedAtMs != null) 'completed_at_ms': completedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PeriodicQuestStatesCompanion copyWith({
+    Value<String>? playerId,
+    Value<String>? questId,
+    Value<String>? periodKey,
+    Value<int>? completedAtMs,
+    Value<int>? rowid,
+  }) {
+    return PeriodicQuestStatesCompanion(
+      playerId: playerId ?? this.playerId,
+      questId: questId ?? this.questId,
+      periodKey: periodKey ?? this.periodKey,
+      completedAtMs: completedAtMs ?? this.completedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playerId.present) {
+      map['player_id'] = Variable<String>(playerId.value);
+    }
+    if (questId.present) {
+      map['quest_id'] = Variable<String>(questId.value);
+    }
+    if (periodKey.present) {
+      map['period_key'] = Variable<String>(periodKey.value);
+    }
+    if (completedAtMs.present) {
+      map['completed_at_ms'] = Variable<int>(completedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeriodicQuestStatesCompanion(')
+          ..write('playerId: $playerId, ')
+          ..write('questId: $questId, ')
+          ..write('periodKey: $periodKey, ')
+          ..write('completedAtMs: $completedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $EventShopPurchasesTable extends EventShopPurchases
+    with TableInfo<$EventShopPurchasesTable, EventShopPurchase> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EventShopPurchasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<String> playerId = GeneratedColumn<String>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES players (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _entryIdMeta = const VerificationMeta(
+    'entryId',
+  );
+  @override
+  late final GeneratedColumn<String> entryId = GeneratedColumn<String>(
+    'entry_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _periodKeyMeta = const VerificationMeta(
+    'periodKey',
+  );
+  @override
+  late final GeneratedColumn<String> periodKey = GeneratedColumn<String>(
+    'period_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _purchasedCountMeta = const VerificationMeta(
+    'purchasedCount',
+  );
+  @override
+  late final GeneratedColumn<int> purchasedCount = GeneratedColumn<int>(
+    'purchased_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    playerId,
+    entryId,
+    periodKey,
+    purchasedCount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'event_shop_purchases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EventShopPurchase> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('entry_id')) {
+      context.handle(
+        _entryIdMeta,
+        entryId.isAcceptableOrUnknown(data['entry_id']!, _entryIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entryIdMeta);
+    }
+    if (data.containsKey('period_key')) {
+      context.handle(
+        _periodKeyMeta,
+        periodKey.isAcceptableOrUnknown(data['period_key']!, _periodKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_periodKeyMeta);
+    }
+    if (data.containsKey('purchased_count')) {
+      context.handle(
+        _purchasedCountMeta,
+        purchasedCount.isAcceptableOrUnknown(
+          data['purchased_count']!,
+          _purchasedCountMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playerId, entryId, periodKey};
+  @override
+  EventShopPurchase map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EventShopPurchase(
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}player_id'],
+      )!,
+      entryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entry_id'],
+      )!,
+      periodKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period_key'],
+      )!,
+      purchasedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}purchased_count'],
+      )!,
+    );
+  }
+
+  @override
+  $EventShopPurchasesTable createAlias(String alias) {
+    return $EventShopPurchasesTable(attachedDatabase, alias);
+  }
+}
+
+class EventShopPurchase extends DataClass
+    implements Insertable<EventShopPurchase> {
+  final String playerId;
+  final String entryId;
+  final String periodKey;
+  final int purchasedCount;
+  const EventShopPurchase({
+    required this.playerId,
+    required this.entryId,
+    required this.periodKey,
+    required this.purchasedCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['player_id'] = Variable<String>(playerId);
+    map['entry_id'] = Variable<String>(entryId);
+    map['period_key'] = Variable<String>(periodKey);
+    map['purchased_count'] = Variable<int>(purchasedCount);
+    return map;
+  }
+
+  EventShopPurchasesCompanion toCompanion(bool nullToAbsent) {
+    return EventShopPurchasesCompanion(
+      playerId: Value(playerId),
+      entryId: Value(entryId),
+      periodKey: Value(periodKey),
+      purchasedCount: Value(purchasedCount),
+    );
+  }
+
+  factory EventShopPurchase.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EventShopPurchase(
+      playerId: serializer.fromJson<String>(json['playerId']),
+      entryId: serializer.fromJson<String>(json['entryId']),
+      periodKey: serializer.fromJson<String>(json['periodKey']),
+      purchasedCount: serializer.fromJson<int>(json['purchasedCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playerId': serializer.toJson<String>(playerId),
+      'entryId': serializer.toJson<String>(entryId),
+      'periodKey': serializer.toJson<String>(periodKey),
+      'purchasedCount': serializer.toJson<int>(purchasedCount),
+    };
+  }
+
+  EventShopPurchase copyWith({
+    String? playerId,
+    String? entryId,
+    String? periodKey,
+    int? purchasedCount,
+  }) => EventShopPurchase(
+    playerId: playerId ?? this.playerId,
+    entryId: entryId ?? this.entryId,
+    periodKey: periodKey ?? this.periodKey,
+    purchasedCount: purchasedCount ?? this.purchasedCount,
+  );
+  EventShopPurchase copyWithCompanion(EventShopPurchasesCompanion data) {
+    return EventShopPurchase(
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      entryId: data.entryId.present ? data.entryId.value : this.entryId,
+      periodKey: data.periodKey.present ? data.periodKey.value : this.periodKey,
+      purchasedCount: data.purchasedCount.present
+          ? data.purchasedCount.value
+          : this.purchasedCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventShopPurchase(')
+          ..write('playerId: $playerId, ')
+          ..write('entryId: $entryId, ')
+          ..write('periodKey: $periodKey, ')
+          ..write('purchasedCount: $purchasedCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(playerId, entryId, periodKey, purchasedCount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EventShopPurchase &&
+          other.playerId == this.playerId &&
+          other.entryId == this.entryId &&
+          other.periodKey == this.periodKey &&
+          other.purchasedCount == this.purchasedCount);
+}
+
+class EventShopPurchasesCompanion extends UpdateCompanion<EventShopPurchase> {
+  final Value<String> playerId;
+  final Value<String> entryId;
+  final Value<String> periodKey;
+  final Value<int> purchasedCount;
+  final Value<int> rowid;
+  const EventShopPurchasesCompanion({
+    this.playerId = const Value.absent(),
+    this.entryId = const Value.absent(),
+    this.periodKey = const Value.absent(),
+    this.purchasedCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EventShopPurchasesCompanion.insert({
+    required String playerId,
+    required String entryId,
+    required String periodKey,
+    this.purchasedCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : playerId = Value(playerId),
+       entryId = Value(entryId),
+       periodKey = Value(periodKey);
+  static Insertable<EventShopPurchase> custom({
+    Expression<String>? playerId,
+    Expression<String>? entryId,
+    Expression<String>? periodKey,
+    Expression<int>? purchasedCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playerId != null) 'player_id': playerId,
+      if (entryId != null) 'entry_id': entryId,
+      if (periodKey != null) 'period_key': periodKey,
+      if (purchasedCount != null) 'purchased_count': purchasedCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EventShopPurchasesCompanion copyWith({
+    Value<String>? playerId,
+    Value<String>? entryId,
+    Value<String>? periodKey,
+    Value<int>? purchasedCount,
+    Value<int>? rowid,
+  }) {
+    return EventShopPurchasesCompanion(
+      playerId: playerId ?? this.playerId,
+      entryId: entryId ?? this.entryId,
+      periodKey: periodKey ?? this.periodKey,
+      purchasedCount: purchasedCount ?? this.purchasedCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playerId.present) {
+      map['player_id'] = Variable<String>(playerId.value);
+    }
+    if (entryId.present) {
+      map['entry_id'] = Variable<String>(entryId.value);
+    }
+    if (periodKey.present) {
+      map['period_key'] = Variable<String>(periodKey.value);
+    }
+    if (purchasedCount.present) {
+      map['purchased_count'] = Variable<int>(purchasedCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventShopPurchasesCompanion(')
+          ..write('playerId: $playerId, ')
+          ..write('entryId: $entryId, ')
+          ..write('periodKey: $periodKey, ')
+          ..write('purchasedCount: $purchasedCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CloudSyncStatesTable extends CloudSyncStates
+    with TableInfo<$CloudSyncStatesTable, CloudSyncState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CloudSyncStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<String> playerId = GeneratedColumn<String>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastSyncedRevisionMeta =
+      const VerificationMeta('lastSyncedRevision');
+  @override
+  late final GeneratedColumn<int> lastSyncedRevision = GeneratedColumn<int>(
+    'last_synced_revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastSyncedBlobSha256Meta =
+      const VerificationMeta('lastSyncedBlobSha256');
+  @override
+  late final GeneratedColumn<String> lastSyncedBlobSha256 =
+      GeneratedColumn<String>(
+        'last_synced_blob_sha256',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastSyncAtMsMeta = const VerificationMeta(
+    'lastSyncAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> lastSyncAtMs = GeneratedColumn<int>(
+    'last_sync_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastRejectCodeMeta = const VerificationMeta(
+    'lastRejectCode',
+  );
+  @override
+  late final GeneratedColumn<String> lastRejectCode = GeneratedColumn<String>(
+    'last_reject_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastRejectAtMsMeta = const VerificationMeta(
+    'lastRejectAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> lastRejectAtMs = GeneratedColumn<int>(
+    'last_reject_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverOffsetMsMeta = const VerificationMeta(
+    'serverOffsetMs',
+  );
+  @override
+  late final GeneratedColumn<int> serverOffsetMs = GeneratedColumn<int>(
+    'server_offset_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverOffsetAtMsMeta = const VerificationMeta(
+    'serverOffsetAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> serverOffsetAtMs = GeneratedColumn<int>(
+    'server_offset_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    playerId,
+    deviceId,
+    lastSyncedRevision,
+    lastSyncedBlobSha256,
+    lastSyncAtMs,
+    lastRejectCode,
+    lastRejectAtMs,
+    serverOffsetMs,
+    serverOffsetAtMs,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cloud_sync_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CloudSyncState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('last_synced_revision')) {
+      context.handle(
+        _lastSyncedRevisionMeta,
+        lastSyncedRevision.isAcceptableOrUnknown(
+          data['last_synced_revision']!,
+          _lastSyncedRevisionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_synced_blob_sha256')) {
+      context.handle(
+        _lastSyncedBlobSha256Meta,
+        lastSyncedBlobSha256.isAcceptableOrUnknown(
+          data['last_synced_blob_sha256']!,
+          _lastSyncedBlobSha256Meta,
+        ),
+      );
+    }
+    if (data.containsKey('last_sync_at_ms')) {
+      context.handle(
+        _lastSyncAtMsMeta,
+        lastSyncAtMs.isAcceptableOrUnknown(
+          data['last_sync_at_ms']!,
+          _lastSyncAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_reject_code')) {
+      context.handle(
+        _lastRejectCodeMeta,
+        lastRejectCode.isAcceptableOrUnknown(
+          data['last_reject_code']!,
+          _lastRejectCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_reject_at_ms')) {
+      context.handle(
+        _lastRejectAtMsMeta,
+        lastRejectAtMs.isAcceptableOrUnknown(
+          data['last_reject_at_ms']!,
+          _lastRejectAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('server_offset_ms')) {
+      context.handle(
+        _serverOffsetMsMeta,
+        serverOffsetMs.isAcceptableOrUnknown(
+          data['server_offset_ms']!,
+          _serverOffsetMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('server_offset_at_ms')) {
+      context.handle(
+        _serverOffsetAtMsMeta,
+        serverOffsetAtMs.isAcceptableOrUnknown(
+          data['server_offset_at_ms']!,
+          _serverOffsetAtMsMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playerId};
+  @override
+  CloudSyncState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CloudSyncState(
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}player_id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      lastSyncedRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_synced_revision'],
+      )!,
+      lastSyncedBlobSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_synced_blob_sha256'],
+      ),
+      lastSyncAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_sync_at_ms'],
+      ),
+      lastRejectCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_reject_code'],
+      ),
+      lastRejectAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_reject_at_ms'],
+      ),
+      serverOffsetMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_offset_ms'],
+      ),
+      serverOffsetAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_offset_at_ms'],
+      ),
+    );
+  }
+
+  @override
+  $CloudSyncStatesTable createAlias(String alias) {
+    return $CloudSyncStatesTable(attachedDatabase, alias);
+  }
+}
+
+class CloudSyncState extends DataClass implements Insertable<CloudSyncState> {
+  final String playerId;
+  final String deviceId;
+  final int lastSyncedRevision;
+  final String? lastSyncedBlobSha256;
+  final int? lastSyncAtMs;
+  final String? lastRejectCode;
+  final int? lastRejectAtMs;
+  final int? serverOffsetMs;
+  final int? serverOffsetAtMs;
+  const CloudSyncState({
+    required this.playerId,
+    required this.deviceId,
+    required this.lastSyncedRevision,
+    this.lastSyncedBlobSha256,
+    this.lastSyncAtMs,
+    this.lastRejectCode,
+    this.lastRejectAtMs,
+    this.serverOffsetMs,
+    this.serverOffsetAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['player_id'] = Variable<String>(playerId);
+    map['device_id'] = Variable<String>(deviceId);
+    map['last_synced_revision'] = Variable<int>(lastSyncedRevision);
+    if (!nullToAbsent || lastSyncedBlobSha256 != null) {
+      map['last_synced_blob_sha256'] = Variable<String>(lastSyncedBlobSha256);
+    }
+    if (!nullToAbsent || lastSyncAtMs != null) {
+      map['last_sync_at_ms'] = Variable<int>(lastSyncAtMs);
+    }
+    if (!nullToAbsent || lastRejectCode != null) {
+      map['last_reject_code'] = Variable<String>(lastRejectCode);
+    }
+    if (!nullToAbsent || lastRejectAtMs != null) {
+      map['last_reject_at_ms'] = Variable<int>(lastRejectAtMs);
+    }
+    if (!nullToAbsent || serverOffsetMs != null) {
+      map['server_offset_ms'] = Variable<int>(serverOffsetMs);
+    }
+    if (!nullToAbsent || serverOffsetAtMs != null) {
+      map['server_offset_at_ms'] = Variable<int>(serverOffsetAtMs);
+    }
+    return map;
+  }
+
+  CloudSyncStatesCompanion toCompanion(bool nullToAbsent) {
+    return CloudSyncStatesCompanion(
+      playerId: Value(playerId),
+      deviceId: Value(deviceId),
+      lastSyncedRevision: Value(lastSyncedRevision),
+      lastSyncedBlobSha256: lastSyncedBlobSha256 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedBlobSha256),
+      lastSyncAtMs: lastSyncAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncAtMs),
+      lastRejectCode: lastRejectCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastRejectCode),
+      lastRejectAtMs: lastRejectAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastRejectAtMs),
+      serverOffsetMs: serverOffsetMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverOffsetMs),
+      serverOffsetAtMs: serverOffsetAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverOffsetAtMs),
+    );
+  }
+
+  factory CloudSyncState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CloudSyncState(
+      playerId: serializer.fromJson<String>(json['playerId']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      lastSyncedRevision: serializer.fromJson<int>(json['lastSyncedRevision']),
+      lastSyncedBlobSha256: serializer.fromJson<String?>(
+        json['lastSyncedBlobSha256'],
+      ),
+      lastSyncAtMs: serializer.fromJson<int?>(json['lastSyncAtMs']),
+      lastRejectCode: serializer.fromJson<String?>(json['lastRejectCode']),
+      lastRejectAtMs: serializer.fromJson<int?>(json['lastRejectAtMs']),
+      serverOffsetMs: serializer.fromJson<int?>(json['serverOffsetMs']),
+      serverOffsetAtMs: serializer.fromJson<int?>(json['serverOffsetAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playerId': serializer.toJson<String>(playerId),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'lastSyncedRevision': serializer.toJson<int>(lastSyncedRevision),
+      'lastSyncedBlobSha256': serializer.toJson<String?>(lastSyncedBlobSha256),
+      'lastSyncAtMs': serializer.toJson<int?>(lastSyncAtMs),
+      'lastRejectCode': serializer.toJson<String?>(lastRejectCode),
+      'lastRejectAtMs': serializer.toJson<int?>(lastRejectAtMs),
+      'serverOffsetMs': serializer.toJson<int?>(serverOffsetMs),
+      'serverOffsetAtMs': serializer.toJson<int?>(serverOffsetAtMs),
+    };
+  }
+
+  CloudSyncState copyWith({
+    String? playerId,
+    String? deviceId,
+    int? lastSyncedRevision,
+    Value<String?> lastSyncedBlobSha256 = const Value.absent(),
+    Value<int?> lastSyncAtMs = const Value.absent(),
+    Value<String?> lastRejectCode = const Value.absent(),
+    Value<int?> lastRejectAtMs = const Value.absent(),
+    Value<int?> serverOffsetMs = const Value.absent(),
+    Value<int?> serverOffsetAtMs = const Value.absent(),
+  }) => CloudSyncState(
+    playerId: playerId ?? this.playerId,
+    deviceId: deviceId ?? this.deviceId,
+    lastSyncedRevision: lastSyncedRevision ?? this.lastSyncedRevision,
+    lastSyncedBlobSha256: lastSyncedBlobSha256.present
+        ? lastSyncedBlobSha256.value
+        : this.lastSyncedBlobSha256,
+    lastSyncAtMs: lastSyncAtMs.present ? lastSyncAtMs.value : this.lastSyncAtMs,
+    lastRejectCode: lastRejectCode.present
+        ? lastRejectCode.value
+        : this.lastRejectCode,
+    lastRejectAtMs: lastRejectAtMs.present
+        ? lastRejectAtMs.value
+        : this.lastRejectAtMs,
+    serverOffsetMs: serverOffsetMs.present
+        ? serverOffsetMs.value
+        : this.serverOffsetMs,
+    serverOffsetAtMs: serverOffsetAtMs.present
+        ? serverOffsetAtMs.value
+        : this.serverOffsetAtMs,
+  );
+  CloudSyncState copyWithCompanion(CloudSyncStatesCompanion data) {
+    return CloudSyncState(
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      lastSyncedRevision: data.lastSyncedRevision.present
+          ? data.lastSyncedRevision.value
+          : this.lastSyncedRevision,
+      lastSyncedBlobSha256: data.lastSyncedBlobSha256.present
+          ? data.lastSyncedBlobSha256.value
+          : this.lastSyncedBlobSha256,
+      lastSyncAtMs: data.lastSyncAtMs.present
+          ? data.lastSyncAtMs.value
+          : this.lastSyncAtMs,
+      lastRejectCode: data.lastRejectCode.present
+          ? data.lastRejectCode.value
+          : this.lastRejectCode,
+      lastRejectAtMs: data.lastRejectAtMs.present
+          ? data.lastRejectAtMs.value
+          : this.lastRejectAtMs,
+      serverOffsetMs: data.serverOffsetMs.present
+          ? data.serverOffsetMs.value
+          : this.serverOffsetMs,
+      serverOffsetAtMs: data.serverOffsetAtMs.present
+          ? data.serverOffsetAtMs.value
+          : this.serverOffsetAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CloudSyncState(')
+          ..write('playerId: $playerId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('lastSyncedRevision: $lastSyncedRevision, ')
+          ..write('lastSyncedBlobSha256: $lastSyncedBlobSha256, ')
+          ..write('lastSyncAtMs: $lastSyncAtMs, ')
+          ..write('lastRejectCode: $lastRejectCode, ')
+          ..write('lastRejectAtMs: $lastRejectAtMs, ')
+          ..write('serverOffsetMs: $serverOffsetMs, ')
+          ..write('serverOffsetAtMs: $serverOffsetAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    playerId,
+    deviceId,
+    lastSyncedRevision,
+    lastSyncedBlobSha256,
+    lastSyncAtMs,
+    lastRejectCode,
+    lastRejectAtMs,
+    serverOffsetMs,
+    serverOffsetAtMs,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CloudSyncState &&
+          other.playerId == this.playerId &&
+          other.deviceId == this.deviceId &&
+          other.lastSyncedRevision == this.lastSyncedRevision &&
+          other.lastSyncedBlobSha256 == this.lastSyncedBlobSha256 &&
+          other.lastSyncAtMs == this.lastSyncAtMs &&
+          other.lastRejectCode == this.lastRejectCode &&
+          other.lastRejectAtMs == this.lastRejectAtMs &&
+          other.serverOffsetMs == this.serverOffsetMs &&
+          other.serverOffsetAtMs == this.serverOffsetAtMs);
+}
+
+class CloudSyncStatesCompanion extends UpdateCompanion<CloudSyncState> {
+  final Value<String> playerId;
+  final Value<String> deviceId;
+  final Value<int> lastSyncedRevision;
+  final Value<String?> lastSyncedBlobSha256;
+  final Value<int?> lastSyncAtMs;
+  final Value<String?> lastRejectCode;
+  final Value<int?> lastRejectAtMs;
+  final Value<int?> serverOffsetMs;
+  final Value<int?> serverOffsetAtMs;
+  final Value<int> rowid;
+  const CloudSyncStatesCompanion({
+    this.playerId = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.lastSyncedRevision = const Value.absent(),
+    this.lastSyncedBlobSha256 = const Value.absent(),
+    this.lastSyncAtMs = const Value.absent(),
+    this.lastRejectCode = const Value.absent(),
+    this.lastRejectAtMs = const Value.absent(),
+    this.serverOffsetMs = const Value.absent(),
+    this.serverOffsetAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CloudSyncStatesCompanion.insert({
+    required String playerId,
+    required String deviceId,
+    this.lastSyncedRevision = const Value.absent(),
+    this.lastSyncedBlobSha256 = const Value.absent(),
+    this.lastSyncAtMs = const Value.absent(),
+    this.lastRejectCode = const Value.absent(),
+    this.lastRejectAtMs = const Value.absent(),
+    this.serverOffsetMs = const Value.absent(),
+    this.serverOffsetAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : playerId = Value(playerId),
+       deviceId = Value(deviceId);
+  static Insertable<CloudSyncState> custom({
+    Expression<String>? playerId,
+    Expression<String>? deviceId,
+    Expression<int>? lastSyncedRevision,
+    Expression<String>? lastSyncedBlobSha256,
+    Expression<int>? lastSyncAtMs,
+    Expression<String>? lastRejectCode,
+    Expression<int>? lastRejectAtMs,
+    Expression<int>? serverOffsetMs,
+    Expression<int>? serverOffsetAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playerId != null) 'player_id': playerId,
+      if (deviceId != null) 'device_id': deviceId,
+      if (lastSyncedRevision != null)
+        'last_synced_revision': lastSyncedRevision,
+      if (lastSyncedBlobSha256 != null)
+        'last_synced_blob_sha256': lastSyncedBlobSha256,
+      if (lastSyncAtMs != null) 'last_sync_at_ms': lastSyncAtMs,
+      if (lastRejectCode != null) 'last_reject_code': lastRejectCode,
+      if (lastRejectAtMs != null) 'last_reject_at_ms': lastRejectAtMs,
+      if (serverOffsetMs != null) 'server_offset_ms': serverOffsetMs,
+      if (serverOffsetAtMs != null) 'server_offset_at_ms': serverOffsetAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CloudSyncStatesCompanion copyWith({
+    Value<String>? playerId,
+    Value<String>? deviceId,
+    Value<int>? lastSyncedRevision,
+    Value<String?>? lastSyncedBlobSha256,
+    Value<int?>? lastSyncAtMs,
+    Value<String?>? lastRejectCode,
+    Value<int?>? lastRejectAtMs,
+    Value<int?>? serverOffsetMs,
+    Value<int?>? serverOffsetAtMs,
+    Value<int>? rowid,
+  }) {
+    return CloudSyncStatesCompanion(
+      playerId: playerId ?? this.playerId,
+      deviceId: deviceId ?? this.deviceId,
+      lastSyncedRevision: lastSyncedRevision ?? this.lastSyncedRevision,
+      lastSyncedBlobSha256: lastSyncedBlobSha256 ?? this.lastSyncedBlobSha256,
+      lastSyncAtMs: lastSyncAtMs ?? this.lastSyncAtMs,
+      lastRejectCode: lastRejectCode ?? this.lastRejectCode,
+      lastRejectAtMs: lastRejectAtMs ?? this.lastRejectAtMs,
+      serverOffsetMs: serverOffsetMs ?? this.serverOffsetMs,
+      serverOffsetAtMs: serverOffsetAtMs ?? this.serverOffsetAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playerId.present) {
+      map['player_id'] = Variable<String>(playerId.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (lastSyncedRevision.present) {
+      map['last_synced_revision'] = Variable<int>(lastSyncedRevision.value);
+    }
+    if (lastSyncedBlobSha256.present) {
+      map['last_synced_blob_sha256'] = Variable<String>(
+        lastSyncedBlobSha256.value,
+      );
+    }
+    if (lastSyncAtMs.present) {
+      map['last_sync_at_ms'] = Variable<int>(lastSyncAtMs.value);
+    }
+    if (lastRejectCode.present) {
+      map['last_reject_code'] = Variable<String>(lastRejectCode.value);
+    }
+    if (lastRejectAtMs.present) {
+      map['last_reject_at_ms'] = Variable<int>(lastRejectAtMs.value);
+    }
+    if (serverOffsetMs.present) {
+      map['server_offset_ms'] = Variable<int>(serverOffsetMs.value);
+    }
+    if (serverOffsetAtMs.present) {
+      map['server_offset_at_ms'] = Variable<int>(serverOffsetAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CloudSyncStatesCompanion(')
+          ..write('playerId: $playerId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('lastSyncedRevision: $lastSyncedRevision, ')
+          ..write('lastSyncedBlobSha256: $lastSyncedBlobSha256, ')
+          ..write('lastSyncAtMs: $lastSyncAtMs, ')
+          ..write('lastRejectCode: $lastRejectCode, ')
+          ..write('lastRejectAtMs: $lastRejectAtMs, ')
+          ..write('serverOffsetMs: $serverOffsetMs, ')
+          ..write('serverOffsetAtMs: $serverOffsetAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalSaveBackupsTable extends LocalSaveBackups
+    with TableInfo<$LocalSaveBackupsTable, LocalSaveBackup> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalSaveBackupsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _createdAtMsMeta = const VerificationMeta(
+    'createdAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtMs = GeneratedColumn<int>(
+    'created_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _schemaVersionMeta = const VerificationMeta(
+    'schemaVersion',
+  );
+  @override
+  late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
+    'schema_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _blobSha256Meta = const VerificationMeta(
+    'blobSha256',
+  );
+  @override
+  late final GeneratedColumn<String> blobSha256 = GeneratedColumn<String>(
+    'blob_sha256',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> payload = GeneratedColumn<Uint8List>(
+    'blob',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    createdAtMs,
+    reason,
+    schemaVersion,
+    blobSha256,
+    payload,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_save_backups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalSaveBackup> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('created_at_ms')) {
+      context.handle(
+        _createdAtMsMeta,
+        createdAtMs.isAcceptableOrUnknown(
+          data['created_at_ms']!,
+          _createdAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMsMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reasonMeta);
+    }
+    if (data.containsKey('schema_version')) {
+      context.handle(
+        _schemaVersionMeta,
+        schemaVersion.isAcceptableOrUnknown(
+          data['schema_version']!,
+          _schemaVersionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_schemaVersionMeta);
+    }
+    if (data.containsKey('blob_sha256')) {
+      context.handle(
+        _blobSha256Meta,
+        blobSha256.isAcceptableOrUnknown(data['blob_sha256']!, _blobSha256Meta),
+      );
+    } else if (isInserting) {
+      context.missing(_blobSha256Meta);
+    }
+    if (data.containsKey('blob')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['blob']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalSaveBackup map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalSaveBackup(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      createdAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_ms'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      )!,
+      schemaVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}schema_version'],
+      )!,
+      blobSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}blob_sha256'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}blob'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalSaveBackupsTable createAlias(String alias) {
+    return $LocalSaveBackupsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalSaveBackup extends DataClass implements Insertable<LocalSaveBackup> {
+  final int id;
+  final int createdAtMs;
+  final String reason;
+  final int schemaVersion;
+  final String blobSha256;
+  final Uint8List payload;
+  const LocalSaveBackup({
+    required this.id,
+    required this.createdAtMs,
+    required this.reason,
+    required this.schemaVersion,
+    required this.blobSha256,
+    required this.payload,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['created_at_ms'] = Variable<int>(createdAtMs);
+    map['reason'] = Variable<String>(reason);
+    map['schema_version'] = Variable<int>(schemaVersion);
+    map['blob_sha256'] = Variable<String>(blobSha256);
+    map['blob'] = Variable<Uint8List>(payload);
+    return map;
+  }
+
+  LocalSaveBackupsCompanion toCompanion(bool nullToAbsent) {
+    return LocalSaveBackupsCompanion(
+      id: Value(id),
+      createdAtMs: Value(createdAtMs),
+      reason: Value(reason),
+      schemaVersion: Value(schemaVersion),
+      blobSha256: Value(blobSha256),
+      payload: Value(payload),
+    );
+  }
+
+  factory LocalSaveBackup.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalSaveBackup(
+      id: serializer.fromJson<int>(json['id']),
+      createdAtMs: serializer.fromJson<int>(json['createdAtMs']),
+      reason: serializer.fromJson<String>(json['reason']),
+      schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
+      blobSha256: serializer.fromJson<String>(json['blobSha256']),
+      payload: serializer.fromJson<Uint8List>(json['payload']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'createdAtMs': serializer.toJson<int>(createdAtMs),
+      'reason': serializer.toJson<String>(reason),
+      'schemaVersion': serializer.toJson<int>(schemaVersion),
+      'blobSha256': serializer.toJson<String>(blobSha256),
+      'payload': serializer.toJson<Uint8List>(payload),
+    };
+  }
+
+  LocalSaveBackup copyWith({
+    int? id,
+    int? createdAtMs,
+    String? reason,
+    int? schemaVersion,
+    String? blobSha256,
+    Uint8List? payload,
+  }) => LocalSaveBackup(
+    id: id ?? this.id,
+    createdAtMs: createdAtMs ?? this.createdAtMs,
+    reason: reason ?? this.reason,
+    schemaVersion: schemaVersion ?? this.schemaVersion,
+    blobSha256: blobSha256 ?? this.blobSha256,
+    payload: payload ?? this.payload,
+  );
+  LocalSaveBackup copyWithCompanion(LocalSaveBackupsCompanion data) {
+    return LocalSaveBackup(
+      id: data.id.present ? data.id.value : this.id,
+      createdAtMs: data.createdAtMs.present
+          ? data.createdAtMs.value
+          : this.createdAtMs,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      schemaVersion: data.schemaVersion.present
+          ? data.schemaVersion.value
+          : this.schemaVersion,
+      blobSha256: data.blobSha256.present
+          ? data.blobSha256.value
+          : this.blobSha256,
+      payload: data.payload.present ? data.payload.value : this.payload,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSaveBackup(')
+          ..write('id: $id, ')
+          ..write('createdAtMs: $createdAtMs, ')
+          ..write('reason: $reason, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('blobSha256: $blobSha256, ')
+          ..write('payload: $payload')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    createdAtMs,
+    reason,
+    schemaVersion,
+    blobSha256,
+    $driftBlobEquality.hash(payload),
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalSaveBackup &&
+          other.id == this.id &&
+          other.createdAtMs == this.createdAtMs &&
+          other.reason == this.reason &&
+          other.schemaVersion == this.schemaVersion &&
+          other.blobSha256 == this.blobSha256 &&
+          $driftBlobEquality.equals(other.payload, this.payload));
+}
+
+class LocalSaveBackupsCompanion extends UpdateCompanion<LocalSaveBackup> {
+  final Value<int> id;
+  final Value<int> createdAtMs;
+  final Value<String> reason;
+  final Value<int> schemaVersion;
+  final Value<String> blobSha256;
+  final Value<Uint8List> payload;
+  const LocalSaveBackupsCompanion({
+    this.id = const Value.absent(),
+    this.createdAtMs = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.schemaVersion = const Value.absent(),
+    this.blobSha256 = const Value.absent(),
+    this.payload = const Value.absent(),
+  });
+  LocalSaveBackupsCompanion.insert({
+    this.id = const Value.absent(),
+    required int createdAtMs,
+    required String reason,
+    required int schemaVersion,
+    required String blobSha256,
+    required Uint8List payload,
+  }) : createdAtMs = Value(createdAtMs),
+       reason = Value(reason),
+       schemaVersion = Value(schemaVersion),
+       blobSha256 = Value(blobSha256),
+       payload = Value(payload);
+  static Insertable<LocalSaveBackup> custom({
+    Expression<int>? id,
+    Expression<int>? createdAtMs,
+    Expression<String>? reason,
+    Expression<int>? schemaVersion,
+    Expression<String>? blobSha256,
+    Expression<Uint8List>? payload,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (createdAtMs != null) 'created_at_ms': createdAtMs,
+      if (reason != null) 'reason': reason,
+      if (schemaVersion != null) 'schema_version': schemaVersion,
+      if (blobSha256 != null) 'blob_sha256': blobSha256,
+      if (payload != null) 'blob': payload,
+    });
+  }
+
+  LocalSaveBackupsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? createdAtMs,
+    Value<String>? reason,
+    Value<int>? schemaVersion,
+    Value<String>? blobSha256,
+    Value<Uint8List>? payload,
+  }) {
+    return LocalSaveBackupsCompanion(
+      id: id ?? this.id,
+      createdAtMs: createdAtMs ?? this.createdAtMs,
+      reason: reason ?? this.reason,
+      schemaVersion: schemaVersion ?? this.schemaVersion,
+      blobSha256: blobSha256 ?? this.blobSha256,
+      payload: payload ?? this.payload,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (createdAtMs.present) {
+      map['created_at_ms'] = Variable<int>(createdAtMs.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (schemaVersion.present) {
+      map['schema_version'] = Variable<int>(schemaVersion.value);
+    }
+    if (blobSha256.present) {
+      map['blob_sha256'] = Variable<String>(blobSha256.value);
+    }
+    if (payload.present) {
+      map['blob'] = Variable<Uint8List>(payload.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSaveBackupsCompanion(')
+          ..write('id: $id, ')
+          ..write('createdAtMs: $createdAtMs, ')
+          ..write('reason: $reason, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('blobSha256: $blobSha256, ')
+          ..write('payload: $payload')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4254,6 +6545,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $GameSessionsTable gameSessions = $GameSessionsTable(this);
   late final $ClaimedRewardsTable claimedRewards = $ClaimedRewardsTable(this);
   late final $ShopPurchasesTable shopPurchases = $ShopPurchasesTable(this);
+  late final $ClockStatesTable clockStates = $ClockStatesTable(this);
+  late final $CurrenciesTable currencies = $CurrenciesTable(this);
+  late final $PeriodicQuestStatesTable periodicQuestStates =
+      $PeriodicQuestStatesTable(this);
+  late final $EventShopPurchasesTable eventShopPurchases =
+      $EventShopPurchasesTable(this);
+  late final $CloudSyncStatesTable cloudSyncStates = $CloudSyncStatesTable(
+    this,
+  );
+  late final $LocalSaveBackupsTable localSaveBackups = $LocalSaveBackupsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4270,6 +6573,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     gameSessions,
     claimedRewards,
     shopPurchases,
+    clockStates,
+    currencies,
+    periodicQuestStates,
+    eventShopPurchases,
+    cloudSyncStates,
+    localSaveBackups,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -4335,6 +6644,34 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('shop_purchases', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'players',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('clock_states', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'players',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('currencies', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'players',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('periodic_quest_states', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'players',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('event_shop_purchases', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -4694,6 +7031,87 @@ final class $$PlayersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$ClockStatesTable, List<ClockState>>
+  _clockStatesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.clockStates,
+    aliasName: 'players__id__clock_states__player_id',
+  );
+
+  $$ClockStatesTableProcessedTableManager get clockStatesRefs {
+    final manager = $$ClockStatesTableTableManager(
+      $_db,
+      $_db.clockStates,
+    ).filter((f) => f.playerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_clockStatesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$CurrenciesTable, List<Currency>>
+  _currenciesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.currencies,
+    aliasName: 'players__id__currencies__player_id',
+  );
+
+  $$CurrenciesTableProcessedTableManager get currenciesRefs {
+    final manager = $$CurrenciesTableTableManager(
+      $_db,
+      $_db.currencies,
+    ).filter((f) => f.playerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_currenciesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $PeriodicQuestStatesTable,
+    List<PeriodicQuestState>
+  >
+  _periodicQuestStatesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.periodicQuestStates,
+        aliasName: 'players__id__periodic_quest_states__player_id',
+      );
+
+  $$PeriodicQuestStatesTableProcessedTableManager get periodicQuestStatesRefs {
+    final manager = $$PeriodicQuestStatesTableTableManager(
+      $_db,
+      $_db.periodicQuestStates,
+    ).filter((f) => f.playerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _periodicQuestStatesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$EventShopPurchasesTable, List<EventShopPurchase>>
+  _eventShopPurchasesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.eventShopPurchases,
+        aliasName: 'players__id__event_shop_purchases__player_id',
+      );
+
+  $$EventShopPurchasesTableProcessedTableManager get eventShopPurchasesRefs {
+    final manager = $$EventShopPurchasesTableTableManager(
+      $_db,
+      $_db.eventShopPurchases,
+    ).filter((f) => f.playerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _eventShopPurchasesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PlayersTableFilterComposer
@@ -4966,6 +7384,106 @@ class $$PlayersTableFilterComposer
           }) => $$ShopPurchasesTableFilterComposer(
             $db: $db,
             $table: $db.shopPurchases,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> clockStatesRefs(
+    Expression<bool> Function($$ClockStatesTableFilterComposer f) f,
+  ) {
+    final $$ClockStatesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.clockStates,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ClockStatesTableFilterComposer(
+            $db: $db,
+            $table: $db.clockStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> currenciesRefs(
+    Expression<bool> Function($$CurrenciesTableFilterComposer f) f,
+  ) {
+    final $$CurrenciesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.currencies,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CurrenciesTableFilterComposer(
+            $db: $db,
+            $table: $db.currencies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> periodicQuestStatesRefs(
+    Expression<bool> Function($$PeriodicQuestStatesTableFilterComposer f) f,
+  ) {
+    final $$PeriodicQuestStatesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.periodicQuestStates,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeriodicQuestStatesTableFilterComposer(
+            $db: $db,
+            $table: $db.periodicQuestStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> eventShopPurchasesRefs(
+    Expression<bool> Function($$EventShopPurchasesTableFilterComposer f) f,
+  ) {
+    final $$EventShopPurchasesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.eventShopPurchases,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventShopPurchasesTableFilterComposer(
+            $db: $db,
+            $table: $db.eventShopPurchases,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5303,6 +7821,108 @@ class $$PlayersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> clockStatesRefs<T extends Object>(
+    Expression<T> Function($$ClockStatesTableAnnotationComposer a) f,
+  ) {
+    final $$ClockStatesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.clockStates,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ClockStatesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.clockStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> currenciesRefs<T extends Object>(
+    Expression<T> Function($$CurrenciesTableAnnotationComposer a) f,
+  ) {
+    final $$CurrenciesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.currencies,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CurrenciesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.currencies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> periodicQuestStatesRefs<T extends Object>(
+    Expression<T> Function($$PeriodicQuestStatesTableAnnotationComposer a) f,
+  ) {
+    final $$PeriodicQuestStatesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.periodicQuestStates,
+          getReferencedColumn: (t) => t.playerId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PeriodicQuestStatesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.periodicQuestStates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> eventShopPurchasesRefs<T extends Object>(
+    Expression<T> Function($$EventShopPurchasesTableAnnotationComposer a) f,
+  ) {
+    final $$EventShopPurchasesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.eventShopPurchases,
+          getReferencedColumn: (t) => t.playerId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$EventShopPurchasesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.eventShopPurchases,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$PlayersTableTableManager
@@ -5328,6 +7948,10 @@ class $$PlayersTableTableManager
             bool gameSessionsRefs,
             bool claimedRewardsRefs,
             bool shopPurchasesRefs,
+            bool clockStatesRefs,
+            bool currenciesRefs,
+            bool periodicQuestStatesRefs,
+            bool eventShopPurchasesRefs,
           })
         > {
   $$PlayersTableTableManager(_$AppDatabase db, $PlayersTable table)
@@ -5408,6 +8032,10 @@ class $$PlayersTableTableManager
                 gameSessionsRefs = false,
                 claimedRewardsRefs = false,
                 shopPurchasesRefs = false,
+                clockStatesRefs = false,
+                currenciesRefs = false,
+                periodicQuestStatesRefs = false,
+                eventShopPurchasesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5421,6 +8049,10 @@ class $$PlayersTableTableManager
                     if (gameSessionsRefs) db.gameSessions,
                     if (claimedRewardsRefs) db.claimedRewards,
                     if (shopPurchasesRefs) db.shopPurchases,
+                    if (clockStatesRefs) db.clockStates,
+                    if (currenciesRefs) db.currencies,
+                    if (periodicQuestStatesRefs) db.periodicQuestStates,
+                    if (eventShopPurchasesRefs) db.eventShopPurchases,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5605,6 +8237,86 @@ class $$PlayersTableTableManager
                           referencedColumn: 'player_id',
                           typedResults: items,
                         ),
+                      if (clockStatesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          Player,
+                          $PlayersTable,
+                          ClockState,
+                          $ClockStatesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PlayersTableReferences
+                              ._clockStatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PlayersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).clockStatesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'player_id',
+                          typedResults: items,
+                        ),
+                      if (currenciesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          Player,
+                          $PlayersTable,
+                          Currency,
+                          $CurrenciesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PlayersTableReferences
+                              ._currenciesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PlayersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).currenciesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'player_id',
+                          typedResults: items,
+                        ),
+                      if (periodicQuestStatesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          Player,
+                          $PlayersTable,
+                          PeriodicQuestState,
+                          $PeriodicQuestStatesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PlayersTableReferences
+                              ._periodicQuestStatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PlayersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).periodicQuestStatesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'player_id',
+                          typedResults: items,
+                        ),
+                      if (eventShopPurchasesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          Player,
+                          $PlayersTable,
+                          EventShopPurchase,
+                          $EventShopPurchasesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PlayersTableReferences
+                              ._eventShopPurchasesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PlayersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).eventShopPurchasesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'player_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5635,6 +8347,10 @@ typedef $$PlayersTableProcessedTableManager =
         bool gameSessionsRefs,
         bool claimedRewardsRefs,
         bool shopPurchasesRefs,
+        bool clockStatesRefs,
+        bool currenciesRefs,
+        bool periodicQuestStatesRefs,
+        bool eventShopPurchasesRefs,
       })
     >;
 typedef $$SkillProgressesTableCreateCompanionBuilder =
@@ -8580,6 +11296,1755 @@ typedef $$ShopPurchasesTableProcessedTableManager =
       ShopPurchase,
       PrefetchHooks Function({bool playerId})
     >;
+typedef $$ClockStatesTableCreateCompanionBuilder =
+    ClockStatesCompanion Function({
+      required String playerId,
+      Value<int> lastSeenAtMs,
+      Value<int> forwardJumpCount,
+      Value<int> maxForwardJumpMs,
+      Value<int> rowid,
+    });
+typedef $$ClockStatesTableUpdateCompanionBuilder =
+    ClockStatesCompanion Function({
+      Value<String> playerId,
+      Value<int> lastSeenAtMs,
+      Value<int> forwardJumpCount,
+      Value<int> maxForwardJumpMs,
+      Value<int> rowid,
+    });
+
+final class $$ClockStatesTableReferences
+    extends BaseReferences<_$AppDatabase, $ClockStatesTable, ClockState> {
+  $$ClockStatesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('clock_states__player_id__players__id');
+
+  $$PlayersTableProcessedTableManager get playerId {
+    final $_column = $_itemColumn<String>('player_id')!;
+
+    final manager = $$PlayersTableTableManager(
+      $_db,
+      $_db.players,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ClockStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $ClockStatesTable> {
+  $$ClockStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get lastSeenAtMs => $composableBuilder(
+    column: $table.lastSeenAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get forwardJumpCount => $composableBuilder(
+    column: $table.forwardJumpCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxForwardJumpMs => $composableBuilder(
+    column: $table.maxForwardJumpMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PlayersTableFilterComposer get playerId {
+    final $$PlayersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableFilterComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ClockStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ClockStatesTable> {
+  $$ClockStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get lastSeenAtMs => $composableBuilder(
+    column: $table.lastSeenAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get forwardJumpCount => $composableBuilder(
+    column: $table.forwardJumpCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxForwardJumpMs => $composableBuilder(
+    column: $table.maxForwardJumpMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PlayersTableOrderingComposer get playerId {
+    final $$PlayersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableOrderingComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ClockStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ClockStatesTable> {
+  $$ClockStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get lastSeenAtMs => $composableBuilder(
+    column: $table.lastSeenAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get forwardJumpCount => $composableBuilder(
+    column: $table.forwardJumpCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get maxForwardJumpMs => $composableBuilder(
+    column: $table.maxForwardJumpMs,
+    builder: (column) => column,
+  );
+
+  $$PlayersTableAnnotationComposer get playerId {
+    final $$PlayersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ClockStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ClockStatesTable,
+          ClockState,
+          $$ClockStatesTableFilterComposer,
+          $$ClockStatesTableOrderingComposer,
+          $$ClockStatesTableAnnotationComposer,
+          $$ClockStatesTableCreateCompanionBuilder,
+          $$ClockStatesTableUpdateCompanionBuilder,
+          (ClockState, $$ClockStatesTableReferences),
+          ClockState,
+          PrefetchHooks Function({bool playerId})
+        > {
+  $$ClockStatesTableTableManager(_$AppDatabase db, $ClockStatesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ClockStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ClockStatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ClockStatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> playerId = const Value.absent(),
+                Value<int> lastSeenAtMs = const Value.absent(),
+                Value<int> forwardJumpCount = const Value.absent(),
+                Value<int> maxForwardJumpMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ClockStatesCompanion(
+                playerId: playerId,
+                lastSeenAtMs: lastSeenAtMs,
+                forwardJumpCount: forwardJumpCount,
+                maxForwardJumpMs: maxForwardJumpMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String playerId,
+                Value<int> lastSeenAtMs = const Value.absent(),
+                Value<int> forwardJumpCount = const Value.absent(),
+                Value<int> maxForwardJumpMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ClockStatesCompanion.insert(
+                playerId: playerId,
+                lastSeenAtMs: lastSeenAtMs,
+                forwardJumpCount: forwardJumpCount,
+                maxForwardJumpMs: maxForwardJumpMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ClockStatesTable, ClockState>(table),
+                  $$ClockStatesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({playerId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (playerId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.playerId,
+                        referencedTable: $$ClockStatesTableReferences
+                            ._playerIdTable(db),
+                        referencedColumn: $$ClockStatesTableReferences
+                            ._playerIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ClockStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ClockStatesTable,
+      ClockState,
+      $$ClockStatesTableFilterComposer,
+      $$ClockStatesTableOrderingComposer,
+      $$ClockStatesTableAnnotationComposer,
+      $$ClockStatesTableCreateCompanionBuilder,
+      $$ClockStatesTableUpdateCompanionBuilder,
+      (ClockState, $$ClockStatesTableReferences),
+      ClockState,
+      PrefetchHooks Function({bool playerId})
+    >;
+typedef $$CurrenciesTableCreateCompanionBuilder = CurrenciesCompanion Function({
+  required String playerId,
+  required String currencyId,
+  Value<int> amount,
+  Value<int> rowid,
+});
+typedef $$CurrenciesTableUpdateCompanionBuilder = CurrenciesCompanion Function({
+  Value<String> playerId,
+  Value<String> currencyId,
+  Value<int> amount,
+  Value<int> rowid,
+});
+
+final class $$CurrenciesTableReferences
+    extends BaseReferences<_$AppDatabase, $CurrenciesTable, Currency> {
+  $$CurrenciesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('currencies__player_id__players__id');
+
+  $$PlayersTableProcessedTableManager get playerId {
+    final $_column = $_itemColumn<String>('player_id')!;
+
+    final manager = $$PlayersTableTableManager(
+      $_db,
+      $_db.players,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CurrenciesTableFilterComposer
+    extends Composer<_$AppDatabase, $CurrenciesTable> {
+  $$CurrenciesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get currencyId => $composableBuilder(
+    column: $table.currencyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PlayersTableFilterComposer get playerId {
+    final $$PlayersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableFilterComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CurrenciesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CurrenciesTable> {
+  $$CurrenciesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get currencyId => $composableBuilder(
+    column: $table.currencyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PlayersTableOrderingComposer get playerId {
+    final $$PlayersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableOrderingComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CurrenciesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CurrenciesTable> {
+  $$CurrenciesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get currencyId => $composableBuilder(
+    column: $table.currencyId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  $$PlayersTableAnnotationComposer get playerId {
+    final $$PlayersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CurrenciesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CurrenciesTable,
+          Currency,
+          $$CurrenciesTableFilterComposer,
+          $$CurrenciesTableOrderingComposer,
+          $$CurrenciesTableAnnotationComposer,
+          $$CurrenciesTableCreateCompanionBuilder,
+          $$CurrenciesTableUpdateCompanionBuilder,
+          (Currency, $$CurrenciesTableReferences),
+          Currency,
+          PrefetchHooks Function({bool playerId})
+        > {
+  $$CurrenciesTableTableManager(_$AppDatabase db, $CurrenciesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CurrenciesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CurrenciesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CurrenciesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> playerId = const Value.absent(),
+                Value<String> currencyId = const Value.absent(),
+                Value<int> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CurrenciesCompanion(
+                playerId: playerId,
+                currencyId: currencyId,
+                amount: amount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String playerId,
+                required String currencyId,
+                Value<int> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CurrenciesCompanion.insert(
+                playerId: playerId,
+                currencyId: currencyId,
+                amount: amount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CurrenciesTable, Currency>(table),
+                  $$CurrenciesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({playerId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (playerId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.playerId,
+                        referencedTable: $$CurrenciesTableReferences
+                            ._playerIdTable(db),
+                        referencedColumn: $$CurrenciesTableReferences
+                            ._playerIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CurrenciesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CurrenciesTable,
+      Currency,
+      $$CurrenciesTableFilterComposer,
+      $$CurrenciesTableOrderingComposer,
+      $$CurrenciesTableAnnotationComposer,
+      $$CurrenciesTableCreateCompanionBuilder,
+      $$CurrenciesTableUpdateCompanionBuilder,
+      (Currency, $$CurrenciesTableReferences),
+      Currency,
+      PrefetchHooks Function({bool playerId})
+    >;
+typedef $$PeriodicQuestStatesTableCreateCompanionBuilder =
+    PeriodicQuestStatesCompanion Function({
+      required String playerId,
+      required String questId,
+      required String periodKey,
+      required int completedAtMs,
+      Value<int> rowid,
+    });
+typedef $$PeriodicQuestStatesTableUpdateCompanionBuilder =
+    PeriodicQuestStatesCompanion Function({
+      Value<String> playerId,
+      Value<String> questId,
+      Value<String> periodKey,
+      Value<int> completedAtMs,
+      Value<int> rowid,
+    });
+
+final class $$PeriodicQuestStatesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $PeriodicQuestStatesTable,
+          PeriodicQuestState
+        > {
+  $$PeriodicQuestStatesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('periodic_quest_states__player_id__players__id');
+
+  $$PlayersTableProcessedTableManager get playerId {
+    final $_column = $_itemColumn<String>('player_id')!;
+
+    final manager = $$PlayersTableTableManager(
+      $_db,
+      $_db.players,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PeriodicQuestStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $PeriodicQuestStatesTable> {
+  $$PeriodicQuestStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get questId => $composableBuilder(
+    column: $table.questId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get completedAtMs => $composableBuilder(
+    column: $table.completedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PlayersTableFilterComposer get playerId {
+    final $$PlayersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableFilterComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PeriodicQuestStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PeriodicQuestStatesTable> {
+  $$PeriodicQuestStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get questId => $composableBuilder(
+    column: $table.questId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get completedAtMs => $composableBuilder(
+    column: $table.completedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PlayersTableOrderingComposer get playerId {
+    final $$PlayersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableOrderingComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PeriodicQuestStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PeriodicQuestStatesTable> {
+  $$PeriodicQuestStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get questId =>
+      $composableBuilder(column: $table.questId, builder: (column) => column);
+
+  GeneratedColumn<String> get periodKey =>
+      $composableBuilder(column: $table.periodKey, builder: (column) => column);
+
+  GeneratedColumn<int> get completedAtMs => $composableBuilder(
+    column: $table.completedAtMs,
+    builder: (column) => column,
+  );
+
+  $$PlayersTableAnnotationComposer get playerId {
+    final $$PlayersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PeriodicQuestStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PeriodicQuestStatesTable,
+          PeriodicQuestState,
+          $$PeriodicQuestStatesTableFilterComposer,
+          $$PeriodicQuestStatesTableOrderingComposer,
+          $$PeriodicQuestStatesTableAnnotationComposer,
+          $$PeriodicQuestStatesTableCreateCompanionBuilder,
+          $$PeriodicQuestStatesTableUpdateCompanionBuilder,
+          (PeriodicQuestState, $$PeriodicQuestStatesTableReferences),
+          PeriodicQuestState,
+          PrefetchHooks Function({bool playerId})
+        > {
+  $$PeriodicQuestStatesTableTableManager(
+    _$AppDatabase db,
+    $PeriodicQuestStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PeriodicQuestStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PeriodicQuestStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PeriodicQuestStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> playerId = const Value.absent(),
+                Value<String> questId = const Value.absent(),
+                Value<String> periodKey = const Value.absent(),
+                Value<int> completedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PeriodicQuestStatesCompanion(
+                playerId: playerId,
+                questId: questId,
+                periodKey: periodKey,
+                completedAtMs: completedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String playerId,
+                required String questId,
+                required String periodKey,
+                required int completedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => PeriodicQuestStatesCompanion.insert(
+                playerId: playerId,
+                questId: questId,
+                periodKey: periodKey,
+                completedAtMs: completedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PeriodicQuestStatesTable, PeriodicQuestState>(
+                    table,
+                  ),
+                  $$PeriodicQuestStatesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({playerId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (playerId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.playerId,
+                        referencedTable: $$PeriodicQuestStatesTableReferences
+                            ._playerIdTable(db),
+                        referencedColumn: $$PeriodicQuestStatesTableReferences
+                            ._playerIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PeriodicQuestStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PeriodicQuestStatesTable,
+      PeriodicQuestState,
+      $$PeriodicQuestStatesTableFilterComposer,
+      $$PeriodicQuestStatesTableOrderingComposer,
+      $$PeriodicQuestStatesTableAnnotationComposer,
+      $$PeriodicQuestStatesTableCreateCompanionBuilder,
+      $$PeriodicQuestStatesTableUpdateCompanionBuilder,
+      (PeriodicQuestState, $$PeriodicQuestStatesTableReferences),
+      PeriodicQuestState,
+      PrefetchHooks Function({bool playerId})
+    >;
+typedef $$EventShopPurchasesTableCreateCompanionBuilder =
+    EventShopPurchasesCompanion Function({
+      required String playerId,
+      required String entryId,
+      required String periodKey,
+      Value<int> purchasedCount,
+      Value<int> rowid,
+    });
+typedef $$EventShopPurchasesTableUpdateCompanionBuilder =
+    EventShopPurchasesCompanion Function({
+      Value<String> playerId,
+      Value<String> entryId,
+      Value<String> periodKey,
+      Value<int> purchasedCount,
+      Value<int> rowid,
+    });
+
+final class $$EventShopPurchasesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $EventShopPurchasesTable,
+          EventShopPurchase
+        > {
+  $$EventShopPurchasesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('event_shop_purchases__player_id__players__id');
+
+  $$PlayersTableProcessedTableManager get playerId {
+    final $_column = $_itemColumn<String>('player_id')!;
+
+    final manager = $$PlayersTableTableManager(
+      $_db,
+      $_db.players,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$EventShopPurchasesTableFilterComposer
+    extends Composer<_$AppDatabase, $EventShopPurchasesTable> {
+  $$EventShopPurchasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get purchasedCount => $composableBuilder(
+    column: $table.purchasedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PlayersTableFilterComposer get playerId {
+    final $$PlayersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableFilterComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EventShopPurchasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $EventShopPurchasesTable> {
+  $$EventShopPurchasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get purchasedCount => $composableBuilder(
+    column: $table.purchasedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PlayersTableOrderingComposer get playerId {
+    final $$PlayersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableOrderingComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EventShopPurchasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EventShopPurchasesTable> {
+  $$EventShopPurchasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get entryId =>
+      $composableBuilder(column: $table.entryId, builder: (column) => column);
+
+  GeneratedColumn<String> get periodKey =>
+      $composableBuilder(column: $table.periodKey, builder: (column) => column);
+
+  GeneratedColumn<int> get purchasedCount => $composableBuilder(
+    column: $table.purchasedCount,
+    builder: (column) => column,
+  );
+
+  $$PlayersTableAnnotationComposer get playerId {
+    final $$PlayersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EventShopPurchasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EventShopPurchasesTable,
+          EventShopPurchase,
+          $$EventShopPurchasesTableFilterComposer,
+          $$EventShopPurchasesTableOrderingComposer,
+          $$EventShopPurchasesTableAnnotationComposer,
+          $$EventShopPurchasesTableCreateCompanionBuilder,
+          $$EventShopPurchasesTableUpdateCompanionBuilder,
+          (EventShopPurchase, $$EventShopPurchasesTableReferences),
+          EventShopPurchase,
+          PrefetchHooks Function({bool playerId})
+        > {
+  $$EventShopPurchasesTableTableManager(
+    _$AppDatabase db,
+    $EventShopPurchasesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EventShopPurchasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EventShopPurchasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EventShopPurchasesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> playerId = const Value.absent(),
+                Value<String> entryId = const Value.absent(),
+                Value<String> periodKey = const Value.absent(),
+                Value<int> purchasedCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EventShopPurchasesCompanion(
+                playerId: playerId,
+                entryId: entryId,
+                periodKey: periodKey,
+                purchasedCount: purchasedCount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String playerId,
+                required String entryId,
+                required String periodKey,
+                Value<int> purchasedCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EventShopPurchasesCompanion.insert(
+                playerId: playerId,
+                entryId: entryId,
+                periodKey: periodKey,
+                purchasedCount: purchasedCount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$EventShopPurchasesTable, EventShopPurchase>(
+                    table,
+                  ),
+                  $$EventShopPurchasesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({playerId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (playerId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.playerId,
+                        referencedTable: $$EventShopPurchasesTableReferences
+                            ._playerIdTable(db),
+                        referencedColumn: $$EventShopPurchasesTableReferences
+                            ._playerIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$EventShopPurchasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EventShopPurchasesTable,
+      EventShopPurchase,
+      $$EventShopPurchasesTableFilterComposer,
+      $$EventShopPurchasesTableOrderingComposer,
+      $$EventShopPurchasesTableAnnotationComposer,
+      $$EventShopPurchasesTableCreateCompanionBuilder,
+      $$EventShopPurchasesTableUpdateCompanionBuilder,
+      (EventShopPurchase, $$EventShopPurchasesTableReferences),
+      EventShopPurchase,
+      PrefetchHooks Function({bool playerId})
+    >;
+typedef $$CloudSyncStatesTableCreateCompanionBuilder =
+    CloudSyncStatesCompanion Function({
+      required String playerId,
+      required String deviceId,
+      Value<int> lastSyncedRevision,
+      Value<String?> lastSyncedBlobSha256,
+      Value<int?> lastSyncAtMs,
+      Value<String?> lastRejectCode,
+      Value<int?> lastRejectAtMs,
+      Value<int?> serverOffsetMs,
+      Value<int?> serverOffsetAtMs,
+      Value<int> rowid,
+    });
+typedef $$CloudSyncStatesTableUpdateCompanionBuilder =
+    CloudSyncStatesCompanion Function({
+      Value<String> playerId,
+      Value<String> deviceId,
+      Value<int> lastSyncedRevision,
+      Value<String?> lastSyncedBlobSha256,
+      Value<int?> lastSyncAtMs,
+      Value<String?> lastRejectCode,
+      Value<int?> lastRejectAtMs,
+      Value<int?> serverOffsetMs,
+      Value<int?> serverOffsetAtMs,
+      Value<int> rowid,
+    });
+
+class $$CloudSyncStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $CloudSyncStatesTable> {
+  $$CloudSyncStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get playerId => $composableBuilder(
+    column: $table.playerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastSyncedRevision => $composableBuilder(
+    column: $table.lastSyncedRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastSyncedBlobSha256 => $composableBuilder(
+    column: $table.lastSyncedBlobSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastSyncAtMs => $composableBuilder(
+    column: $table.lastSyncAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastRejectCode => $composableBuilder(
+    column: $table.lastRejectCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastRejectAtMs => $composableBuilder(
+    column: $table.lastRejectAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverOffsetMs => $composableBuilder(
+    column: $table.serverOffsetMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverOffsetAtMs => $composableBuilder(
+    column: $table.serverOffsetAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CloudSyncStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CloudSyncStatesTable> {
+  $$CloudSyncStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get playerId => $composableBuilder(
+    column: $table.playerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastSyncedRevision => $composableBuilder(
+    column: $table.lastSyncedRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastSyncedBlobSha256 => $composableBuilder(
+    column: $table.lastSyncedBlobSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastSyncAtMs => $composableBuilder(
+    column: $table.lastSyncAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastRejectCode => $composableBuilder(
+    column: $table.lastRejectCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastRejectAtMs => $composableBuilder(
+    column: $table.lastRejectAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverOffsetMs => $composableBuilder(
+    column: $table.serverOffsetMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverOffsetAtMs => $composableBuilder(
+    column: $table.serverOffsetAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CloudSyncStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CloudSyncStatesTable> {
+  $$CloudSyncStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get playerId =>
+      $composableBuilder(column: $table.playerId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<int> get lastSyncedRevision => $composableBuilder(
+    column: $table.lastSyncedRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastSyncedBlobSha256 => $composableBuilder(
+    column: $table.lastSyncedBlobSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastSyncAtMs => $composableBuilder(
+    column: $table.lastSyncAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastRejectCode => $composableBuilder(
+    column: $table.lastRejectCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastRejectAtMs => $composableBuilder(
+    column: $table.lastRejectAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverOffsetMs => $composableBuilder(
+    column: $table.serverOffsetMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverOffsetAtMs => $composableBuilder(
+    column: $table.serverOffsetAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$CloudSyncStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CloudSyncStatesTable,
+          CloudSyncState,
+          $$CloudSyncStatesTableFilterComposer,
+          $$CloudSyncStatesTableOrderingComposer,
+          $$CloudSyncStatesTableAnnotationComposer,
+          $$CloudSyncStatesTableCreateCompanionBuilder,
+          $$CloudSyncStatesTableUpdateCompanionBuilder,
+          (
+            CloudSyncState,
+            BaseReferences<
+              _$AppDatabase,
+              $CloudSyncStatesTable,
+              CloudSyncState
+            >,
+          ),
+          CloudSyncState,
+          PrefetchHooks Function()
+        > {
+  $$CloudSyncStatesTableTableManager(
+    _$AppDatabase db,
+    $CloudSyncStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CloudSyncStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CloudSyncStatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CloudSyncStatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> playerId = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> lastSyncedRevision = const Value.absent(),
+                Value<String?> lastSyncedBlobSha256 = const Value.absent(),
+                Value<int?> lastSyncAtMs = const Value.absent(),
+                Value<String?> lastRejectCode = const Value.absent(),
+                Value<int?> lastRejectAtMs = const Value.absent(),
+                Value<int?> serverOffsetMs = const Value.absent(),
+                Value<int?> serverOffsetAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CloudSyncStatesCompanion(
+                playerId: playerId,
+                deviceId: deviceId,
+                lastSyncedRevision: lastSyncedRevision,
+                lastSyncedBlobSha256: lastSyncedBlobSha256,
+                lastSyncAtMs: lastSyncAtMs,
+                lastRejectCode: lastRejectCode,
+                lastRejectAtMs: lastRejectAtMs,
+                serverOffsetMs: serverOffsetMs,
+                serverOffsetAtMs: serverOffsetAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String playerId,
+                required String deviceId,
+                Value<int> lastSyncedRevision = const Value.absent(),
+                Value<String?> lastSyncedBlobSha256 = const Value.absent(),
+                Value<int?> lastSyncAtMs = const Value.absent(),
+                Value<String?> lastRejectCode = const Value.absent(),
+                Value<int?> lastRejectAtMs = const Value.absent(),
+                Value<int?> serverOffsetMs = const Value.absent(),
+                Value<int?> serverOffsetAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CloudSyncStatesCompanion.insert(
+                playerId: playerId,
+                deviceId: deviceId,
+                lastSyncedRevision: lastSyncedRevision,
+                lastSyncedBlobSha256: lastSyncedBlobSha256,
+                lastSyncAtMs: lastSyncAtMs,
+                lastRejectCode: lastRejectCode,
+                lastRejectAtMs: lastRejectAtMs,
+                serverOffsetMs: serverOffsetMs,
+                serverOffsetAtMs: serverOffsetAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CloudSyncStatesTable, CloudSyncState>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CloudSyncStatesTable,
+                    CloudSyncState
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CloudSyncStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CloudSyncStatesTable,
+      CloudSyncState,
+      $$CloudSyncStatesTableFilterComposer,
+      $$CloudSyncStatesTableOrderingComposer,
+      $$CloudSyncStatesTableAnnotationComposer,
+      $$CloudSyncStatesTableCreateCompanionBuilder,
+      $$CloudSyncStatesTableUpdateCompanionBuilder,
+      (
+        CloudSyncState,
+        BaseReferences<_$AppDatabase, $CloudSyncStatesTable, CloudSyncState>,
+      ),
+      CloudSyncState,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalSaveBackupsTableCreateCompanionBuilder =
+    LocalSaveBackupsCompanion Function({
+      Value<int> id,
+      required int createdAtMs,
+      required String reason,
+      required int schemaVersion,
+      required String blobSha256,
+      required Uint8List payload,
+    });
+typedef $$LocalSaveBackupsTableUpdateCompanionBuilder =
+    LocalSaveBackupsCompanion Function({
+      Value<int> id,
+      Value<int> createdAtMs,
+      Value<String> reason,
+      Value<int> schemaVersion,
+      Value<String> blobSha256,
+      Value<Uint8List> payload,
+    });
+
+class $$LocalSaveBackupsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalSaveBackupsTable> {
+  $$LocalSaveBackupsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtMs => $composableBuilder(
+    column: $table.createdAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get schemaVersion => $composableBuilder(
+    column: $table.schemaVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get blobSha256 => $composableBuilder(
+    column: $table.blobSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalSaveBackupsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalSaveBackupsTable> {
+  $$LocalSaveBackupsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtMs => $composableBuilder(
+    column: $table.createdAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get schemaVersion => $composableBuilder(
+    column: $table.schemaVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get blobSha256 => $composableBuilder(
+    column: $table.blobSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalSaveBackupsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalSaveBackupsTable> {
+  $$LocalSaveBackupsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAtMs => $composableBuilder(
+    column: $table.createdAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<int> get schemaVersion => $composableBuilder(
+    column: $table.schemaVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get blobSha256 => $composableBuilder(
+    column: $table.blobSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+}
+
+class $$LocalSaveBackupsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalSaveBackupsTable,
+          LocalSaveBackup,
+          $$LocalSaveBackupsTableFilterComposer,
+          $$LocalSaveBackupsTableOrderingComposer,
+          $$LocalSaveBackupsTableAnnotationComposer,
+          $$LocalSaveBackupsTableCreateCompanionBuilder,
+          $$LocalSaveBackupsTableUpdateCompanionBuilder,
+          (
+            LocalSaveBackup,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalSaveBackupsTable,
+              LocalSaveBackup
+            >,
+          ),
+          LocalSaveBackup,
+          PrefetchHooks Function()
+        > {
+  $$LocalSaveBackupsTableTableManager(
+    _$AppDatabase db,
+    $LocalSaveBackupsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalSaveBackupsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalSaveBackupsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalSaveBackupsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> createdAtMs = const Value.absent(),
+                Value<String> reason = const Value.absent(),
+                Value<int> schemaVersion = const Value.absent(),
+                Value<String> blobSha256 = const Value.absent(),
+                Value<Uint8List> payload = const Value.absent(),
+              }) => LocalSaveBackupsCompanion(
+                id: id,
+                createdAtMs: createdAtMs,
+                reason: reason,
+                schemaVersion: schemaVersion,
+                blobSha256: blobSha256,
+                payload: payload,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int createdAtMs,
+                required String reason,
+                required int schemaVersion,
+                required String blobSha256,
+                required Uint8List payload,
+              }) => LocalSaveBackupsCompanion.insert(
+                id: id,
+                createdAtMs: createdAtMs,
+                reason: reason,
+                schemaVersion: schemaVersion,
+                blobSha256: blobSha256,
+                payload: payload,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LocalSaveBackupsTable, LocalSaveBackup>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $LocalSaveBackupsTable,
+                    LocalSaveBackup
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalSaveBackupsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalSaveBackupsTable,
+      LocalSaveBackup,
+      $$LocalSaveBackupsTableFilterComposer,
+      $$LocalSaveBackupsTableOrderingComposer,
+      $$LocalSaveBackupsTableAnnotationComposer,
+      $$LocalSaveBackupsTableCreateCompanionBuilder,
+      $$LocalSaveBackupsTableUpdateCompanionBuilder,
+      (
+        LocalSaveBackup,
+        BaseReferences<_$AppDatabase, $LocalSaveBackupsTable, LocalSaveBackup>,
+      ),
+      LocalSaveBackup,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8606,4 +13071,16 @@ class $AppDatabaseManager {
       $$ClaimedRewardsTableTableManager(_db, _db.claimedRewards);
   $$ShopPurchasesTableTableManager get shopPurchases =>
       $$ShopPurchasesTableTableManager(_db, _db.shopPurchases);
+  $$ClockStatesTableTableManager get clockStates =>
+      $$ClockStatesTableTableManager(_db, _db.clockStates);
+  $$CurrenciesTableTableManager get currencies =>
+      $$CurrenciesTableTableManager(_db, _db.currencies);
+  $$PeriodicQuestStatesTableTableManager get periodicQuestStates =>
+      $$PeriodicQuestStatesTableTableManager(_db, _db.periodicQuestStates);
+  $$EventShopPurchasesTableTableManager get eventShopPurchases =>
+      $$EventShopPurchasesTableTableManager(_db, _db.eventShopPurchases);
+  $$CloudSyncStatesTableTableManager get cloudSyncStates =>
+      $$CloudSyncStatesTableTableManager(_db, _db.cloudSyncStates);
+  $$LocalSaveBackupsTableTableManager get localSaveBackups =>
+      $$LocalSaveBackupsTableTableManager(_db, _db.localSaveBackups);
 }

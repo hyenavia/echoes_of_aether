@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../entities/combat_stats.dart';
 import '../entities/equipment.dart';
+import '../entities/equipment_config.dart';
 import '../entities/skill_definition.dart';
 import '../entities/specialization.dart';
 
@@ -60,9 +61,13 @@ class StatBounds {
 /// - Perhitungan bersifat murni (stateless): tidak menyimpan akumulasi hasil
 ///   sebelumnya sehingga pemanggilan berulang selalu identik.
 class DerivedStatsCalculator {
-  const DerivedStatsCalculator({this.bounds = const StatBounds()});
+  const DerivedStatsCalculator({
+    this.bounds = const StatBounds(),
+    this.pctCaps = const EquipmentPctCaps(),
+  });
 
   final StatBounds bounds;
+  final EquipmentPctCaps pctCaps;
 
   CombatStats calculate({
     required CombatStats baseStats,
@@ -83,9 +88,24 @@ class DerivedStatsCalculator {
       totalBonus = totalBonus + specialization.bonus;
     }
 
-    final rawMaxHp = baseStats.maxHp + totalBonus.hp.round();
-    final rawAtk = baseStats.atk + totalBonus.atk.round();
-    final rawDef = baseStats.def + totalBonus.def.round();
+    final rawMaxHp = _applyPct(
+      baseStats.maxHp,
+      totalBonus.hp,
+      totalBonus.hpPct,
+      pctCaps.hpPct,
+    );
+    final rawAtk = _applyPct(
+      baseStats.atk,
+      totalBonus.atk,
+      totalBonus.atkPct,
+      pctCaps.atkPct,
+    );
+    final rawDef = _applyPct(
+      baseStats.def,
+      totalBonus.def,
+      totalBonus.defPct,
+      pctCaps.defPct,
+    );
     final baseRange = specialization?.attackRange ?? baseStats.attackRange;
 
     return clamp(
@@ -136,6 +156,15 @@ class DerivedStatsCalculator {
         bounds.maxSkillHaste,
       ),
     );
+  }
+
+  int _applyPct(int base, double flatBonus, double rawPct, double cap) {
+    final flatTotal = base + flatBonus.round();
+    if (rawPct.isNaN || rawPct <= 0.0) return flatTotal;
+    final safeCap = (cap.isNaN || cap.isInfinite || cap < 0.0) ? 0.0 : cap;
+    final cappedPct = math.min(rawPct, safeCap);
+    if (cappedPct <= 0.0) return flatTotal;
+    return (flatTotal * (1.0 + cappedPct)).round();
   }
 
   double _clampDouble(double value, double min, double max) {
