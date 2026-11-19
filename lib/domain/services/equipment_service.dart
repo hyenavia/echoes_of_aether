@@ -39,4 +39,23 @@ class EquipmentService {
     inventory.addEquipment(removed);
     return true;
   }
+
+  /// Mengubah status favorit (favorite / unfavorite) pada equipment di tas atau loadout.
+  /// Mengembalikan `true` jika status berhasil diubah.
+  bool toggleFavorite(String instanceId) {
+    final inBag = inventory.equipmentById(instanceId);
+    if (inBag != null) {
+      final updated = inBag.copyWith(isFavorite: !inBag.isFavorite);
+      return inventory.updateEquipment(updated);
+    }
+    for (final entry in loadout.equipped.entries) {
+      if (entry.value.id == instanceId) {
+        final updated = entry.value.copyWith(
+          isFavorite: !entry.value.isFavorite,
+        );
+        return loadout.updateEquipment(updated);
+      }
+    }
+    return false;
+  }
 }

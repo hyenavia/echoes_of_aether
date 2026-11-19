@@ -67,6 +67,8 @@ class ItemConfigParser {
       'weapon_type',
       'stats',
       'fixed_stats',
+      'signature_class_id',
+      'resonance_description',
     });
 
     final slot = _slot(_r.string(data, w, 'slot'), w);
@@ -82,11 +84,19 @@ class ItemConfigParser {
     final sw = '$w.stats';
     final stats = StatBonusParser.parse(_r, _r.asMap(data['stats'], sw), sw);
     final fixedStats = _r.boolean(data, w, 'fixed_stats', fallback: false);
+    final signatureClassId = data['signature_class_id'] == null
+        ? null
+        : _r.string(data, w, 'signature_class_id');
+    final resonanceDescription = data['resonance_description'] == null
+        ? null
+        : _r.string(data, w, 'resonance_description');
     return EquipmentData(
       slot: slot,
       baseStats: stats,
       weaponType: weaponType,
       fixedStats: fixedStats,
+      signatureClassId: signatureClassId,
+      resonanceDescription: resonanceDescription,
     );
   }
 
@@ -118,9 +128,10 @@ class ItemConfigParser {
     'rare' => ItemRarity.rare,
     'epic' => ItemRarity.epic,
     'legendary' => ItemRarity.legendary,
+    'mythical' => ItemRarity.mythical,
     _ => throw ConfigException(
       'items.json: $where."rarity" tidak dikenal: "$raw" '
-      '(pilihan: common, uncommon, rare, epic, legendary).',
+      '(pilihan: common, uncommon, rare, epic, legendary, mythical).',
     ),
   };
 }

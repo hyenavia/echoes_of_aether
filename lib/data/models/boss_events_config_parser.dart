@@ -26,7 +26,13 @@ class BossEventsConfigParser {
     'sprite_tint',
     'base_stats',
   };
-  static const Set<String> _statsKeys = {'hp', 'atk', 'def'};
+  static const Set<String> _statsKeys = {
+    'hp',
+    'atk',
+    'def',
+    'lifesteal',
+    'spell_vamp',
+  };
 
   BossEventsConfig parse(String source) {
     final root = _r.decodeRoot(source);
@@ -138,13 +144,35 @@ class BossEventsConfigParser {
     final hp = _r.integer(statsMap, '$where.base_stats', 'hp', min: 1);
     final atk = _r.integer(statsMap, '$where.base_stats', 'atk', min: 0);
     final def = _r.integer(statsMap, '$where.base_stats', 'def', min: 0);
+    final lifesteal = _r.number(
+      statsMap,
+      '$where.base_stats',
+      'lifesteal',
+      min: 0,
+      max: 1.0,
+      fallback: 0.0,
+    );
+    final spellVamp = _r.number(
+      statsMap,
+      '$where.base_stats',
+      'spell_vamp',
+      min: 0,
+      max: 1.0,
+      fallback: 0.0,
+    );
 
     return BossEvent(
       id: id,
       name: name,
       spriteRef: spriteRef,
       spriteTint: spriteTint,
-      baseStats: BossBaseStats(hp: hp, atk: atk, def: def),
+      baseStats: BossBaseStats(
+        hp: hp,
+        atk: atk,
+        def: def,
+        lifesteal: lifesteal,
+        spellVamp: spellVamp,
+      ),
     );
   }
 }

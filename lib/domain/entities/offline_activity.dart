@@ -50,6 +50,10 @@ class OfflineSummarySnapshot {
     this.overflowStacks = const {},
     this.addedEquipmentCount = 0,
     this.droppedEquipmentCount = 0,
+    this.autoSoldEquipmentCount = 0,
+    this.autoSoldEquipmentGold = 0,
+    this.autoSalvagedEquipmentCount = 0,
+    this.autoSalvagedScrapCount = 0,
     this.acknowledged = false,
     this.generatedAtMs = 0,
     this.cycleRank = 0,
@@ -73,6 +77,10 @@ class OfflineSummarySnapshot {
   final Map<String, int> overflowStacks;
   final int addedEquipmentCount;
   final int droppedEquipmentCount;
+  final int autoSoldEquipmentCount;
+  final int autoSoldEquipmentGold;
+  final int autoSalvagedEquipmentCount;
+  final int autoSalvagedScrapCount;
   final bool acknowledged;
   final int generatedAtMs;
   final int cycleRank;
@@ -82,7 +90,9 @@ class OfflineSummarySnapshot {
       expGained > 0 ||
       goldGained > 0 ||
       addedStacks.isNotEmpty ||
-      addedEquipmentCount > 0;
+      addedEquipmentCount > 0 ||
+      autoSoldEquipmentCount > 0 ||
+      autoSalvagedEquipmentCount > 0;
 
   OfflineSummarySnapshot markAcknowledged() => OfflineSummarySnapshot(
     eventId: eventId,
@@ -102,6 +112,10 @@ class OfflineSummarySnapshot {
     overflowStacks: overflowStacks,
     addedEquipmentCount: addedEquipmentCount,
     droppedEquipmentCount: droppedEquipmentCount,
+    autoSoldEquipmentCount: autoSoldEquipmentCount,
+    autoSoldEquipmentGold: autoSoldEquipmentGold,
+    autoSalvagedEquipmentCount: autoSalvagedEquipmentCount,
+    autoSalvagedScrapCount: autoSalvagedScrapCount,
     acknowledged: true,
     generatedAtMs: generatedAtMs,
     cycleRank: cycleRank,

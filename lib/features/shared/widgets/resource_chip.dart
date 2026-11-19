@@ -13,6 +13,7 @@ class ResourceChip extends StatelessWidget {
     required this.label,
     required this.value,
     this.icon,
+    this.spritePath,
     this.kind = ResourceChipKind.neutral,
     this.accentColor,
   });
@@ -22,6 +23,7 @@ class ResourceChip extends StatelessWidget {
     label: 'Gold',
     value: NumberFormatter.format(amount),
     icon: Icons.monetization_on_outlined,
+    spritePath: 'assets/sprite/fc131.png',
     kind: ResourceChipKind.gold,
   );
 
@@ -38,12 +40,14 @@ class ResourceChip extends StatelessWidget {
     label: 'Aether Shard:',
     value: NumberFormatter.format(amount),
     icon: Icons.diamond_outlined,
+    spritePath: 'assets/sprite/fc255.png',
     kind: ResourceChipKind.neutral,
   );
 
   final String label;
   final String value;
   final IconData? icon;
+  final String? spritePath;
   final ResourceChipKind kind;
   final Color? accentColor;
 
@@ -71,7 +75,17 @@ class ResourceChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[
+          if (spritePath != null) ...[
+            Image.asset(
+              spritePath!,
+              width: 16,
+              height: 16,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.none,
+              errorBuilder: (_, _, _) => Icon(icon, size: 15, color: color),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ] else if (icon != null) ...[
             Icon(icon, size: 15, color: color),
             const SizedBox(width: AppSpacing.xs),
           ],

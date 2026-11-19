@@ -300,6 +300,12 @@ class ShopService {
     if (instance == null) {
       return ShopSellNotFound(targetId: instanceId);
     }
+    if (instance.isFavorite) {
+      return ShopSellNotSellable(
+        targetId: instanceId,
+        reason: 'Equipment favorit tidak dapat dijual.',
+      );
+    }
 
     final itemDef = items[instance.definitionId];
     if (itemDef == null) {
@@ -510,6 +516,12 @@ class ShopService {
       final instance = inventory.equipmentById(instanceId);
       if (instance == null) {
         return ShopSellNotFound(targetId: instanceId);
+      }
+      if (instance.isFavorite) {
+        return ShopSellNotSellable(
+          targetId: instanceId,
+          reason: 'Equipment favorit tidak dapat dijual.',
+        );
       }
       final itemDef = items[instance.definitionId];
       if (itemDef == null) {

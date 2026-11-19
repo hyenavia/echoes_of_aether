@@ -212,6 +212,12 @@ Future<void> _seedLegacyDatabase(File dbFile, int version) async {
         raw.execute(
           "INSERT INTO game_sessions VALUES ('default_player', 'default_player', 1700000000000, 1700000000000, 1700000000000, 1, '{}');",
         );
+        raw.execute(
+          "INSERT INTO equipment_instances VALUES ('default_player', 'sword_legacy', 'rusty_sword', 'weapon', 'rare', '{\"atk\": 15}', 0);",
+        );
+        raw.execute(
+          "INSERT INTO equipped_items VALUES ('default_player', 'weapon', 'sword_legacy');",
+        );
       }
 
       if (version >= 3) {
@@ -290,6 +296,34 @@ Future<void> _seedLegacyDatabase(File dbFile, int version) async {
         );
         raw.execute(
           "INSERT INTO event_shop_purchases VALUES ('default_player', 'evt_dawn_blade', '2026-W14', 1);",
+        );
+      }
+
+      if (version >= 8) {
+        raw.execute(
+          'CREATE TABLE cloud_sync_states ('
+          'player_id TEXT NOT NULL PRIMARY KEY, '
+          'device_id TEXT NOT NULL, '
+          'last_synced_revision INTEGER NOT NULL DEFAULT 0, '
+          'last_synced_blob_sha256 TEXT NULL, '
+          'last_sync_at_ms INTEGER NULL, '
+          'last_reject_code TEXT NULL, '
+          'last_reject_at_ms INTEGER NULL, '
+          'server_offset_ms INTEGER NULL, '
+          'server_offset_at_ms INTEGER NULL, '
+          'CHECK (last_synced_revision >= 0));',
+        );
+        raw.execute(
+          'CREATE TABLE local_save_backups ('
+          'id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, '
+          'created_at_ms INTEGER NOT NULL, '
+          'reason TEXT NOT NULL, '
+          'schema_version INTEGER NOT NULL, '
+          'blob_sha256 TEXT NOT NULL, '
+          'blob BLOB NOT NULL);',
+        );
+        raw.execute(
+          "INSERT INTO cloud_sync_states VALUES ('default_player', 'dev_seed', 2, 'hash_seed', 1700000008000, NULL, NULL, NULL, NULL);",
         );
       }
 
@@ -681,12 +715,12 @@ void main() {
       expect(restored.character.progress.gold, 500);
     });
 
-    test('instalasi baru membuat schemaVersion 8 dengan CloudSyncStates dan LocalSaveBackups', () async {
+    test('instalasi baru membuat schemaVersion 9 dengan CloudSyncStates, LocalSaveBackups, dan kolom isFavorite', () async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
       await db.initialize();
 
-      expect(db.schemaVersion, 8);
+      expect(db.schemaVersion, 10);
       final tables = await db
           .customSelect("SELECT name FROM sqlite_master WHERE type = 'table'")
           .get();
@@ -694,11 +728,16 @@ void main() {
         tables.map((r) => r.read<String>('name')),
         containsAll(['cloud_sync_states', 'local_save_backups']),
       );
+
+      final eqCols = await db
+          .customSelect("PRAGMA table_info('equipment_instances')")
+          .get();
+      expect(eqCols.map((r) => r.data['name']), contains('is_favorite'));
     });
 
-    for (final oldVersion in [1, 2, 3, 4, 5, 6, 7]) {
+    for (final oldVersion in [1, 2, 3, 4, 5, 6, 7, 8]) {
       test(
-        'migrasi v$oldVersion -> v8 mempertahankan data nyata dan membuat tabel CloudSyncStates & LocalSaveBackups',
+        'migrasi v$oldVersion -> v9 mempertahankan data nyata, menambah is_favorite default false, dan membuat tabel CloudSyncStates & LocalSaveBackups',
         () async {
           final tempDir = await Directory.systemTemp.createTemp(
             'eoa_m14_v${oldVersion}_test_',
@@ -715,12 +754,12 @@ void main() {
           addTearDown(migratedDb.close);
           await migratedDb.initialize();
 
-          expect(migratedDb.schemaVersion, 8);
+          expect(migratedDb.schemaVersion, 10);
 
           final versionRow = await migratedDb
               .customSelect('PRAGMA user_version')
               .getSingle();
-          expect(versionRow.read<int>('user_version'), 8);
+          expect(versionRow.read<int>('user_version'), 10);
 
           final repo = DriftPlayerSaveRepository(
             db: migratedDb,
@@ -735,6 +774,10 @@ void main() {
             expect(snap.character.progress.gold, 3200);
             expect(snap.inventory.stacks['slime_gel'], 14);
             expect(snap.dungeon.clearsCount, 2);
+            expect(
+              snap.character.equipped[EquipmentSlot.weapon]?.isFavorite,
+              isFalse,
+            );
           }
           if (oldVersion >= 6) {
             final snap = (await repo.loadSnapshot())!;
@@ -750,8 +793,13 @@ void main() {
           // Tabel v8 baru siap digunakan segera setelah migrasi.
           final syncStateRepo = DriftCloudSyncStateRepository(db: migratedDb);
           final state = await syncStateRepo.getOrCreateState();
-          expect(state.deviceId, isNotEmpty);
-          expect(state.lastSyncedRevision, 0);
+          if (oldVersion >= 8) {
+            expect(state.deviceId, 'dev_seed');
+            expect(state.lastSyncedRevision, 2);
+          } else {
+            expect(state.deviceId, isNotEmpty);
+            expect(state.lastSyncedRevision, 0);
+          }
 
           final backupSvc = LocalBackupService(
             db: migratedDb,
@@ -771,7 +819,7 @@ void main() {
             ),
             reason: 'post_migration_test',
           );
-          expect(backup.schemaVersion, 8);
+          expect(backup.schemaVersion, 10);
         },
       );
     }

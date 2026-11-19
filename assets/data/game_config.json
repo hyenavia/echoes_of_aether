@@ -37,12 +37,52 @@
     "cycle_level_step": 44,
     "stat_exponents": { "hp": 1.0, "atk": 1.0, "def": 0.9 },
     "cycle_stat_exponents": { "hp": 0.25, "atk": 0.22, "def": 0.20 },
+    "elite_hp_per_rank": 0.02,
+    "elite_atk_per_rank": 0.01,
+    "boss_hp_per_rank": 0.02,
+    "boss_atk_per_rank": 0.01,
     "reward_exponent": 0.85,
     "drop": {
       "rare_chance_per_rank": 0.1,
       "max_chance_multiplier": 3.0,
       "roll_bonus_per_rank": 0.02,
       "max_roll_bonus": 0.5
+    },
+    "mechanics": {
+      "min_ascension_rank": 1,
+      "stoneskin_damage_reduction": 0.15,
+      "stoneskin_hp_threshold": 0.50,
+      "berserk_hp_threshold": 0.25,
+      "berserk_atk_multiplier": 1.10,
+      "berserk_speed_multiplier": 1.10,
+      "elite_heavy_strike_cooldown_seconds": 6.0,
+      "elite_heavy_strike_multiplier": 1.20,
+      "boss_aoe_cooldown_seconds": 8.0,
+      "boss_aoe_radius": 2.5,
+      "boss_aoe_multiplier": 1.05,
+      "boss_summon_hp_threshold": 0.35,
+      "boss_summon_count": 1,
+      "daily_elemental_ward_reduction": 0.30,
+      "daily_elemental_ward_duration_seconds": 6.0,
+      "daily_elemental_ward_hp_threshold": 0.60,
+      "daily_blazing_surge_cooldown_seconds": 6.0,
+      "daily_blazing_surge_radius": 3.0,
+      "daily_blazing_surge_multiplier": 1.25,
+      "daily_enraged_rush_hp_threshold": 0.30,
+      "daily_enraged_rush_atk_multiplier": 1.20,
+      "daily_enraged_rush_speed_multiplier": 1.20,
+      "weekly_life_siphon_cooldown_seconds": 5.0,
+      "weekly_life_siphon_multiplier": 1.30,
+      "weekly_life_siphon_heal_ratio": 0.15,
+      "weekly_cataclysm_cooldown_seconds": 8.0,
+      "weekly_cataclysm_radius": 3.5,
+      "weekly_cataclysm_multiplier": 1.25,
+      "weekly_summon_hp_threshold": 0.50,
+      "weekly_summon_count": 2,
+      "weekly_final_stand_hp_threshold": 0.20,
+      "weekly_final_stand_atk_multiplier": 1.15,
+      "weekly_final_stand_speed_multiplier": 1.25,
+      "weekly_final_stand_damage_reduction": 0.10
     },
     "max_multiplier": 1000000000
   },
@@ -62,6 +102,30 @@
     "aether_shard": {
       "name": "Aether Shard",
       "max_amount": 1000000
+    },
+    "soul_prism": {
+      "name": "Soul Prism",
+      "max_amount": 9999
+    },
+    "altar_might": {
+      "name": "Blessing of Might",
+      "max_amount": 20
+    },
+    "altar_vitality": {
+      "name": "Blessing of Vitality",
+      "max_amount": 20
+    },
+    "altar_aegis": {
+      "name": "Blessing of Aegis",
+      "max_amount": 20
+    },
+    "altar_fortune": {
+      "name": "Blessing of Fortune",
+      "max_amount": 20
+    },
+    "bag_expansion": {
+      "name": "Bag Expansion",
+      "max_amount": 10
     }
   },
   "notifications": {

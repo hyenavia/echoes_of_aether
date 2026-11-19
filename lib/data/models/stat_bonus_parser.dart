@@ -20,6 +20,8 @@ class StatBonusParser {
     'move_speed',
     'attack_range',
     'skill_haste',
+    'lifesteal',
+    'spell_vamp',
   };
 
   /// Field tidak dikenal ditolak, dan minimal satu stat harus lebih dari 0.
@@ -45,6 +47,8 @@ class StatBonusParser {
       moveSpeed: stat('move_speed'),
       attackRange: stat('attack_range'),
       skillHaste: stat('skill_haste', max: EquipmentStats.maxSkillHaste),
+      lifesteal: stat('lifesteal', max: 1.0),
+      spellVamp: stat('spell_vamp', max: 1.0),
     );
     if (stats.isEmpty) {
       throw ConfigException(

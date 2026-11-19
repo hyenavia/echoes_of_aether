@@ -111,10 +111,12 @@ void main() {
       config: config.progression,
       specializationConfig: config.specializations,
       skillCatalog: config.skills,
-      progress: const PlayerProgress(level: 30, gold: 1000),
+      progress: const PlayerProgress(level: 30, gold: 100000),
       initialSpecializationId: 'vanguard',
     );
-    final inventory = Inventory(definitions: config.items);
+    final inventory = Inventory(definitions: config.items)
+      ..add('boss_remnant', 20)
+      ..add('aether_scrap', 200);
     final currencyService = CurrencyService(
       definitions: config.currencies,
       initialBalances: {kAetherShardCurrencyId: 300},
@@ -174,6 +176,7 @@ void main() {
       effectiveNowMs: week1MondayMs,
       inventory: inventory,
       currencyService: currencyService,
+      character: character,
       context: ctx,
       random: math.Random(7),
       purchaseCounts: counts,
@@ -209,7 +212,10 @@ void main() {
       nowMs: () => week1MondayMs,
     ).loadAndProcessOffline();
 
-    expect(reloaded.currencies[kAetherShardCurrencyId], 300 - legEntry.price);
+    expect(reloaded.currencies[kAetherShardCurrencyId], 300);
+    expect(reloaded.character.gold, 100000 - legEntry.goldPrice);
+    expect(reloaded.inventory.quantityOf('boss_remnant'), 14);
+    expect(reloaded.inventory.quantityOf('aether_scrap'), 125);
     expect(reloaded.eventShopPurchases, [purchaseRecord]);
     expect(reloaded.inventory.equipmentCount, 1);
     final eq = reloaded.inventory.equipmentById(

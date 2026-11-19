@@ -3,8 +3,8 @@ import 'equipment.dart';
 /// Kategori item (GDD bagian 7).
 enum ItemCategory { equipment, material, consumable, questItem }
 
-/// Rarity item (GDD 3.4).
-enum ItemRarity { common, uncommon, rare, epic, legendary }
+/// Rarity item (GDD 3.4 & M15 Gacha).
+enum ItemRarity { common, uncommon, rare, epic, legendary, mythical }
 
 /// Definisi statis satu jenis item (dari items.json).
 /// Material dan consumable disimpan sebagai stack di `Inventory`; equipment

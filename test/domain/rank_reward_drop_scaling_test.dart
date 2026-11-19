@@ -335,13 +335,22 @@ void _expectStatsEqual(EquipmentStats a, EquipmentStats b) {
   GameConfig config,
   DungeonDefinition dungeon,
   DifficultyProfile profile,
-  DifficultyService diffService,
-) {
+  DifficultyService diffService, {
+  int cycleRank = 0,
+}) {
   var exp = 0;
   var gold = 0;
   for (final roomId in dungeon.roomOrder) {
     final room = dungeon.rooms[roomId]!;
-    for (final spawn in room.spawns) {
+    final spawns = cycleRank > 0
+        ? DungeonManager.resolveRoomSpawns(
+            room: room,
+            cycleRank: cycleRank,
+            grid: room.createNavigationGrid(),
+            dungeon: dungeon,
+          )
+        : room.spawns;
+    for (final spawn in spawns) {
       final monster = config.monsters[spawn.monsterId]!;
       exp += diffService.scaleExp(monster.expReward, profile);
       gold += diffService.scaleGold(monster.goldReward, profile);
@@ -817,6 +826,7 @@ void main() {
           dungeon,
           profile,
           dService,
+          cycleRank: rank,
         );
 
         // 1) Jalur Headless Online (DungeonManager + CombatSimulation + EncounterTracker + Settlement).
@@ -1275,6 +1285,7 @@ void main() {
           forest,
           rank5ForestProfile,
           dService,
+          cycleRank: 5,
         );
         final forestCompletion =
             forest.completionReward ?? strongConfig.dungeonCompletion;
@@ -1416,6 +1427,7 @@ void main() {
           asc,
           rank5AscProfile,
           dService,
+          cycleRank: 5,
         );
         final expectedAscClearExp = dService.scaleExp(
           asc.completionReward!.expReward,

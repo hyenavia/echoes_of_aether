@@ -7,6 +7,8 @@ abstract interface class NotificationScheduler {
   Future<void> cancelAll();
 
   Future<bool> requestPermission();
+
+  Future<void> sendTestNotification();
 }
 
 /// Implementasi palsu deterministik untuk pengujian unit dan widget.
@@ -17,6 +19,7 @@ class FakeNotificationScheduler implements NotificationScheduler {
   int replaceAllCalls = 0;
   int cancelAllCalls = 0;
   int requestPermissionCalls = 0;
+  int sendTestNotificationCalls = 0;
   List<PlannedNotification> scheduled = const [];
 
   @override
@@ -35,5 +38,10 @@ class FakeNotificationScheduler implements NotificationScheduler {
   Future<bool> requestPermission() async {
     requestPermissionCalls++;
     return permissionGranted;
+  }
+
+  @override
+  Future<void> sendTestNotification() async {
+    sendTestNotificationCalls++;
   }
 }

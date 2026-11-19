@@ -45,7 +45,9 @@ class Inventory {
 
   final Map<String, ItemDefinition> _definitions;
   final int? maxStackSlots;
-  final int? maxEquipmentCapacity;
+
+  /// Kapasitas maksimum tas perlengkapan, dapat diperluas secara dinamis melalui upgrade.
+  int? maxEquipmentCapacity;
 
   final Map<String, int> _quantities = {};
   final Map<String, EquipmentInstance> _equipment = {};
@@ -140,6 +142,16 @@ class Inventory {
   /// Mengambil (menghapus) equipment dari tas; null jika id tidak ada.
   EquipmentInstance? takeEquipment(String instanceId) =>
       _equipment.remove(instanceId);
+
+  /// Memperbarui instance equipment yang sudah ada di inventory.
+  /// Mengembalikan `false` jika instance id tidak ditemukan di inventory.
+  bool updateEquipment(EquipmentInstance updated) {
+    if (!_equipment.containsKey(updated.id)) {
+      return false;
+    }
+    _equipment[updated.id] = updated;
+    return true;
+  }
 
   /// Menghapus equipment berdasarkan id; mengembalikan false jika tidak ditemukan.
   bool removeEquipment(String instanceId) =>

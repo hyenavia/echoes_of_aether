@@ -56,6 +56,11 @@ class TownTopBar extends StatelessWidget {
                   runSpacing: 2,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
+                    const AetherSymbolMark(
+                      variant: AetherSymbolVariant.mark,
+                      size: 14,
+                      glow: true,
+                    ),
                     Text(
                       '$specLabel • Lv ${NumberFormatter.format(level)}',
                       maxLines: 1,

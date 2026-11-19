@@ -385,5 +385,138 @@ void main() {
         expect(sim.isReviveAvailable, isFalse);
       },
     );
+
+    test('penskalaan pengawal dinamis di room Elite dan Boss pada Ascension Rank >= 1', () {
+      final dungeon = DungeonDefinition(
+        id: 'test_dungeon',
+        name: 'Test Dungeon',
+        biome: 'forest',
+        startRoomId: 'r_normal',
+        roomOrder: const ['r_normal', 'r_elite', 'r_boss'],
+        rooms: {
+          'r_normal': const RoomDefinition(
+            id: 'r_normal',
+            dungeonId: 'test_dungeon',
+            name: 'Normal Room',
+            type: RoomType.normal,
+            mapRef: 'map_normal',
+            layout: ['#######', '#.....#', '#.....#', '#.....#', '#######'],
+            entryPosition: GridPoint(1, 2),
+            exitPosition: GridPoint(5, 2),
+            spawns: [
+              RoomSpawnConfig(
+                id: 'sp_normal',
+                monsterId: 'slime_normal',
+                position: GridPoint(3, 2),
+              ),
+            ],
+            completionCondition: RoomCompletionCondition(
+              type: RoomCompletionConditionType.defeatRequiredEnemies,
+            ),
+          ),
+          'r_elite': const RoomDefinition(
+            id: 'r_elite',
+            dungeonId: 'test_dungeon',
+            name: 'Elite Room',
+            type: RoomType.elite,
+            mapRef: 'map_elite',
+            layout: ['#######', '#.....#', '#.....#', '#.....#', '#######'],
+            entryPosition: GridPoint(1, 2),
+            exitPosition: GridPoint(5, 2),
+            spawns: [
+              RoomSpawnConfig(
+                id: 'sp_elite',
+                monsterId: 'elite_goblin',
+                position: GridPoint(3, 2),
+                isElite: true,
+              ),
+            ],
+            completionCondition: RoomCompletionCondition(
+              type: RoomCompletionConditionType.defeatRequiredEnemies,
+            ),
+          ),
+          'r_boss': const RoomDefinition(
+            id: 'r_boss',
+            dungeonId: 'test_dungeon',
+            name: 'Boss Room',
+            type: RoomType.boss,
+            mapRef: 'map_boss',
+            layout: [
+              '#########',
+              '#.......#',
+              '#.......#',
+              '#.......#',
+              '#########',
+            ],
+            entryPosition: GridPoint(1, 2),
+            exitPosition: GridPoint(7, 2),
+            spawns: [
+              RoomSpawnConfig(
+                id: 'sp_boss',
+                monsterId: 'boss_dragon',
+                position: GridPoint(4, 2),
+                isBoss: true,
+              ),
+            ],
+            completionCondition: RoomCompletionCondition(
+              type: RoomCompletionConditionType.defeatRequiredEnemies,
+            ),
+          ),
+        },
+      );
+
+      // 1. Pada Rank 0: spawns persis sama dengan definisi asli (0 pengawal tambahan)
+      final mgrR0 = DungeonManager(dungeons: {'test_dungeon': dungeon});
+      mgrR0.startDungeon('test_dungeon', cycleRank: 0);
+      expect(mgrR0.preparedSpawns.length, 1);
+
+      mgrR0.loadRoom('r_elite');
+      expect(mgrR0.preparedSpawns.length, 1);
+      expect(mgrR0.preparedSpawns.first.id, 'sp_elite');
+
+      mgrR0.loadRoom('r_boss');
+      expect(mgrR0.preparedSpawns.length, 1);
+      expect(mgrR0.preparedSpawns.first.id, 'sp_boss');
+
+      // 2. Pada Rank 1: Elite room mendapat 1 guard, Boss room mendapat 1 guard
+      final mgrR1 = DungeonManager(dungeons: {'test_dungeon': dungeon});
+      mgrR1.startDungeon('test_dungeon', cycleRank: 1);
+      // Normal room tetap 1 spawn
+      expect(mgrR1.preparedSpawns.length, 1);
+
+      mgrR1.loadRoom('r_elite');
+      expect(mgrR1.preparedSpawns.length, 2); // 1 elite + 1 guard
+      expect(
+        mgrR1.preparedSpawns.any((s) => s.id.startsWith('guard_r_elite_')),
+        isTrue,
+      );
+      expect(
+        mgrR1.preparedSpawns.any((s) => s.monsterId == 'slime_normal'),
+        isTrue,
+      );
+
+      mgrR1.loadRoom('r_boss');
+      expect(mgrR1.preparedSpawns.length, 2); // 1 boss + 1 guard
+      expect(
+        mgrR1.preparedSpawns.any((s) => s.id.startsWith('guard_r_boss_')),
+        isTrue,
+      );
+
+      // 3. Pada Rank 5: Elite room mendapat 2 guard, Boss room mendapat 3 guard
+      final mgrR5 = DungeonManager(dungeons: {'test_dungeon': dungeon});
+      mgrR5.startDungeon('test_dungeon', cycleRank: 5);
+      mgrR5.loadRoom('r_elite');
+      expect(mgrR5.preparedSpawns.length, 3); // 1 elite + 2 guards
+
+      mgrR5.loadRoom('r_boss');
+      expect(mgrR5.preparedSpawns.length, 4); // 1 boss + 3 guards
+      final grid = mgrR5.activeGrid!;
+      for (final sp in mgrR5.preparedSpawns) {
+        expect(grid.inBounds(sp.position.x, sp.position.y), isTrue);
+        expect(grid.isWalkable(sp.position.x, sp.position.y), isTrue);
+        expect(sp.position != const GridPoint(1, 2), isTrue); // Not entry
+        expect(sp.position != const GridPoint(7, 2), isTrue); // Not exit
+      }
+    });
   });
 }

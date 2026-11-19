@@ -7,9 +7,9 @@ String _n(double value) {
   return r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(1);
 }
 
-/// Ringkasan bonus stat, misalnya "ATK +4.2, CRIT +2%".
-String describeEquipmentStats(EquipmentStats s) {
-  final parts = <String>[
+/// List baris bonus stat per elemen, misalnya ["ATK +4.2", "CRIT +2%"].
+List<String> equipmentStatLines(EquipmentStats s) {
+  return <String>[
     if (s.hp != 0) 'HP +${_n(s.hp)}',
     if (s.hpPct != 0) 'HP +${_n(s.hpPct * 100)}%',
     if (s.atk != 0) 'ATK +${_n(s.atk)}',
@@ -22,8 +22,14 @@ String describeEquipmentStats(EquipmentStats s) {
     if (s.moveSpeed != 0) 'SPD +${_n(s.moveSpeed)}',
     if (s.attackRange != 0) 'RANGE +${_n(s.attackRange)}',
     if (s.skillHaste != 0) 'HASTE +${_n(s.skillHaste * 100)}%',
+    if (s.lifesteal != 0) 'LIFESTEAL +${_n(s.lifesteal * 100)}%',
+    if (s.spellVamp != 0) 'SPELL VAMP +${_n(s.spellVamp * 100)}%',
   ];
-  return parts.join(', ');
+}
+
+/// Ringkasan bonus stat, misalnya "ATK +4.2, CRIT +2%".
+String describeEquipmentStats(EquipmentStats s) {
+  return equipmentStatLines(s).join(', ');
 }
 
 /// Ringkasan stat tempur akhir karakter.
@@ -99,6 +105,16 @@ List<EquipmentStatDelta> computeEquipmentStatDeltas(
     (
       label: 'HASTE',
       delta: (candidate.skillHaste - current.skillHaste) * 100,
+      isPercent: true,
+    ),
+    (
+      label: 'LIFESTEAL',
+      delta: (candidate.lifesteal - current.lifesteal) * 100,
+      isPercent: true,
+    ),
+    (
+      label: 'SPELL VAMP',
+      delta: (candidate.spellVamp - current.spellVamp) * 100,
       isPercent: true,
     ),
   ].where((e) => e.delta.abs() >= 0.05).toList();

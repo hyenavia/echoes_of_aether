@@ -344,6 +344,265 @@ class GameConfigParser {
       );
     }
 
+    final mechanicsRaw = section['mechanics'];
+    final EliteBossMechanicsConfig mechanics;
+    if (mechanicsRaw == null) {
+      mechanics = defaults.mechanics;
+    } else {
+      final m = _section(section, 'mechanics', '$w.mechanics');
+      mechanics = EliteBossMechanicsConfig(
+        minAscensionRank: _int(
+          m,
+          '$w.mechanics',
+          'min_ascension_rank',
+          min: 0,
+          fallback: defaults.mechanics.minAscensionRank,
+        ),
+        stoneskinDamageReduction: _number(
+          m,
+          '$w.mechanics',
+          'stoneskin_damage_reduction',
+          min: 0,
+          max: 0.95,
+          fallback: defaults.mechanics.stoneskinDamageReduction,
+        ),
+        stoneskinHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'stoneskin_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.stoneskinHpThreshold,
+        ),
+        berserkHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'berserk_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.berserkHpThreshold,
+        ),
+        berserkAtkMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'berserk_atk_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.berserkAtkMultiplier,
+        ),
+        berserkSpeedMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'berserk_speed_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.berserkSpeedMultiplier,
+        ),
+        eliteHeavyStrikeCooldownSeconds: _number(
+          m,
+          '$w.mechanics',
+          'elite_heavy_strike_cooldown_seconds',
+          min: 0.5,
+          fallback: defaults.mechanics.eliteHeavyStrikeCooldownSeconds,
+        ),
+        eliteHeavyStrikeMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'elite_heavy_strike_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.eliteHeavyStrikeMultiplier,
+        ),
+        bossAoeCooldownSeconds: _number(
+          m,
+          '$w.mechanics',
+          'boss_aoe_cooldown_seconds',
+          min: 0.5,
+          fallback: defaults.mechanics.bossAoeCooldownSeconds,
+        ),
+        bossAoeRadius: _number(
+          m,
+          '$w.mechanics',
+          'boss_aoe_radius',
+          min: 0.5,
+          fallback: defaults.mechanics.bossAoeRadius,
+        ),
+        bossAoeMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'boss_aoe_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.bossAoeMultiplier,
+        ),
+        bossSummonHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'boss_summon_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.bossSummonHpThreshold,
+        ),
+        bossSummonCount: _int(
+          m,
+          '$w.mechanics',
+          'boss_summon_count',
+          min: 1,
+          fallback: defaults.mechanics.bossSummonCount,
+        ),
+        dailyElementalWardReduction: _number(
+          m,
+          '$w.mechanics',
+          'daily_elemental_ward_reduction',
+          min: 0,
+          max: 0.95,
+          fallback: defaults.mechanics.dailyElementalWardReduction,
+        ),
+        dailyElementalWardDurationSeconds: _number(
+          m,
+          '$w.mechanics',
+          'daily_elemental_ward_duration_seconds',
+          min: 0.5,
+          fallback: defaults.mechanics.dailyElementalWardDurationSeconds,
+        ),
+        dailyElementalWardHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'daily_elemental_ward_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.dailyElementalWardHpThreshold,
+        ),
+        dailyBlazingSurgeCooldownSeconds: _number(
+          m,
+          '$w.mechanics',
+          'daily_blazing_surge_cooldown_seconds',
+          min: 0.5,
+          fallback: defaults.mechanics.dailyBlazingSurgeCooldownSeconds,
+        ),
+        dailyBlazingSurgeRadius: _number(
+          m,
+          '$w.mechanics',
+          'daily_blazing_surge_radius',
+          min: 0.5,
+          fallback: defaults.mechanics.dailyBlazingSurgeRadius,
+        ),
+        dailyBlazingSurgeMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'daily_blazing_surge_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.dailyBlazingSurgeMultiplier,
+        ),
+        dailyEnragedRushHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'daily_enraged_rush_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.dailyEnragedRushHpThreshold,
+        ),
+        dailyEnragedRushAtkMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'daily_enraged_rush_atk_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.dailyEnragedRushAtkMultiplier,
+        ),
+        dailyEnragedRushSpeedMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'daily_enraged_rush_speed_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.dailyEnragedRushSpeedMultiplier,
+        ),
+        weeklyLifeSiphonCooldownSeconds: _number(
+          m,
+          '$w.mechanics',
+          'weekly_life_siphon_cooldown_seconds',
+          min: 0.5,
+          fallback: defaults.mechanics.weeklyLifeSiphonCooldownSeconds,
+        ),
+        weeklyLifeSiphonMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'weekly_life_siphon_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.weeklyLifeSiphonMultiplier,
+        ),
+        weeklyLifeSiphonHealRatio: _number(
+          m,
+          '$w.mechanics',
+          'weekly_life_siphon_heal_ratio',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.weeklyLifeSiphonHealRatio,
+        ),
+        weeklyCataclysmCooldownSeconds: _number(
+          m,
+          '$w.mechanics',
+          'weekly_cataclysm_cooldown_seconds',
+          min: 0.5,
+          fallback: defaults.mechanics.weeklyCataclysmCooldownSeconds,
+        ),
+        weeklyCataclysmRadius: _number(
+          m,
+          '$w.mechanics',
+          'weekly_cataclysm_radius',
+          min: 0.5,
+          fallback: defaults.mechanics.weeklyCataclysmRadius,
+        ),
+        weeklyCataclysmMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'weekly_cataclysm_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.weeklyCataclysmMultiplier,
+        ),
+        weeklySummonHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'weekly_summon_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.weeklySummonHpThreshold,
+        ),
+        weeklySummonCount: _int(
+          m,
+          '$w.mechanics',
+          'weekly_summon_count',
+          min: 1,
+          fallback: defaults.mechanics.weeklySummonCount,
+        ),
+        weeklyFinalStandHpThreshold: _number(
+          m,
+          '$w.mechanics',
+          'weekly_final_stand_hp_threshold',
+          min: 0,
+          max: 1.0,
+          fallback: defaults.mechanics.weeklyFinalStandHpThreshold,
+        ),
+        weeklyFinalStandAtkMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'weekly_final_stand_atk_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.weeklyFinalStandAtkMultiplier,
+        ),
+        weeklyFinalStandSpeedMultiplier: _number(
+          m,
+          '$w.mechanics',
+          'weekly_final_stand_speed_multiplier',
+          min: 1.0,
+          fallback: defaults.mechanics.weeklyFinalStandSpeedMultiplier,
+        ),
+        weeklyFinalStandDamageReduction: _number(
+          m,
+          '$w.mechanics',
+          'weekly_final_stand_damage_reduction',
+          min: 0,
+          max: 0.95,
+          fallback: defaults.mechanics.weeklyFinalStandDamageReduction,
+        ),
+      );
+    }
+
     return DifficultyConfig(
       cyclePerRank: _number(
         section,
@@ -364,6 +623,34 @@ class GameConfigParser {
       cycleLevelStep: section['cycle_level_step'] == null
           ? null
           : _int(section, w, 'cycle_level_step', min: 0),
+      eliteHpPerRank: _number(
+        section,
+        w,
+        'elite_hp_per_rank',
+        min: 0,
+        fallback: defaults.eliteHpPerRank,
+      ),
+      eliteAtkPerRank: _number(
+        section,
+        w,
+        'elite_atk_per_rank',
+        min: 0,
+        fallback: defaults.eliteAtkPerRank,
+      ),
+      bossHpPerRank: _number(
+        section,
+        w,
+        'boss_hp_per_rank',
+        min: 0,
+        fallback: defaults.bossHpPerRank,
+      ),
+      bossAtkPerRank: _number(
+        section,
+        w,
+        'boss_atk_per_rank',
+        min: 0,
+        fallback: defaults.bossAtkPerRank,
+      ),
       rewardExponent: _number(
         section,
         w,
@@ -372,6 +659,7 @@ class GameConfigParser {
         fallback: defaults.rewardExponent,
       ),
       drop: drop,
+      mechanics: mechanics,
       maxMultiplier: _number(
         section,
         w,
@@ -708,9 +996,12 @@ class GameConfigParser {
     String where,
     String key, {
     required int min,
+    int? max,
+    int? fallback,
   }) {
     final value = map[key];
     if (value == null) {
+      if (fallback != null) return fallback;
       throw ConfigException('$_file: $where."$key" wajib diisi.');
     }
     if (value is! int) {
@@ -721,6 +1012,11 @@ class GameConfigParser {
     if (value < min) {
       throw ConfigException(
         '$_file: $where."$key" harus >= $min (nilai: $value).',
+      );
+    }
+    if (max != null && value > max) {
+      throw ConfigException(
+        '$_file: $where."$key" harus <= $max (nilai: $value).',
       );
     }
     return value;

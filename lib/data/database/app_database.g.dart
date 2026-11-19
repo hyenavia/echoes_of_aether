@@ -1541,6 +1541,21 @@ class $EquipmentInstancesTable extends EquipmentInstances
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     playerId,
@@ -1550,6 +1565,7 @@ class $EquipmentInstancesTable extends EquipmentInstances
     rarity,
     rolledStatsJson,
     enhancementLevel,
+    isFavorite,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1626,6 +1642,12 @@ class $EquipmentInstancesTable extends EquipmentInstances
         ),
       );
     }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
     return context;
   }
 
@@ -1663,6 +1685,10 @@ class $EquipmentInstancesTable extends EquipmentInstances
         DriftSqlType.int,
         data['${effectivePrefix}enhancement_level'],
       )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
+      )!,
     );
   }
 
@@ -1681,6 +1707,7 @@ class EquipmentInstanceRow extends DataClass
   final String rarity;
   final String rolledStatsJson;
   final int enhancementLevel;
+  final bool isFavorite;
   const EquipmentInstanceRow({
     required this.playerId,
     required this.instanceId,
@@ -1689,6 +1716,7 @@ class EquipmentInstanceRow extends DataClass
     required this.rarity,
     required this.rolledStatsJson,
     required this.enhancementLevel,
+    required this.isFavorite,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1700,6 +1728,7 @@ class EquipmentInstanceRow extends DataClass
     map['rarity'] = Variable<String>(rarity);
     map['rolled_stats_json'] = Variable<String>(rolledStatsJson);
     map['enhancement_level'] = Variable<int>(enhancementLevel);
+    map['is_favorite'] = Variable<bool>(isFavorite);
     return map;
   }
 
@@ -1712,6 +1741,7 @@ class EquipmentInstanceRow extends DataClass
       rarity: Value(rarity),
       rolledStatsJson: Value(rolledStatsJson),
       enhancementLevel: Value(enhancementLevel),
+      isFavorite: Value(isFavorite),
     );
   }
 
@@ -1728,6 +1758,7 @@ class EquipmentInstanceRow extends DataClass
       rarity: serializer.fromJson<String>(json['rarity']),
       rolledStatsJson: serializer.fromJson<String>(json['rolledStatsJson']),
       enhancementLevel: serializer.fromJson<int>(json['enhancementLevel']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
     );
   }
   @override
@@ -1741,6 +1772,7 @@ class EquipmentInstanceRow extends DataClass
       'rarity': serializer.toJson<String>(rarity),
       'rolledStatsJson': serializer.toJson<String>(rolledStatsJson),
       'enhancementLevel': serializer.toJson<int>(enhancementLevel),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
     };
   }
 
@@ -1752,6 +1784,7 @@ class EquipmentInstanceRow extends DataClass
     String? rarity,
     String? rolledStatsJson,
     int? enhancementLevel,
+    bool? isFavorite,
   }) => EquipmentInstanceRow(
     playerId: playerId ?? this.playerId,
     instanceId: instanceId ?? this.instanceId,
@@ -1760,6 +1793,7 @@ class EquipmentInstanceRow extends DataClass
     rarity: rarity ?? this.rarity,
     rolledStatsJson: rolledStatsJson ?? this.rolledStatsJson,
     enhancementLevel: enhancementLevel ?? this.enhancementLevel,
+    isFavorite: isFavorite ?? this.isFavorite,
   );
   EquipmentInstanceRow copyWithCompanion(EquipmentInstancesCompanion data) {
     return EquipmentInstanceRow(
@@ -1778,6 +1812,9 @@ class EquipmentInstanceRow extends DataClass
       enhancementLevel: data.enhancementLevel.present
           ? data.enhancementLevel.value
           : this.enhancementLevel,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
     );
   }
 
@@ -1790,7 +1827,8 @@ class EquipmentInstanceRow extends DataClass
           ..write('slot: $slot, ')
           ..write('rarity: $rarity, ')
           ..write('rolledStatsJson: $rolledStatsJson, ')
-          ..write('enhancementLevel: $enhancementLevel')
+          ..write('enhancementLevel: $enhancementLevel, ')
+          ..write('isFavorite: $isFavorite')
           ..write(')'))
         .toString();
   }
@@ -1804,6 +1842,7 @@ class EquipmentInstanceRow extends DataClass
     rarity,
     rolledStatsJson,
     enhancementLevel,
+    isFavorite,
   );
   @override
   bool operator ==(Object other) =>
@@ -1815,7 +1854,8 @@ class EquipmentInstanceRow extends DataClass
           other.slot == this.slot &&
           other.rarity == this.rarity &&
           other.rolledStatsJson == this.rolledStatsJson &&
-          other.enhancementLevel == this.enhancementLevel);
+          other.enhancementLevel == this.enhancementLevel &&
+          other.isFavorite == this.isFavorite);
 }
 
 class EquipmentInstancesCompanion
@@ -1827,6 +1867,7 @@ class EquipmentInstancesCompanion
   final Value<String> rarity;
   final Value<String> rolledStatsJson;
   final Value<int> enhancementLevel;
+  final Value<bool> isFavorite;
   final Value<int> rowid;
   const EquipmentInstancesCompanion({
     this.playerId = const Value.absent(),
@@ -1836,6 +1877,7 @@ class EquipmentInstancesCompanion
     this.rarity = const Value.absent(),
     this.rolledStatsJson = const Value.absent(),
     this.enhancementLevel = const Value.absent(),
+    this.isFavorite = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EquipmentInstancesCompanion.insert({
@@ -1846,6 +1888,7 @@ class EquipmentInstancesCompanion
     required String rarity,
     required String rolledStatsJson,
     this.enhancementLevel = const Value.absent(),
+    this.isFavorite = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : playerId = Value(playerId),
        instanceId = Value(instanceId),
@@ -1861,6 +1904,7 @@ class EquipmentInstancesCompanion
     Expression<String>? rarity,
     Expression<String>? rolledStatsJson,
     Expression<int>? enhancementLevel,
+    Expression<bool>? isFavorite,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1871,6 +1915,7 @@ class EquipmentInstancesCompanion
       if (rarity != null) 'rarity': rarity,
       if (rolledStatsJson != null) 'rolled_stats_json': rolledStatsJson,
       if (enhancementLevel != null) 'enhancement_level': enhancementLevel,
+      if (isFavorite != null) 'is_favorite': isFavorite,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1883,6 +1928,7 @@ class EquipmentInstancesCompanion
     Value<String>? rarity,
     Value<String>? rolledStatsJson,
     Value<int>? enhancementLevel,
+    Value<bool>? isFavorite,
     Value<int>? rowid,
   }) {
     return EquipmentInstancesCompanion(
@@ -1893,6 +1939,7 @@ class EquipmentInstancesCompanion
       rarity: rarity ?? this.rarity,
       rolledStatsJson: rolledStatsJson ?? this.rolledStatsJson,
       enhancementLevel: enhancementLevel ?? this.enhancementLevel,
+      isFavorite: isFavorite ?? this.isFavorite,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1921,6 +1968,9 @@ class EquipmentInstancesCompanion
     if (enhancementLevel.present) {
       map['enhancement_level'] = Variable<int>(enhancementLevel.value);
     }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1937,6 +1987,7 @@ class EquipmentInstancesCompanion
           ..write('rarity: $rarity, ')
           ..write('rolledStatsJson: $rolledStatsJson, ')
           ..write('enhancementLevel: $enhancementLevel, ')
+          ..write('isFavorite: $isFavorite, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6523,6 +6574,522 @@ class LocalSaveBackupsCompanion extends UpdateCompanion<LocalSaveBackup> {
   }
 }
 
+class $GachaPityStatesTable extends GachaPityStates
+    with TableInfo<$GachaPityStatesTable, GachaPityStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GachaPityStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _bannerTypeMeta = const VerificationMeta(
+    'bannerType',
+  );
+  @override
+  late final GeneratedColumn<String> bannerType = GeneratedColumn<String>(
+    'banner_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pullCountMeta = const VerificationMeta(
+    'pullCount',
+  );
+  @override
+  late final GeneratedColumn<int> pullCount = GeneratedColumn<int>(
+    'pull_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isGuaranteedMeta = const VerificationMeta(
+    'isGuaranteed',
+  );
+  @override
+  late final GeneratedColumn<bool> isGuaranteed = GeneratedColumn<bool>(
+    'is_guaranteed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_guaranteed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [bannerType, pullCount, isGuaranteed];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'gacha_pity_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GachaPityStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('banner_type')) {
+      context.handle(
+        _bannerTypeMeta,
+        bannerType.isAcceptableOrUnknown(data['banner_type']!, _bannerTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bannerTypeMeta);
+    }
+    if (data.containsKey('pull_count')) {
+      context.handle(
+        _pullCountMeta,
+        pullCount.isAcceptableOrUnknown(data['pull_count']!, _pullCountMeta),
+      );
+    }
+    if (data.containsKey('is_guaranteed')) {
+      context.handle(
+        _isGuaranteedMeta,
+        isGuaranteed.isAcceptableOrUnknown(
+          data['is_guaranteed']!,
+          _isGuaranteedMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {bannerType};
+  @override
+  GachaPityStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GachaPityStateRow(
+      bannerType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}banner_type'],
+      )!,
+      pullCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pull_count'],
+      )!,
+      isGuaranteed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_guaranteed'],
+      )!,
+    );
+  }
+
+  @override
+  $GachaPityStatesTable createAlias(String alias) {
+    return $GachaPityStatesTable(attachedDatabase, alias);
+  }
+}
+
+class GachaPityStateRow extends DataClass
+    implements Insertable<GachaPityStateRow> {
+  final String bannerType;
+  final int pullCount;
+  final bool isGuaranteed;
+  const GachaPityStateRow({
+    required this.bannerType,
+    required this.pullCount,
+    required this.isGuaranteed,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['banner_type'] = Variable<String>(bannerType);
+    map['pull_count'] = Variable<int>(pullCount);
+    map['is_guaranteed'] = Variable<bool>(isGuaranteed);
+    return map;
+  }
+
+  GachaPityStatesCompanion toCompanion(bool nullToAbsent) {
+    return GachaPityStatesCompanion(
+      bannerType: Value(bannerType),
+      pullCount: Value(pullCount),
+      isGuaranteed: Value(isGuaranteed),
+    );
+  }
+
+  factory GachaPityStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GachaPityStateRow(
+      bannerType: serializer.fromJson<String>(json['bannerType']),
+      pullCount: serializer.fromJson<int>(json['pullCount']),
+      isGuaranteed: serializer.fromJson<bool>(json['isGuaranteed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bannerType': serializer.toJson<String>(bannerType),
+      'pullCount': serializer.toJson<int>(pullCount),
+      'isGuaranteed': serializer.toJson<bool>(isGuaranteed),
+    };
+  }
+
+  GachaPityStateRow copyWith({
+    String? bannerType,
+    int? pullCount,
+    bool? isGuaranteed,
+  }) => GachaPityStateRow(
+    bannerType: bannerType ?? this.bannerType,
+    pullCount: pullCount ?? this.pullCount,
+    isGuaranteed: isGuaranteed ?? this.isGuaranteed,
+  );
+  GachaPityStateRow copyWithCompanion(GachaPityStatesCompanion data) {
+    return GachaPityStateRow(
+      bannerType: data.bannerType.present
+          ? data.bannerType.value
+          : this.bannerType,
+      pullCount: data.pullCount.present ? data.pullCount.value : this.pullCount,
+      isGuaranteed: data.isGuaranteed.present
+          ? data.isGuaranteed.value
+          : this.isGuaranteed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GachaPityStateRow(')
+          ..write('bannerType: $bannerType, ')
+          ..write('pullCount: $pullCount, ')
+          ..write('isGuaranteed: $isGuaranteed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(bannerType, pullCount, isGuaranteed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GachaPityStateRow &&
+          other.bannerType == this.bannerType &&
+          other.pullCount == this.pullCount &&
+          other.isGuaranteed == this.isGuaranteed);
+}
+
+class GachaPityStatesCompanion extends UpdateCompanion<GachaPityStateRow> {
+  final Value<String> bannerType;
+  final Value<int> pullCount;
+  final Value<bool> isGuaranteed;
+  final Value<int> rowid;
+  const GachaPityStatesCompanion({
+    this.bannerType = const Value.absent(),
+    this.pullCount = const Value.absent(),
+    this.isGuaranteed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GachaPityStatesCompanion.insert({
+    required String bannerType,
+    this.pullCount = const Value.absent(),
+    this.isGuaranteed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : bannerType = Value(bannerType);
+  static Insertable<GachaPityStateRow> custom({
+    Expression<String>? bannerType,
+    Expression<int>? pullCount,
+    Expression<bool>? isGuaranteed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bannerType != null) 'banner_type': bannerType,
+      if (pullCount != null) 'pull_count': pullCount,
+      if (isGuaranteed != null) 'is_guaranteed': isGuaranteed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GachaPityStatesCompanion copyWith({
+    Value<String>? bannerType,
+    Value<int>? pullCount,
+    Value<bool>? isGuaranteed,
+    Value<int>? rowid,
+  }) {
+    return GachaPityStatesCompanion(
+      bannerType: bannerType ?? this.bannerType,
+      pullCount: pullCount ?? this.pullCount,
+      isGuaranteed: isGuaranteed ?? this.isGuaranteed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bannerType.present) {
+      map['banner_type'] = Variable<String>(bannerType.value);
+    }
+    if (pullCount.present) {
+      map['pull_count'] = Variable<int>(pullCount.value);
+    }
+    if (isGuaranteed.present) {
+      map['is_guaranteed'] = Variable<bool>(isGuaranteed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GachaPityStatesCompanion(')
+          ..write('bannerType: $bannerType, ')
+          ..write('pullCount: $pullCount, ')
+          ..write('isGuaranteed: $isGuaranteed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $UnlockedSpecializationsTable extends UnlockedSpecializations
+    with TableInfo<$UnlockedSpecializationsTable, UnlockedSpecializationRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UnlockedSpecializationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _specializationIdMeta = const VerificationMeta(
+    'specializationId',
+  );
+  @override
+  late final GeneratedColumn<String> specializationId = GeneratedColumn<String>(
+    'specialization_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unlockedAtMsMeta = const VerificationMeta(
+    'unlockedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> unlockedAtMs = GeneratedColumn<int>(
+    'unlocked_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [specializationId, unlockedAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'unlocked_specializations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UnlockedSpecializationRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('specialization_id')) {
+      context.handle(
+        _specializationIdMeta,
+        specializationId.isAcceptableOrUnknown(
+          data['specialization_id']!,
+          _specializationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_specializationIdMeta);
+    }
+    if (data.containsKey('unlocked_at_ms')) {
+      context.handle(
+        _unlockedAtMsMeta,
+        unlockedAtMs.isAcceptableOrUnknown(
+          data['unlocked_at_ms']!,
+          _unlockedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_unlockedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {specializationId};
+  @override
+  UnlockedSpecializationRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UnlockedSpecializationRow(
+      specializationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}specialization_id'],
+      )!,
+      unlockedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unlocked_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $UnlockedSpecializationsTable createAlias(String alias) {
+    return $UnlockedSpecializationsTable(attachedDatabase, alias);
+  }
+}
+
+class UnlockedSpecializationRow extends DataClass
+    implements Insertable<UnlockedSpecializationRow> {
+  final String specializationId;
+  final int unlockedAtMs;
+  const UnlockedSpecializationRow({
+    required this.specializationId,
+    required this.unlockedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['specialization_id'] = Variable<String>(specializationId);
+    map['unlocked_at_ms'] = Variable<int>(unlockedAtMs);
+    return map;
+  }
+
+  UnlockedSpecializationsCompanion toCompanion(bool nullToAbsent) {
+    return UnlockedSpecializationsCompanion(
+      specializationId: Value(specializationId),
+      unlockedAtMs: Value(unlockedAtMs),
+    );
+  }
+
+  factory UnlockedSpecializationRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UnlockedSpecializationRow(
+      specializationId: serializer.fromJson<String>(json['specializationId']),
+      unlockedAtMs: serializer.fromJson<int>(json['unlockedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'specializationId': serializer.toJson<String>(specializationId),
+      'unlockedAtMs': serializer.toJson<int>(unlockedAtMs),
+    };
+  }
+
+  UnlockedSpecializationRow copyWith({
+    String? specializationId,
+    int? unlockedAtMs,
+  }) => UnlockedSpecializationRow(
+    specializationId: specializationId ?? this.specializationId,
+    unlockedAtMs: unlockedAtMs ?? this.unlockedAtMs,
+  );
+  UnlockedSpecializationRow copyWithCompanion(
+    UnlockedSpecializationsCompanion data,
+  ) {
+    return UnlockedSpecializationRow(
+      specializationId: data.specializationId.present
+          ? data.specializationId.value
+          : this.specializationId,
+      unlockedAtMs: data.unlockedAtMs.present
+          ? data.unlockedAtMs.value
+          : this.unlockedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UnlockedSpecializationRow(')
+          ..write('specializationId: $specializationId, ')
+          ..write('unlockedAtMs: $unlockedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(specializationId, unlockedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UnlockedSpecializationRow &&
+          other.specializationId == this.specializationId &&
+          other.unlockedAtMs == this.unlockedAtMs);
+}
+
+class UnlockedSpecializationsCompanion
+    extends UpdateCompanion<UnlockedSpecializationRow> {
+  final Value<String> specializationId;
+  final Value<int> unlockedAtMs;
+  final Value<int> rowid;
+  const UnlockedSpecializationsCompanion({
+    this.specializationId = const Value.absent(),
+    this.unlockedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UnlockedSpecializationsCompanion.insert({
+    required String specializationId,
+    required int unlockedAtMs,
+    this.rowid = const Value.absent(),
+  }) : specializationId = Value(specializationId),
+       unlockedAtMs = Value(unlockedAtMs);
+  static Insertable<UnlockedSpecializationRow> custom({
+    Expression<String>? specializationId,
+    Expression<int>? unlockedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (specializationId != null) 'specialization_id': specializationId,
+      if (unlockedAtMs != null) 'unlocked_at_ms': unlockedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UnlockedSpecializationsCompanion copyWith({
+    Value<String>? specializationId,
+    Value<int>? unlockedAtMs,
+    Value<int>? rowid,
+  }) {
+    return UnlockedSpecializationsCompanion(
+      specializationId: specializationId ?? this.specializationId,
+      unlockedAtMs: unlockedAtMs ?? this.unlockedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (specializationId.present) {
+      map['specialization_id'] = Variable<String>(specializationId.value);
+    }
+    if (unlockedAtMs.present) {
+      map['unlocked_at_ms'] = Variable<int>(unlockedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UnlockedSpecializationsCompanion(')
+          ..write('specializationId: $specializationId, ')
+          ..write('unlockedAtMs: $unlockedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6557,6 +7124,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LocalSaveBackupsTable localSaveBackups = $LocalSaveBackupsTable(
     this,
   );
+  late final $GachaPityStatesTable gachaPityStates = $GachaPityStatesTable(
+    this,
+  );
+  late final $UnlockedSpecializationsTable unlockedSpecializations =
+      $UnlockedSpecializationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6579,6 +7151,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     eventShopPurchases,
     cloudSyncStates,
     localSaveBackups,
+    gachaPityStates,
+    unlockedSpecializations,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -8978,6 +9552,7 @@ typedef $$EquipmentInstancesTableCreateCompanionBuilder =
       required String rarity,
       required String rolledStatsJson,
       Value<int> enhancementLevel,
+      Value<bool> isFavorite,
       Value<int> rowid,
     });
 typedef $$EquipmentInstancesTableUpdateCompanionBuilder =
@@ -8989,6 +9564,7 @@ typedef $$EquipmentInstancesTableUpdateCompanionBuilder =
       Value<String> rarity,
       Value<String> rolledStatsJson,
       Value<int> enhancementLevel,
+      Value<bool> isFavorite,
       Value<int> rowid,
     });
 
@@ -9062,6 +9638,11 @@ class $$EquipmentInstancesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$PlayersTableFilterComposer get playerId {
     final $$PlayersTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -9125,6 +9706,11 @@ class $$EquipmentInstancesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PlayersTableOrderingComposer get playerId {
     final $$PlayersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9181,6 +9767,11 @@ class $$EquipmentInstancesTableAnnotationComposer
 
   GeneratedColumn<int> get enhancementLevel => $composableBuilder(
     column: $table.enhancementLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
     builder: (column) => column,
   );
 
@@ -9248,6 +9839,7 @@ class $$EquipmentInstancesTableTableManager
                 Value<String> rarity = const Value.absent(),
                 Value<String> rolledStatsJson = const Value.absent(),
                 Value<int> enhancementLevel = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EquipmentInstancesCompanion(
                 playerId: playerId,
@@ -9257,6 +9849,7 @@ class $$EquipmentInstancesTableTableManager
                 rarity: rarity,
                 rolledStatsJson: rolledStatsJson,
                 enhancementLevel: enhancementLevel,
+                isFavorite: isFavorite,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9268,6 +9861,7 @@ class $$EquipmentInstancesTableTableManager
                 required String rarity,
                 required String rolledStatsJson,
                 Value<int> enhancementLevel = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EquipmentInstancesCompanion.insert(
                 playerId: playerId,
@@ -9277,6 +9871,7 @@ class $$EquipmentInstancesTableTableManager
                 rarity: rarity,
                 rolledStatsJson: rolledStatsJson,
                 enhancementLevel: enhancementLevel,
+                isFavorite: isFavorite,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -13045,6 +13640,365 @@ typedef $$LocalSaveBackupsTableProcessedTableManager =
       LocalSaveBackup,
       PrefetchHooks Function()
     >;
+typedef $$GachaPityStatesTableCreateCompanionBuilder =
+    GachaPityStatesCompanion Function({
+      required String bannerType,
+      Value<int> pullCount,
+      Value<bool> isGuaranteed,
+      Value<int> rowid,
+    });
+typedef $$GachaPityStatesTableUpdateCompanionBuilder =
+    GachaPityStatesCompanion Function({
+      Value<String> bannerType,
+      Value<int> pullCount,
+      Value<bool> isGuaranteed,
+      Value<int> rowid,
+    });
+
+class $$GachaPityStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $GachaPityStatesTable> {
+  $$GachaPityStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get bannerType => $composableBuilder(
+    column: $table.bannerType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pullCount => $composableBuilder(
+    column: $table.pullCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isGuaranteed => $composableBuilder(
+    column: $table.isGuaranteed,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$GachaPityStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $GachaPityStatesTable> {
+  $$GachaPityStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get bannerType => $composableBuilder(
+    column: $table.bannerType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pullCount => $composableBuilder(
+    column: $table.pullCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isGuaranteed => $composableBuilder(
+    column: $table.isGuaranteed,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$GachaPityStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GachaPityStatesTable> {
+  $$GachaPityStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get bannerType => $composableBuilder(
+    column: $table.bannerType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get pullCount =>
+      $composableBuilder(column: $table.pullCount, builder: (column) => column);
+
+  GeneratedColumn<bool> get isGuaranteed => $composableBuilder(
+    column: $table.isGuaranteed,
+    builder: (column) => column,
+  );
+}
+
+class $$GachaPityStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GachaPityStatesTable,
+          GachaPityStateRow,
+          $$GachaPityStatesTableFilterComposer,
+          $$GachaPityStatesTableOrderingComposer,
+          $$GachaPityStatesTableAnnotationComposer,
+          $$GachaPityStatesTableCreateCompanionBuilder,
+          $$GachaPityStatesTableUpdateCompanionBuilder,
+          (
+            GachaPityStateRow,
+            BaseReferences<
+              _$AppDatabase,
+              $GachaPityStatesTable,
+              GachaPityStateRow
+            >,
+          ),
+          GachaPityStateRow,
+          PrefetchHooks Function()
+        > {
+  $$GachaPityStatesTableTableManager(
+    _$AppDatabase db,
+    $GachaPityStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GachaPityStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GachaPityStatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GachaPityStatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> bannerType = const Value.absent(),
+                Value<int> pullCount = const Value.absent(),
+                Value<bool> isGuaranteed = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GachaPityStatesCompanion(
+                bannerType: bannerType,
+                pullCount: pullCount,
+                isGuaranteed: isGuaranteed,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String bannerType,
+                Value<int> pullCount = const Value.absent(),
+                Value<bool> isGuaranteed = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GachaPityStatesCompanion.insert(
+                bannerType: bannerType,
+                pullCount: pullCount,
+                isGuaranteed: isGuaranteed,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$GachaPityStatesTable, GachaPityStateRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $GachaPityStatesTable,
+                    GachaPityStateRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$GachaPityStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GachaPityStatesTable,
+      GachaPityStateRow,
+      $$GachaPityStatesTableFilterComposer,
+      $$GachaPityStatesTableOrderingComposer,
+      $$GachaPityStatesTableAnnotationComposer,
+      $$GachaPityStatesTableCreateCompanionBuilder,
+      $$GachaPityStatesTableUpdateCompanionBuilder,
+      (
+        GachaPityStateRow,
+        BaseReferences<_$AppDatabase, $GachaPityStatesTable, GachaPityStateRow>,
+      ),
+      GachaPityStateRow,
+      PrefetchHooks Function()
+    >;
+typedef $$UnlockedSpecializationsTableCreateCompanionBuilder =
+    UnlockedSpecializationsCompanion Function({
+      required String specializationId,
+      required int unlockedAtMs,
+      Value<int> rowid,
+    });
+typedef $$UnlockedSpecializationsTableUpdateCompanionBuilder =
+    UnlockedSpecializationsCompanion Function({
+      Value<String> specializationId,
+      Value<int> unlockedAtMs,
+      Value<int> rowid,
+    });
+
+class $$UnlockedSpecializationsTableFilterComposer
+    extends Composer<_$AppDatabase, $UnlockedSpecializationsTable> {
+  $$UnlockedSpecializationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get specializationId => $composableBuilder(
+    column: $table.specializationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unlockedAtMs => $composableBuilder(
+    column: $table.unlockedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$UnlockedSpecializationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $UnlockedSpecializationsTable> {
+  $$UnlockedSpecializationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get specializationId => $composableBuilder(
+    column: $table.specializationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unlockedAtMs => $composableBuilder(
+    column: $table.unlockedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$UnlockedSpecializationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UnlockedSpecializationsTable> {
+  $$UnlockedSpecializationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get specializationId => $composableBuilder(
+    column: $table.specializationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get unlockedAtMs => $composableBuilder(
+    column: $table.unlockedAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$UnlockedSpecializationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $UnlockedSpecializationsTable,
+          UnlockedSpecializationRow,
+          $$UnlockedSpecializationsTableFilterComposer,
+          $$UnlockedSpecializationsTableOrderingComposer,
+          $$UnlockedSpecializationsTableAnnotationComposer,
+          $$UnlockedSpecializationsTableCreateCompanionBuilder,
+          $$UnlockedSpecializationsTableUpdateCompanionBuilder,
+          (
+            UnlockedSpecializationRow,
+            BaseReferences<
+              _$AppDatabase,
+              $UnlockedSpecializationsTable,
+              UnlockedSpecializationRow
+            >,
+          ),
+          UnlockedSpecializationRow,
+          PrefetchHooks Function()
+        > {
+  $$UnlockedSpecializationsTableTableManager(
+    _$AppDatabase db,
+    $UnlockedSpecializationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UnlockedSpecializationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$UnlockedSpecializationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$UnlockedSpecializationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> specializationId = const Value.absent(),
+                Value<int> unlockedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UnlockedSpecializationsCompanion(
+                specializationId: specializationId,
+                unlockedAtMs: unlockedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String specializationId,
+                required int unlockedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => UnlockedSpecializationsCompanion.insert(
+                specializationId: specializationId,
+                unlockedAtMs: unlockedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $UnlockedSpecializationsTable,
+                    UnlockedSpecializationRow
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $UnlockedSpecializationsTable,
+                    UnlockedSpecializationRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$UnlockedSpecializationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $UnlockedSpecializationsTable,
+      UnlockedSpecializationRow,
+      $$UnlockedSpecializationsTableFilterComposer,
+      $$UnlockedSpecializationsTableOrderingComposer,
+      $$UnlockedSpecializationsTableAnnotationComposer,
+      $$UnlockedSpecializationsTableCreateCompanionBuilder,
+      $$UnlockedSpecializationsTableUpdateCompanionBuilder,
+      (
+        UnlockedSpecializationRow,
+        BaseReferences<
+          _$AppDatabase,
+          $UnlockedSpecializationsTable,
+          UnlockedSpecializationRow
+        >,
+      ),
+      UnlockedSpecializationRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -13083,4 +14037,11 @@ class $AppDatabaseManager {
       $$CloudSyncStatesTableTableManager(_db, _db.cloudSyncStates);
   $$LocalSaveBackupsTableTableManager get localSaveBackups =>
       $$LocalSaveBackupsTableTableManager(_db, _db.localSaveBackups);
+  $$GachaPityStatesTableTableManager get gachaPityStates =>
+      $$GachaPityStatesTableTableManager(_db, _db.gachaPityStates);
+  $$UnlockedSpecializationsTableTableManager get unlockedSpecializations =>
+      $$UnlockedSpecializationsTableTableManager(
+        _db,
+        _db.unlockedSpecializations,
+      );
 }

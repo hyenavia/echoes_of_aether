@@ -4,8 +4,10 @@ import '../../domain/entities/enemy_definition.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/repositories/game_config_repository.dart';
 import '../models/boss_events_config_parser.dart';
+import '../models/boss_spire_config_parser.dart';
 import '../models/dungeon_config_parser.dart';
 import '../models/event_shop_config_parser.dart';
+import '../models/gacha_config_parser.dart';
 import '../models/game_config_parser.dart';
 import '../models/game_config_validator.dart';
 import '../models/item_config_parser.dart';
@@ -67,10 +69,14 @@ class AssetGameConfigRepository implements GameConfigRepository {
       bossEvents: const BossEventsConfigParser().parse(
         await _read('boss_events.json'),
       ),
+      bossSpire: const BossSpireConfigParser().parse(
+        await _read('boss_spire.json'),
+      ),
       shop: const ShopConfigParser().parse(await _read('shop.json')),
       eventShop: const EventShopConfigParser().parse(
         await _read('event_shop.json'),
       ),
+      gacha: const GachaConfigParser().parse(await _read('gacha_banners.json')),
     );
     const GameConfigValidator().validate(config);
     return config;

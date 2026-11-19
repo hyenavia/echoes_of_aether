@@ -5,11 +5,19 @@ import 'enemy_definition.dart';
 
 /// Stat dasar boss event sebelum dikalikan profil acuan dan `power_factor`.
 class BossBaseStats {
-  const BossBaseStats({required this.hp, required this.atk, required this.def});
+  const BossBaseStats({
+    required this.hp,
+    required this.atk,
+    required this.def,
+    this.lifesteal = 0.0,
+    this.spellVamp = 0.0,
+  });
 
   final int hp;
   final int atk;
   final int def;
+  final double lifesteal;
+  final double spellVamp;
 }
 
 /// Hadiah quest untuk mengalahkan Daily/Weekly Boss.
@@ -66,6 +74,8 @@ class BossEvent {
         moveSpeed: baseTemplateStats?.moveSpeed ?? 1.4,
         attackRange: baseTemplateStats?.attackRange ?? 1.5,
         skillHaste: baseTemplateStats?.skillHaste ?? 0.0,
+        lifesteal: baseStats.lifesteal,
+        spellVamp: baseStats.spellVamp,
       ),
       detectionRange: spriteTemplate?.detectionRange ?? 10.0,
       expReward: 0,

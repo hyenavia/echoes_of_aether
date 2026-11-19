@@ -17,6 +17,7 @@ import 'package:echoes_of_aether/domain/entities/item_definition.dart';
 import 'package:echoes_of_aether/domain/entities/player_character.dart';
 import 'package:echoes_of_aether/domain/entities/player_progress.dart';
 import 'package:echoes_of_aether/domain/entities/player_save_snapshot.dart';
+import 'package:echoes_of_aether/domain/entities/shop_config.dart';
 import 'package:echoes_of_aether/domain/services/equipment_factory.dart';
 import 'package:echoes_of_aether/domain/services/shop_service.dart';
 import 'package:echoes_of_aether/features/dungeon/shop_overlay.dart';
@@ -259,15 +260,27 @@ void main() {
       inventory.add(matDef.id, 8);
       views.refresh();
 
+      final shopCatalogWithMat = ShopCatalog(
+        entries: config.shop.entries,
+        sell: const SellRules(
+          sellableCategories: {ItemCategory.equipment, ItemCategory.material},
+        ),
+      );
+      final shopServiceWithMat = ShopService(
+        catalog: shopCatalogWithMat,
+        items: config.items,
+        equipmentFactory: EquipmentFactory(config.equipment),
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: StatefulBuilder(
               builder: (context, setState) => ShopOverlay(
-                catalog: config.shop,
+                catalog: shopCatalogWithMat,
                 items: config.items,
                 dungeons: config.dungeons,
-                shopService: shopService,
+                shopService: shopServiceWithMat,
                 playerContext: ShopPlayerContext(
                   playerLevel: character.level,
                   shopPurchases: purchases,
@@ -276,7 +289,7 @@ void main() {
                 views: views,
                 onBuy: (entryId) async => ShopBuyNotFound(entryId: entryId),
                 onSellEquipment: (id) async {
-                  final res = shopService.sellEquipment(
+                  final res = shopServiceWithMat.sellEquipment(
                     instanceId: id,
                     character: character,
                     inventory: inventory,
@@ -286,7 +299,7 @@ void main() {
                   return res;
                 },
                 onSellMaterialBulk: (id, qty) async {
-                  final res = shopService.sellMaterialBulk(
+                  final res = shopServiceWithMat.sellMaterialBulk(
                     itemId: id,
                     quantity: qty,
                     character: character,
@@ -476,7 +489,272 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Jual'));
       await tester.pumpAndSettle();
       expect(inventory.equipmentById('eq_epic_blade'), isNull);
-      expect(inventory.quantityOf(matDef.id), 0);
+      expect(
+        inventory.quantityOf(matDef.id),
+        3,
+      ); // Material non-sellable tidak terjual
+    },
+  );
+
+  testWidgets(
+    'Tab Jual: tombol Jual Sampah melikuidasi seluruh equipment Common & Uncommon tanpa menyentuh Rare/Epic dan Material',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 1920);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final eqFactory = EquipmentFactory(config.equipment);
+      final commonDef = config.items['rusty_sword']!;
+      final uncommonDef = config.items['hunters_bow']!;
+      final rareDef = config.items['guardian_amulet']!;
+      final epicDef = config.items['aether_blade']!;
+      final matDef = config.items['slime_gel']!;
+
+      inventory.addEquipment(
+        eqFactory.create(
+          instanceId: 'eq_c1',
+          definition: commonDef,
+          random: math.Random(1),
+        ),
+      );
+      inventory.addEquipment(
+        eqFactory.create(
+          instanceId: 'eq_u1',
+          definition: uncommonDef,
+          random: math.Random(2),
+        ),
+      );
+      inventory.addEquipment(
+        eqFactory.create(
+          instanceId: 'eq_r1',
+          definition: rareDef,
+          random: math.Random(3),
+        ),
+      );
+      inventory.addEquipment(
+        eqFactory.create(
+          instanceId: 'eq_e1',
+          definition: epicDef,
+          random: math.Random(4),
+        ),
+      );
+      inventory.add(matDef.id, 25);
+      views.refresh();
+
+      final initialGold = character.gold;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ShopOverlay(
+                catalog: config.shop,
+                items: config.items,
+                dungeons: config.dungeons,
+                shopService: shopService,
+                playerContext: ShopPlayerContext(
+                  playerLevel: character.level,
+                  shopPurchases: purchases,
+                ),
+                playerGold: character.gold,
+                views: views,
+                onBuy: (entryId) async => ShopBuyNotFound(entryId: entryId),
+                onSellEquipment: (id) async => shopService.sellEquipment(
+                  instanceId: id,
+                  character: character,
+                  inventory: inventory,
+                ),
+                onSellMaterialBulk: (id, qty) async =>
+                    shopService.sellMaterialBulk(
+                      itemId: id,
+                      quantity: qty,
+                      character: character,
+                      inventory: inventory,
+                    ),
+                onSellBatch: (eqIds, matQtys) async {
+                  final res = shopService.sellBatch(
+                    equipmentInstanceIds: eqIds,
+                    materialQuantities: matQtys,
+                    character: character,
+                    inventory: inventory,
+                  );
+                  views.refresh();
+                  setState(() {});
+                  return res;
+                },
+                onClose: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Pindah ke Tab Jual
+      await tester.tap(find.text('Jual'));
+      await tester.pumpAndSettle();
+
+      final junkBtn = find.byKey(const Key('sell_junk_equipment_button'));
+      expect(junkBtn, findsOneWidget);
+      expect(find.textContaining('Jual Sampah (2'), findsOneWidget);
+
+      // Ketuk Jual Sampah -> Dialog konfirmasi muncul
+      await tester.tap(junkBtn);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Jual Semua Sampah (Common & Uncommon)'),
+        findsOneWidget,
+      );
+
+      // Konfirmasi Jual
+      await tester.tap(find.widgetWithText(FilledButton, 'Jual'));
+      await tester.pumpAndSettle();
+
+      // Common dan Uncommon hilang dari tas
+      expect(inventory.equipmentById('eq_c1'), isNull);
+      expect(inventory.equipmentById('eq_u1'), isNull);
+
+      // Rare, Epic, dan Material TIDAK tersentuh
+      expect(inventory.equipmentById('eq_r1'), isNotNull);
+      expect(inventory.equipmentById('eq_e1'), isNotNull);
+      expect(inventory.quantityOf(matDef.id), 25);
+
+      // Gold pemain bertambah
+      expect(character.gold, greaterThan(initialGold));
+
+      // Tombol Jual Sampah sekarang disabled dan menampilkan 0
+      expect(find.textContaining('Jual Sampah (0)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'ShopOverlay Tab Jual melindungi equipment favorit dari single sell, batch sell, dan quick junk sell',
+    (tester) async {
+      final swordDef = config.items['rusty_sword']!;
+      final capDef = config.items['leather_cap']!;
+      final factory = EquipmentFactory(config.equipment);
+
+      // eq_fav_common adalah common, tetapi difavoritkan
+      final favCommon = factory
+          .create(
+            instanceId: 'eq_fav_c1',
+            definition: swordDef,
+            random: math.Random(1),
+          )
+          .copyWith(isFavorite: true, rarity: ItemRarity.common);
+
+      // eq_normal_common adalah common biasa
+      final normalCommon = factory
+          .create(
+            instanceId: 'eq_norm_c1',
+            definition: capDef,
+            random: math.Random(2),
+          )
+          .copyWith(isFavorite: false, rarity: ItemRarity.common);
+
+      inventory.addEquipment(favCommon);
+      inventory.addEquipment(normalCommon);
+      views.refresh();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ShopOverlay(
+                catalog: config.shop,
+                items: config.items,
+                dungeons: config.dungeons,
+                shopService: shopService,
+                playerContext: ShopPlayerContext(
+                  playerLevel: character.level,
+                  shopPurchases: purchases,
+                ),
+                playerGold: character.gold,
+                views: views,
+                onBuy: (entryId) async => ShopBuyNotFound(entryId: entryId),
+                onSellEquipment: (id) async {
+                  final res = shopService.sellEquipment(
+                    instanceId: id,
+                    character: character,
+                    inventory: inventory,
+                  );
+                  views.refresh();
+                  setState(() {});
+                  return res;
+                },
+                onSellMaterialBulk: (id, qty) async =>
+                    shopService.sellMaterialBulk(
+                      itemId: id,
+                      quantity: qty,
+                      character: character,
+                      inventory: inventory,
+                    ),
+                onSellBatch: (eqIds, matMap) async {
+                  final res = shopService.sellBatch(
+                    equipmentInstanceIds: eqIds,
+                    materialQuantities: matMap,
+                    character: character,
+                    inventory: inventory,
+                  );
+                  views.refresh();
+                  setState(() {});
+                  return res;
+                },
+                onClose: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Buka Tab Jual
+      await tester.tap(find.text('Jual'));
+      await tester.pumpAndSettle();
+
+      // 1. Tombol 'Jual Sampah' hanya menghitung 1 (normalCommon), bukan 2, karena favCommon dikecualikan
+      expect(find.textContaining('Jual Sampah (1'), findsOneWidget);
+
+      // 2. Pada item favorit, badge 'Favorit' dan bintang emas muncul
+      expect(find.text('Favorit'), findsWidgets);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+
+      // 3. Tombol jual per-item untuk item favorit adalah disabled dengan label 'Favorit'
+      final favButtonFinder = find.widgetWithText(OutlinedButton, 'Favorit');
+      expect(favButtonFinder, findsOneWidget);
+      final outlinedBtn = tester.widget<OutlinedButton>(favButtonFinder);
+      expect(outlinedBtn.onPressed, isNull); // disabled!
+
+      // 4. Checkbox untuk item favorit disabled
+      final checkboxes = tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .toList();
+      expect(checkboxes, hasLength(2));
+      expect(checkboxes.where((c) => c.onChanged == null), hasLength(1));
+      expect(checkboxes.where((c) => c.onChanged != null), hasLength(1));
+
+      // 5. Tombol 'Pilih Semua' hanya memilih item non-favorit
+      await tester.tap(find.text('Pilih Semua'));
+      await tester.pumpAndSettle();
+
+      // Tombol Jual Terpilih menunjukkan 1 item terpilih (hanya normalCommon)
+      expect(find.textContaining('Jual Terpilih (1'), findsOneWidget);
+
+      // Batal Pilih
+      await tester.tap(find.text('Batal Pilih'));
+      await tester.pumpAndSettle();
+
+      // 6. Jalankan Quick Junk Sell
+      await tester.tap(find.byKey(const Key('sell_junk_equipment_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Jual'));
+      await tester.pumpAndSettle();
+
+      // normalCommon terjual, favCommon TETAP aman di inventory!
+      expect(inventory.equipmentById(normalCommon.id), isNull);
+      expect(inventory.equipmentById(favCommon.id), isNotNull);
+      expect(inventory.equipmentById(favCommon.id)!.isFavorite, isTrue);
     },
   );
 }

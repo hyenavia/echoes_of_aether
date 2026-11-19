@@ -40,6 +40,7 @@ class DungeonWorld extends World {
     required this.hud,
     required this.autoSkill,
     this.dungeonManager,
+    this.dungeonBiome,
     this.roomLayout = TestRoom.layout,
     this.playerStart = TestRoom.playerStart,
     this.roomTransitionDelaySeconds = 1.0,
@@ -61,6 +62,7 @@ class DungeonWorld extends World {
   final ValueNotifier<HudState> hud;
   final ValueNotifier<bool> autoSkill;
   final DungeonManager? dungeonManager;
+  final String? dungeonBiome;
   final List<String> roomLayout;
   final GridPoint playerStart;
   final double roomTransitionDelaySeconds;
@@ -133,6 +135,7 @@ class DungeonWorld extends World {
       cell: initialCell,
     );
 
+    final profile = difficultyProfile ?? manager?.activeDifficultyProfile;
     final resolvedSeed = simulationSeed ?? math.Random().nextInt(0x7fffffff);
     simulation =
         CombatSimulation(
@@ -141,6 +144,8 @@ class DungeonWorld extends World {
           player: player,
           reviveConfig: config.revive,
           damageCalculator: config.damage.createCalculator(),
+          mechanics: config.difficulty.mechanics,
+          cycleRank: profile?.cycleRank ?? 0,
           seed: resolvedSeed,
         )..setPlayerSkills(
           character.activeSkills,
@@ -167,9 +172,15 @@ class DungeonWorld extends World {
       specializationIdProvider: () => character.specializationId,
     )..priority = 2;
 
+    final resolvedBiome =
+        dungeonBiome ??
+        dungeonManager?.activeDungeon?.biome ??
+        'forgotten_forest';
+
     _roomView = DebugRoomComponent(
       grid: grid,
       tileSize: GameConstants.tileSize,
+      biome: resolvedBiome,
       markers: initialRoom == null ? const [] : [initialRoom.exitPosition],
     )..priority = 0;
 
@@ -329,9 +340,15 @@ class DungeonWorld extends World {
       simulation.loadRoom(nextGrid, entryCell: room.entryPosition);
       playerView.resetVisualTransient();
 
+      final resolvedBiome =
+          dungeonBiome ??
+          dungeonManager?.activeDungeon?.biome ??
+          'forgotten_forest';
+
       final nextRoomView = DebugRoomComponent(
         grid: nextGrid,
         tileSize: GameConstants.tileSize,
+        biome: resolvedBiome,
         markers: [room.exitPosition],
       )..priority = 0;
 

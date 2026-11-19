@@ -3,6 +3,7 @@ import 'cycle_progress.dart';
 import 'dungeon_session.dart';
 import 'equipment.dart';
 import 'event_shop_purchase.dart';
+import 'gacha_config.dart';
 import 'offline_activity.dart';
 import 'periodic_quest_state.dart';
 import 'player_progress.dart';
@@ -30,6 +31,28 @@ class PlayerCharacterSnapshot {
 
   /// HP terakhir saat sesi disimpan; null berarti mulai dengan max HP.
   final int? currentHp;
+
+  PlayerCharacterSnapshot copyWith({
+    PlayerProgress? progress,
+    String? specializationId,
+    bool clearSpecializationId = false,
+    Map<String, int>? skillLevels,
+    Map<String, int>? skillCooldownTicks,
+    Map<EquipmentSlot, EquipmentInstance>? equipped,
+    int? currentHp,
+    bool clearCurrentHp = false,
+  }) {
+    return PlayerCharacterSnapshot(
+      progress: progress ?? this.progress,
+      specializationId: clearSpecializationId
+          ? null
+          : (specializationId ?? this.specializationId),
+      skillLevels: skillLevels ?? this.skillLevels,
+      skillCooldownTicks: skillCooldownTicks ?? this.skillCooldownTicks,
+      equipped: equipped ?? this.equipped,
+      currentHp: clearCurrentHp ? null : (currentHp ?? this.currentHp),
+    );
+  }
 }
 
 /// Snapshot isi [Inventory] (stack + equipment bag + counter id) untuk persistensi.
@@ -202,6 +225,8 @@ class PlayerSaveSnapshot {
     this.currencies = const {},
     this.clockState = const ClockState(),
     this.periodicQuestStates = const [],
+    this.gachaPityStates = const {},
+    this.unlockedSpecializations = const {'vanguard', 'arcanist', 'ranger'},
   });
 
   final String playerId;
@@ -235,6 +260,56 @@ class PlayerSaveSnapshot {
 
   /// State penyelesaian quest periodik (`PeriodicQuestStates`).
   final List<PeriodicQuestState> periodicQuestStates;
+
+  /// State pity gacha per tipe banner (`GachaPityStates`).
+  final Map<String, GachaPityState> gachaPityStates;
+
+  /// ID class specialization yang telah dibuka pemain (`UnlockedSpecializations`).
+  final Set<String> unlockedSpecializations;
+
+  PlayerSaveSnapshot copyWith({
+    String? playerId,
+    PlayerCharacterSnapshot? character,
+    InventorySnapshot? inventory,
+    DungeonProgressSnapshot? dungeon,
+    Map<String, DungeonProgressSnapshot>? dungeonProgresses,
+    CycleProgress? cycleProgress,
+    GameSessionSnapshot? session,
+    Set<String>? claimedEventIds,
+    ActiveDungeonSessionSnapshot? activeDungeonSession,
+    bool clearActiveDungeonSession = false,
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int>? shopPurchases,
+    List<EventShopPurchaseRecord>? eventShopPurchases,
+    Map<String, int>? currencies,
+    ClockState? clockState,
+    List<PeriodicQuestState>? periodicQuestStates,
+    Map<String, GachaPityState>? gachaPityStates,
+    Set<String>? unlockedSpecializations,
+  }) {
+    return PlayerSaveSnapshot(
+      playerId: playerId ?? this.playerId,
+      character: character ?? this.character,
+      inventory: inventory ?? this.inventory,
+      dungeon: dungeon ?? this.dungeon,
+      dungeonProgresses: dungeonProgresses ?? this.dungeonProgresses,
+      cycleProgress: cycleProgress ?? this.cycleProgress,
+      session: session ?? this.session,
+      claimedEventIds: claimedEventIds ?? this.claimedEventIds,
+      activeDungeonSession: clearActiveDungeonSession
+          ? null
+          : (activeDungeonSession ?? this.activeDungeonSession),
+      offlineActivity: offlineActivity ?? this.offlineActivity,
+      shopPurchases: shopPurchases ?? this.shopPurchases,
+      eventShopPurchases: eventShopPurchases ?? this.eventShopPurchases,
+      currencies: currencies ?? this.currencies,
+      clockState: clockState ?? this.clockState,
+      periodicQuestStates: periodicQuestStates ?? this.periodicQuestStates,
+      gachaPityStates: gachaPityStates ?? this.gachaPityStates,
+      unlockedSpecializations:
+          unlockedSpecializations ?? this.unlockedSpecializations,
+    );
+  }
 
   /// Mengambil snapshot progres untuk [dungeonId] dengan fallback ke [dungeon]
   /// bila peta belum terisi.

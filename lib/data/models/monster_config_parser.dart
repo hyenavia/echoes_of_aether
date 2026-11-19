@@ -96,6 +96,20 @@ class MonsterConfigParser {
           min: 0,
           exclusive: true,
         ),
+        lifesteal: _double(
+          stats,
+          'lifesteal',
+          '$where.stats',
+          min: 0,
+          fallback: 0.0,
+        ),
+        spellVamp: _double(
+          stats,
+          'spell_vamp',
+          '$where.stats',
+          min: 0,
+          fallback: 0.0,
+        ),
       ),
     );
   }

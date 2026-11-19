@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_tokens.dart';
+import 'branding/aether_loading_indicator.dart';
 import 'panel_frame.dart';
 
 /// State loading bertema Living Aether Camp agar transisi muat konsisten.
@@ -22,14 +23,7 @@ class LoadingState extends StatelessWidget {
     final body = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.6,
-            color: AppColors.aetherBlue,
-          ),
-        ),
+        AetherLoadingIndicator(size: compact ? 24 : 32),
         SizedBox(height: compact ? AppSpacing.sm : AppSpacing.md),
         Text(
           title,

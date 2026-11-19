@@ -24,6 +24,8 @@ class GrantedReward {
     this.addedEquipment = const [],
     this.droppedEquipment = const [],
     this.displayParts = const [],
+    this.autoSoldEquipmentCount = 0,
+    this.autoSoldEquipmentGold = 0,
   });
 
   final String eventId;
@@ -41,6 +43,12 @@ class GrantedReward {
   /// Label ringkas item yang berhasil masuk inventory (untuk HUD/log).
   final List<String> displayParts;
 
+  /// Jumlah equipment yang otomatis terjual (misal saat offline farming).
+  final int autoSoldEquipmentCount;
+
+  /// Jumlah gold yang didapatkan dari auto-sell equipment.
+  final int autoSoldEquipmentGold;
+
   bool get hasLootChanges =>
       addedStacks.isNotEmpty || addedEquipment.isNotEmpty;
 }
@@ -57,6 +65,8 @@ class RewardProcessor {
     this.lootService = const LootService(),
     required this.equipmentFactory,
     Set<String>? claimedEventIds,
+    this.goldMultiplier = 1.0,
+    this.autoSellEquipmentRarities,
   }) : _claimedEventIds = claimedEventIds != null ? {...claimedEventIds} : {};
 
   final PlayerCharacter character;
@@ -67,11 +77,23 @@ class RewardProcessor {
   final EquipmentFactory equipmentFactory;
   final Set<String> _claimedEventIds;
 
+  /// Pengali reward gold (misal dari berkah Camp Altar - Fortune).
+  double goldMultiplier;
+
+  /// Rarity equipment yang otomatis dijual saat reward diproses (misal offline farming).
+  final Set<ItemRarity>? autoSellEquipmentRarities;
+
   Set<String> get claimedEventIds => Set.unmodifiable(_claimedEventIds);
 
   bool isClaimed(String eventId) => _claimedEventIds.contains(eventId);
 
   bool markClaimed(String eventId) => _claimedEventIds.add(eventId);
+
+  /// Menghapus ID klaim musuh sementara (`enemy:*`) saat ruangan/run berganti
+  /// agar set `_claimedEventIds` di memori tidak membengkak selama sesi panjang.
+  void clearTransientEnemyClaims() {
+    _claimedEventIds.removeWhere((id) => id.startsWith('enemy:'));
+  }
 
   GrantedReward processEnemyDefeated({
     required String eventId,
@@ -132,7 +154,14 @@ class RewardProcessor {
     }
 
     final safeExp = math.max<int>(0, expReward);
-    final safeGold = math.max<int>(0, goldReward);
+    final rawGold = math.max<int>(0, goldReward);
+    final safeMultiplier =
+        (goldMultiplier.isNaN ||
+            goldMultiplier.isInfinite ||
+            goldMultiplier < 0.0)
+        ? 1.0
+        : goldMultiplier;
+    final safeGold = (rawGold * safeMultiplier).round();
     final levelsGained = character.receiveReward(exp: safeExp, gold: safeGold);
 
     final addedStacks = <String, int>{};
@@ -140,6 +169,8 @@ class RewardProcessor {
     final addedEquipment = <EquipmentInstance>[];
     final droppedEquipment = <EquipmentInstance>[];
     final displayParts = <String>[];
+    var autoSoldEquipmentCount = 0;
+    var autoSoldEquipmentGold = 0;
 
     final table = lootTableId == null ? null : lootTables[lootTableId];
     if (table != null) {
@@ -159,17 +190,26 @@ class RewardProcessor {
         }
         if (item.isEquipment) {
           for (var i = 0; i < drop.quantity; i++) {
-            final instance = equipmentFactory.create(
-              instanceId: inventory.nextEquipmentId(),
-              definition: item,
-              random: random,
-              rollBonus: difficultyProfile.equipmentRollBonus,
-            );
-            if (inventory.addEquipment(instance)) {
-              addedEquipment.add(instance);
-              displayParts.add(item.name);
+            if (autoSellEquipmentRarities != null &&
+                autoSellEquipmentRarities!.contains(item.rarity)) {
+              final sellPrice = item.sellable ? math.max(0, item.sellValue) : 0;
+              final earned = character.addGold(sellPrice);
+              autoSoldEquipmentCount += 1;
+              autoSoldEquipmentGold += earned;
+              displayParts.add('${item.name} (terjual +$earned Gold)');
             } else {
-              droppedEquipment.add(instance);
+              final instance = equipmentFactory.create(
+                instanceId: inventory.nextEquipmentId(),
+                definition: item,
+                random: random,
+                rollBonus: difficultyProfile.equipmentRollBonus,
+              );
+              if (inventory.addEquipment(instance)) {
+                addedEquipment.add(instance);
+                displayParts.add(item.name);
+              } else {
+                droppedEquipment.add(instance);
+              }
             }
           }
         } else {
@@ -191,13 +231,15 @@ class RewardProcessor {
       eventId: eventId,
       alreadyClaimed: false,
       expGranted: safeExp,
-      goldGranted: safeGold,
+      goldGranted: safeGold + autoSoldEquipmentGold,
       levelsGained: levelsGained,
       addedStacks: Map.unmodifiable(addedStacks),
       overflowStacks: Map.unmodifiable(overflowStacks),
       addedEquipment: List.unmodifiable(addedEquipment),
       droppedEquipment: List.unmodifiable(droppedEquipment),
       displayParts: List.unmodifiable(displayParts),
+      autoSoldEquipmentCount: autoSoldEquipmentCount,
+      autoSoldEquipmentGold: autoSoldEquipmentGold,
     );
   }
 }

@@ -3,15 +3,22 @@ import 'dart:math' as math;
 
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_tokens.dart';
 import '../../app/theme/echoes_theme.dart';
+import '../../application/providers/cloud_sync_provider.dart';
 import '../../application/providers/database_provider.dart';
 import '../../application/providers/game_clock_provider.dart';
 import '../../application/providers/game_config_provider.dart';
 import '../../application/providers/notification_provider.dart';
+import '../../application/services/account_service.dart';
+import '../../application/services/cloud_sync_service.dart';
 import '../../application/services/game_session_coordinator.dart';
+import '../../core/perf/perf_tracer.dart';
+import '../../domain/entities/altar_blessing.dart';
+import '../../domain/entities/boss_spire.dart';
 import '../../domain/entities/currency_config.dart';
 import '../../domain/entities/cycle_progress.dart';
 import '../../domain/entities/difficulty_config.dart';
@@ -19,17 +26,24 @@ import '../../domain/entities/dungeon_definition.dart';
 import '../../domain/entities/dungeon_session.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/event_shop_purchase.dart';
+import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/inventory.dart';
+import '../../domain/entities/mystery_box.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/player_character.dart';
 import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/entities/player_status.dart';
+import '../../domain/repositories/cloud_save_repository.dart';
 import '../../domain/repositories/game_settings_repository.dart';
+import '../../domain/services/altar_service.dart';
 import '../../domain/services/ascension_service.dart';
+import '../../domain/services/bag_expansion_service.dart';
+import '../../domain/services/blacksmith_service.dart';
 import '../../domain/services/boss_event_service.dart';
 import '../../domain/services/boss_quest_service.dart';
+import '../../domain/services/boss_spire_service.dart';
 import '../../domain/services/currency_service.dart';
 import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_manager.dart';
@@ -38,20 +52,28 @@ import '../../domain/services/encounter_tracker.dart';
 import '../../domain/services/equipment_factory.dart';
 import '../../domain/services/equipment_service.dart';
 import '../../domain/services/event_shop_service.dart';
+import '../../domain/services/gacha_service.dart';
 import '../../domain/services/game_clock.dart';
+import '../../domain/services/mystery_box_service.dart';
 import '../../domain/services/offline_progression_service.dart';
 import '../../domain/services/period_service.dart';
 import '../../domain/services/reward_processor.dart';
 import '../../domain/services/shop_service.dart';
+import '../../domain/services/sync_planner.dart';
 import '../../game/audio/audio_service.dart';
 import '../../game/echoes_game.dart';
 import '../../game/hud/inventory_views.dart';
 import '../../game/overlays.dart';
 import '../shared/widgets/shared_widgets.dart';
-import 'character_overlay.dart';
+import 'altar_overlay.dart';
+import 'blacksmith_overlay.dart';
 import 'boss_events_overlay.dart';
+import 'boss_hub_overlay.dart';
+import 'character_overlay.dart';
+import 'cloud_sync_section.dart';
 import 'dungeon_completed_overlay.dart';
 import 'equipment_overlay.dart';
+import 'gacha_overlay.dart';
 import 'hud_overlay.dart';
 import 'inventory_overlay.dart';
 import 'offline_summary_overlay.dart';
@@ -62,9 +84,14 @@ import 'town_hub_view.dart';
 /// Layar utama gameplay: memuat konfigurasi & save data, menampilkan Town Hub,
 /// lalu menjalankan game Flame saat pemain memasuki dungeon.
 class DungeonScreen extends ConsumerStatefulWidget {
-  const DungeonScreen({super.key, this.roomTransitionDelaySeconds = 1.0});
+  const DungeonScreen({
+    super.key,
+    this.roomTransitionDelaySeconds = 1.0,
+    this.onExitConfirmed,
+  });
 
   final double roomTransitionDelaySeconds;
+  final VoidCallback? onExitConfirmed;
 
   @override
   ConsumerState<DungeonScreen> createState() => _DungeonScreenState();
@@ -87,6 +114,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   CycleProgress _cycleProgress = const CycleProgress();
   String? _selectedDungeonId;
   ActiveDungeonSessionSnapshot? _lastSessionSnapshot;
+  String? _preferredAutoFarmDungeonId;
   OfflineActivitySnapshot _offlineActivity =
       const OfflineActivitySnapshot.paused();
   int? _pendingRecoveredHp;
@@ -94,8 +122,14 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   GrantedReward? _lastCompletionReward;
   AscensionResult? _lastAscensionResult;
   BossQuestSettlementResult? _lastBossQuestResult;
+  BossSpireSettlementResult? _lastBossSpireResult;
   DifficultyProfile? _activeBossDifficultyProfile;
   bool _showBossEvents = false;
+  bool _showBossSpire = false;
+  bool _showAltar = false;
+  bool _showGacha = false;
+  Map<String, GachaPityState> _gachaPityStates = {};
+  Set<String> _unlockedSpecializations = {};
   BossQuestService _bossQuestService = BossQuestService();
   Map<String, int> _consecutiveDefeats = const {};
   String? _lastFailedDungeonId;
@@ -117,9 +151,16 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   bool _inDungeon = false;
   Timer? _saveDebounce;
   bool _dirty = false;
+  bool _isSaving = false;
+  bool _pendingSaveAfterCurrent = false;
   bool _initialized = false;
   Future<void>? _initFuture;
   Future<void>? _resumeFuture;
+  CloudSyncService? _cloudSync;
+  bool _cloudConflictDialogOpen = false;
+
+  bool get _isDungeonRunActive =>
+      _inDungeon && (_dungeonManager?.hasActiveSession ?? false);
 
   @override
   void initState() {
@@ -130,6 +171,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cloudSync?.serverClockListener = null;
     _saveDebounce?.cancel();
     if (_dirty) {
       unawaited(_flushSaveNow());
@@ -153,10 +195,82 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       unawaited(_audioService.pauseBgm());
-      unawaited(_flushSaveNow());
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.detached) {
+        unawaited(_flushSaveAndMaybeSyncBackground());
+      } else {
+        unawaited(_flushSaveNow());
+      }
     } else if (state == AppLifecycleState.resumed) {
       unawaited(_audioService.resumeBgm());
       unawaited(_handleAppResumed());
+    }
+  }
+
+  bool _isExiting = false;
+
+  Future<void> _handleBackNavigation() async {
+    if (!mounted || _isExiting) return;
+
+    // 1. Tutup panel modal aktif di dalam dungeon jika ada.
+    if (_inDungeon && _game != null) {
+      for (final panel in GameOverlays.panels) {
+        if (_game!.overlays.isActive(panel)) {
+          _game!.overlays.remove(panel);
+          return;
+        }
+      }
+    }
+
+    // 2. Tutup overlay aktif di Town jika ada.
+    if (!_inDungeon) {
+      if (_showBossEvents) {
+        setState(() => _showBossEvents = false);
+        return;
+      }
+      if (_showBossSpire) {
+        setState(() => _showBossSpire = false);
+        return;
+      }
+      if (_showAltar) {
+        setState(() => _showAltar = false);
+        return;
+      }
+      final pendingSummary = _offlineActivity.pendingSummary;
+      if (pendingSummary != null && !pendingSummary.acknowledged) {
+        _acknowledgeOfflineSummary();
+        return;
+      }
+    }
+
+    // 3. Tampilkan dialog konfirmasi keluar bergaya Living Aether Camp.
+    final confirmed = await showEchoesDialog<bool>(
+      context: context,
+      title: 'Keluar Permainan?',
+      icon: Icons.exit_to_app,
+      accentColor: AppColors.antiqueGold,
+      secondaryLabel: 'Lanjut Main',
+      primaryLabel: 'Simpan & Keluar',
+      child: Text(
+        'Progres permainan Anda akan disimpan otomatis ke database sebelum keluar.',
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: AppColors.textSecondary),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _isExiting = true;
+      _showMessage('Menyimpan progres permainan...');
+      try {
+        await _flushSaveAndMaybeSyncBackground();
+      } finally {
+        if (widget.onExitConfirmed != null) {
+          widget.onExitConfirmed!();
+        } else {
+          await SystemNavigator.pop();
+        }
+      }
     }
   }
 
@@ -170,6 +284,11 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
 
     final future = () async {
       try {
+        final cloud =
+            _cloudSync ?? await _ensureCloudSyncInitialized(coordinator);
+        if (cloud != null && cloud.accountService.current.isSignedIn) {
+          await cloud.syncServerClock();
+        }
         final loaded = await coordinator.processOfflineOnResume();
         if (!mounted) return;
 
@@ -186,121 +305,374 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         );
 
         if (!executedOffline) {
+          unawaited(
+            _triggerCloudSync(SyncTrigger.appOpen, showConflictPrompt: true),
+          );
           return;
         }
 
-        _offlineActivity = loaded.offlineActivity;
-        _character = loaded.character;
-        _inventory = loaded.inventory;
-        _views = InventoryViews(
-          inventory: loaded.inventory,
-          character: loaded.character,
-        );
-        _equipmentService = EquipmentService(
-          inventory: loaded.inventory,
-          loadout: loaded.character.loadout,
-        );
-        _dungeon = loaded.dungeon;
-        _dungeonProgresses = Map.of(loaded.dungeonProgresses);
-        _cycleProgress = loaded.cycleProgress;
-        _shopPurchases = Map.of(loaded.shopPurchases);
-        _eventShopPurchases = {
-          for (final record in loaded.eventShopPurchases)
-            (record.entryId, record.periodKey): record.purchasedCount,
-        };
-        _consecutiveDefeats = Map.of(loaded.session.consecutiveDefeats);
-        _lastFailedDungeonId = loaded.session.lastFailedDungeonId;
-        _lastSessionSnapshot = loaded.activeDungeonSession;
-        _rewardProcessor = loaded.rewardProcessor;
-        _currencyService = CurrencyService(
-          definitions: _config?.currencies ?? CurrencyDefinition.defaults,
-          initialBalances: loaded.currencies,
-          claimedIds: loaded.rewardProcessor.claimedEventIds,
-        );
-        _bossQuestService = BossQuestService(
-          initialStates: loaded.periodicQuestStates,
-        );
-        _autoSkill.value = loaded.session.autoSkillEnabled;
-
-        final manager = _dungeonManager;
-        setState(() {
-          if (manager != null && loaded.hasRecoverableDungeonSession) {
-            _game?.detachSessionListeners();
-            manager.exitToTown();
-            final restored = manager.restoreSession(
-              loaded.activeDungeonSession!,
-            );
-            if (restored != null) {
-              final prev = _progressFor(restored.dungeonId);
-              _selectedDungeonId = restored.dungeonId;
-              _dungeon = DungeonProgressSnapshot(
-                currentDungeonId: restored.dungeonId,
-                currentRoomId: restored.currentRoomId,
-                currentRoomIndex: restored.currentRoomIndex,
-                highestClearedRoomIndex: prev.highestClearedRoomIndex,
-                clearsCount: prev.clearsCount,
-                clearedInCycleRank: prev.clearedInCycleRank,
-                rewardState: prev.rewardState,
-              );
-              _dungeonProgresses[restored.dungeonId] = _dungeon;
-              _pendingRecoveredHp = loaded.recoveredHp;
-              _pendingRecoveredSkillCooldowns =
-                  loaded.recoveredSkillCooldownTicks;
-              _game = _newGame(
-                config,
-                initialPlayerHp: loaded.recoveredHp,
-                initialReviveCooldownTicks:
-                    loaded.activeDungeonSession!.reviveCooldownTicks,
-                initialSkillCooldownTicks: loaded.recoveredSkillCooldownTicks,
-              );
-              if (loaded.hasUnacknowledgedOfflineSummary) {
-                _game?.paused = true;
-              }
-              _inDungeon = true;
-            } else {
-              final nextId = _resolveSelectedDungeonId(
-                config,
-                exitedDungeonId: loaded.activeDungeonSession?.dungeonId,
-              );
-              _selectedDungeonId = nextId;
-              if (nextId != null) {
-                _dungeon = _progressFor(nextId);
-              }
-              _pendingRecoveredHp = null;
-              _pendingRecoveredSkillCooldowns = const {};
-              _lastSessionSnapshot = null;
-              _game = null;
-              _inDungeon = false;
-            }
-          } else {
-            _game?.detachSessionListeners();
-            manager?.exitToTown();
-            final nextId = _resolveSelectedDungeonId(
-              config,
-              exitedDungeonId: loaded.activeDungeonSession?.dungeonId,
-            );
-            _selectedDungeonId = nextId;
-            if (nextId != null) {
-              _dungeon = _progressFor(nextId);
-            }
-            _pendingRecoveredHp = null;
-            _pendingRecoveredSkillCooldowns = const {};
-            _lastSessionSnapshot = null;
-            _game = null;
-            _inDungeon = false;
-          }
-        });
+        _applyLoadedSession(config, loaded);
 
         if (status == OfflineProgressionStatus.noEligibleEncounter &&
             loaded.offlineResult.failureReason != null) {
           _showMessage(loaded.offlineResult.failureReason!);
         }
+        unawaited(
+          _triggerCloudSync(SyncTrigger.appOpen, showConflictPrompt: true),
+        );
       } finally {
         _resumeFuture = null;
       }
     }();
     _resumeFuture = future;
     return future;
+  }
+
+  void _applyLoadedSession(
+    GameConfig config,
+    LoadedGameSession loaded, {
+    bool resetTransientRewards = false,
+  }) {
+    _offlineActivity = loaded.offlineActivity;
+    if (loaded.offlineActivity.selectedDungeonId != null) {
+      _preferredAutoFarmDungeonId = loaded.offlineActivity.selectedDungeonId;
+    }
+    _character = loaded.character;
+    _inventory = loaded.inventory;
+    _views = InventoryViews(
+      inventory: loaded.inventory,
+      character: loaded.character,
+    );
+    _equipmentService = EquipmentService(
+      inventory: loaded.inventory,
+      loadout: loaded.character.loadout,
+    );
+    _dungeon = loaded.dungeon;
+    _dungeonProgresses = Map.of(loaded.dungeonProgresses);
+    _cycleProgress = loaded.cycleProgress;
+    _shopPurchases = Map.of(loaded.shopPurchases);
+    _eventShopPurchases = {
+      for (final record in loaded.eventShopPurchases)
+        (record.entryId, record.periodKey): record.purchasedCount,
+    };
+    _consecutiveDefeats = Map.of(loaded.session.consecutiveDefeats);
+    _lastFailedDungeonId = loaded.session.lastFailedDungeonId;
+    _lastSessionSnapshot = loaded.activeDungeonSession;
+    _rewardProcessor = loaded.rewardProcessor;
+    _currencyService = CurrencyService(
+      definitions: _config?.currencies ?? CurrencyDefinition.defaults,
+      initialBalances: loaded.currencies,
+      claimedIds: loaded.rewardProcessor.claimedEventIds,
+    );
+    const altarService = AltarService();
+    _character?.updateAltarBonus(
+      altarService.getAltarStatBonus(_currencyService!.balances),
+    );
+    _rewardProcessor?.goldMultiplier =
+        1.0 + altarService.getGoldBonusPercent(_currencyService!.balances);
+    _bossQuestService = BossQuestService(
+      initialStates: loaded.periodicQuestStates,
+    );
+    _gachaPityStates = Map<String, GachaPityState>.of(loaded.gachaPityStates);
+    _unlockedSpecializations = Set<String>.of(loaded.unlockedSpecializations);
+    _views?.setUnlockedSpecializations(_unlockedSpecializations);
+    _autoSkill.value = loaded.session.autoSkillEnabled;
+    if (resetTransientRewards) {
+      _lastCompletionReward = null;
+      _lastAscensionResult = null;
+      _lastBossQuestResult = null;
+      _lastBossSpireResult = null;
+      _activeBossDifficultyProfile = null;
+      _showBossEvents = false;
+      _showBossSpire = false;
+      _showAltar = false;
+      _showGacha = false;
+    }
+
+    final manager = _dungeonManager;
+    setState(() {
+      if (manager != null && loaded.hasRecoverableDungeonSession) {
+        _game?.detachSessionListeners();
+        manager.exitToTown();
+        final restored = manager.restoreSession(loaded.activeDungeonSession!);
+        if (restored != null) {
+          final prev = _progressFor(restored.dungeonId);
+          _selectedDungeonId = restored.dungeonId;
+          _dungeon = DungeonProgressSnapshot(
+            currentDungeonId: restored.dungeonId,
+            currentRoomId: restored.currentRoomId,
+            currentRoomIndex: restored.currentRoomIndex,
+            highestClearedRoomIndex: prev.highestClearedRoomIndex,
+            clearsCount: prev.clearsCount,
+            clearedInCycleRank: prev.clearedInCycleRank,
+            rewardState: prev.rewardState,
+          );
+          _dungeonProgresses[restored.dungeonId] = _dungeon;
+          _pendingRecoveredHp = loaded.recoveredHp;
+          _pendingRecoveredSkillCooldowns = loaded.recoveredSkillCooldownTicks;
+          _game = _newGame(
+            config,
+            initialPlayerHp: loaded.recoveredHp,
+            initialReviveCooldownTicks:
+                loaded.activeDungeonSession!.reviveCooldownTicks,
+            initialSkillCooldownTicks: loaded.recoveredSkillCooldownTicks,
+          );
+          if (loaded.hasUnacknowledgedOfflineSummary) {
+            _game?.paused = true;
+          }
+          _inDungeon = true;
+        } else {
+          final nextId = _resolveSelectedDungeonId(
+            config,
+            exitedDungeonId: loaded.activeDungeonSession?.dungeonId,
+          );
+          _selectedDungeonId = nextId;
+          if (nextId != null) {
+            _dungeon = _progressFor(nextId);
+          }
+          _pendingRecoveredHp = null;
+          _pendingRecoveredSkillCooldowns = const {};
+          _lastSessionSnapshot = null;
+          _game = null;
+          _inDungeon = false;
+          _offlineActivity = _resolvedTownOfflineActivity(config);
+        }
+      } else {
+        _game?.detachSessionListeners();
+        manager?.exitToTown();
+        final nextId = _resolveSelectedDungeonId(
+          config,
+          exitedDungeonId: loaded.activeDungeonSession?.dungeonId,
+        );
+        _selectedDungeonId = nextId;
+        if (nextId != null) {
+          _dungeon = _progressFor(nextId);
+        }
+        _pendingRecoveredHp = null;
+        _pendingRecoveredSkillCooldowns = const {};
+        _lastSessionSnapshot = null;
+        _game = null;
+        _inDungeon = false;
+        _offlineActivity = _resolvedTownOfflineActivity(config);
+      }
+    });
+    if (!_inDungeon && !identical(_offlineActivity, loaded.offlineActivity)) {
+      unawaited(_flushSaveNow());
+    }
+  }
+
+  Future<CloudSyncService?> _ensureCloudSyncInitialized([
+    GameSessionCoordinator? coordinator,
+  ]) async {
+    final activeCoordinator = coordinator ?? _coordinator;
+    if (_cloudSync != null) {
+      if (activeCoordinator != null) {
+        _cloudSync!.serverClockListener = activeCoordinator.updateServerClock;
+      }
+      return _cloudSync;
+    }
+    try {
+      final service = await ref.read(cloudSyncServiceProvider.future);
+      if (!mounted) return null;
+      if (activeCoordinator != null) {
+        service.serverClockListener = activeCoordinator.updateServerClock;
+      }
+      _cloudSync = service;
+      return service;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _startupCloudSync(GameSessionCoordinator coordinator) =>
+      PerfTracer.traceAsync('CloudSync.startup', () async {
+        final cloud = await _ensureCloudSyncInitialized(coordinator);
+        if (cloud == null || !mounted) return;
+        if (cloud.accountService.current.isSignedIn) {
+          await cloud.syncServerClock();
+          if (!mounted) return;
+        }
+        await _triggerCloudSync(SyncTrigger.appOpen, showConflictPrompt: true);
+      });
+
+  Future<void> _flushSaveAndMaybeSyncBackground() async {
+    await _flushSaveNow();
+    await _triggerCloudSync(SyncTrigger.background);
+  }
+
+  Future<void> _flushSaveThenCloudSync(SyncTrigger trigger) async {
+    await _flushSaveNow();
+    await _triggerCloudSync(trigger, showConflictPrompt: true);
+  }
+
+  Future<void> _triggerCloudSync(
+    SyncTrigger trigger, {
+    bool showConflictPrompt = false,
+  }) async {
+    final cloud = await _ensureCloudSyncInitialized();
+    if (cloud == null || !mounted) return;
+    try {
+      final outcome = await cloud.sync(trigger);
+      if (!mounted) return;
+      if (showConflictPrompt &&
+          (outcome.kind == SyncOutcomeKind.offerRestore ||
+              outcome.kind == SyncOutcomeKind.conflict)) {
+        final conflictKind = outcome.kind == SyncOutcomeKind.offerRestore
+            ? CloudConflictKind.cloudAheadUnchanged
+            : (outcome.status.conflictKind ?? CloudConflictKind.divergedSave);
+        await _promptCloudConflict(conflictKind, outcome.cloudMeta);
+      }
+    } catch (_) {
+      // Sinkronisasi cloud tidak boleh pernah menghentikan permainan lokal.
+    }
+  }
+
+  Future<void> _promptCloudConflict(
+    CloudConflictKind kind,
+    CloudSaveMeta? cloudMeta,
+  ) async {
+    final config = _config;
+    if (!mounted || config == null || _cloudConflictDialogOpen) return;
+    _cloudConflictDialogOpen = true;
+    try {
+      final shouldRestore = await showCloudConflictDialog(
+        context,
+        kind: kind,
+        cloudMeta: cloudMeta,
+        isDungeonRunActive: _isDungeonRunActive,
+      );
+      if (!mounted) return;
+      if (shouldRestore) {
+        await _performCloudRestore(config);
+      } else {
+        _cloudSync?.dismissConflictPromptAndContinueLocal();
+      }
+    } finally {
+      _cloudConflictDialogOpen = false;
+    }
+  }
+
+  Future<void> _performCloudRestore(GameConfig config) async {
+    final cloud = await _ensureCloudSyncInitialized();
+    final coordinator = _coordinator;
+    if (cloud == null || coordinator == null) {
+      if (mounted) {
+        _showMessage('Layanan cloud tidak tersedia untuk pemulihan.');
+      }
+      return;
+    }
+
+    final result = await cloud.restoreFromCloud(
+      isDungeonRunActive: _isDungeonRunActive,
+    );
+    if (!mounted) return;
+
+    switch (result) {
+      case CloudRestoreSuccess(:final meta):
+        _lastOfflineClaimAtMs = coordinator.effectiveClockMs;
+        final reloaded = await coordinator.loadAndProcessOffline();
+        if (!mounted) return;
+        _applyLoadedSession(config, reloaded, resetTransientRewards: true);
+        _dirty = false;
+        _showMessage('Save cloud revisi ${meta.revision} berhasil dipulihkan.');
+      case CloudRestoreBlockedActiveRun(:final message):
+      case CloudRestoreNotFound(:final message):
+      case CloudRestoreFailed(:final message):
+        _showMessage(message);
+    }
+  }
+
+  Widget _buildCloudSyncSection(GameConfig cfg) {
+    return Consumer(
+      builder: (context, widgetRef, _) {
+        final status =
+            widgetRef.watch(cloudSyncStatusProvider).asData?.value ??
+            const CloudSyncStatusSnapshot.initial();
+        return CloudSyncSection(
+          status: status,
+          isDungeonRunActive: _isDungeonRunActive,
+          onSectionOpened: () => unawaited(() async {
+            final cloud = await _ensureCloudSyncInitialized();
+            if (cloud != null) {
+              await cloud.openAccountSection();
+            }
+          }()),
+          onLinkEmail: ({required email, required password}) async {
+            final cloud = await _ensureCloudSyncInitialized();
+            if (cloud == null) {
+              return const EmailAuthFailed('Layanan cloud tidak tersedia.');
+            }
+            final outcome = await cloud.linkEmailAccount(
+              email: email,
+              password: password,
+            );
+            if (mounted && outcome is EmailAuthSuccess) {
+              _showMessage('Akun email berhasil ditautkan.');
+            }
+            return outcome;
+          },
+          onSignInEmail: ({required email, required password}) async {
+            final cloud = await _ensureCloudSyncInitialized();
+            if (cloud == null) {
+              return const EmailAuthFailed('Layanan cloud tidak tersedia.');
+            }
+            final outcome = await cloud.signInWithEmailAccount(
+              email: email,
+              password: password,
+            );
+            if (mounted && outcome is EmailAuthSuccess) {
+              _showMessage('Berhasil masuk ke akun email.');
+            }
+            return outcome;
+          },
+          onResetPassword: ({required email}) async {
+            final cloud = await _ensureCloudSyncInitialized();
+            if (cloud == null) {
+              return const PasswordResetFailed('Layanan cloud tidak tersedia.');
+            }
+            return cloud.sendPasswordReset(email: email);
+          },
+          onAccountSwitchConflict: () async {
+            final meta = _cloudSync?.status.pendingCloudMeta;
+            await _promptCloudConflict(CloudConflictKind.accountSwitch, meta);
+          },
+          onSignOut: () async {
+            final cloud = await _ensureCloudSyncInitialized();
+            await cloud?.signOut();
+            if (mounted) {
+              _showMessage('Keluar dari akun cloud. Save lokal dipertahankan.');
+            }
+          },
+          onSyncNow: () async {
+            await _flushSaveNow();
+            await _triggerCloudSync(
+              SyncTrigger.manual,
+              showConflictPrompt: true,
+            );
+          },
+          onConfirmRestore: () => _performCloudRestore(cfg),
+        );
+      },
+    );
+  }
+
+  void _precacheUiAssets() {
+    if (!mounted) return;
+    const uiAssets = [
+      'assets/ui/ui_atlas.png',
+      'assets/ui/slot_dark.png',
+      'assets/ui/slot_stone.png',
+      'assets/ui/slot_gold_blue.png',
+      'assets/ui/card_parchment_small.png',
+      'assets/ui/frame_stone_dark.png',
+      'assets/ui/frame_gold_ornate.png',
+      'assets/ui/frame_parchment.png',
+      'assets/ui/banner_dark.png',
+      'assets/ui/bar_frame_gold.png',
+    ];
+    for (final asset in uiAssets) {
+      precacheImage(AssetImage(asset), context).catchError((_) {});
+    }
   }
 
   Future<void> _ensureInitialized(GameConfig config) {
@@ -314,6 +686,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       }
       unawaited(_audioService.preload());
       unawaited(_audioService.startBgm());
+      _precacheUiAssets();
       final offlineService = ref.read(offlineProgressionServiceProvider);
       final clock = ref.read(gameClockProvider);
       _clock = clock;
@@ -349,15 +722,27 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       _lastFailedDungeonId = loaded.session.lastFailedDungeonId;
       _lastSessionSnapshot = loaded.activeDungeonSession;
       _offlineActivity = loaded.offlineActivity;
+      if (loaded.offlineActivity.selectedDungeonId != null) {
+        _preferredAutoFarmDungeonId = loaded.offlineActivity.selectedDungeonId;
+      }
       _rewardProcessor = loaded.rewardProcessor;
       _currencyService = CurrencyService(
         definitions: config.currencies,
         initialBalances: loaded.currencies,
         claimedIds: loaded.rewardProcessor.claimedEventIds,
       );
+      const altarService = AltarService();
+      _character?.updateAltarBonus(
+        altarService.getAltarStatBonus(_currencyService!.balances),
+      );
+      _rewardProcessor?.goldMultiplier =
+          1.0 + altarService.getGoldBonusPercent(_currencyService!.balances);
       _bossQuestService = BossQuestService(
         initialStates: loaded.periodicQuestStates,
       );
+      _gachaPityStates = Map<String, GachaPityState>.of(loaded.gachaPityStates);
+      _unlockedSpecializations = Set<String>.of(loaded.unlockedSpecializations);
+      _views?.setUnlockedSpecializations(_unlockedSpecializations);
       _lastOfflineClaimAtMs = loaded.offlineResult.newLastOfflineClaimAtMs;
       _autoSkill.value = loaded.session.autoSkillEnabled;
       final manager = config.dungeons.isNotEmpty
@@ -419,6 +804,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           _pendingRecoveredSkillCooldowns = const {};
           _lastSessionSnapshot = null;
           _inDungeon = false;
+          _offlineActivity = _resolvedTownOfflineActivity(config);
           unawaited(_flushSaveNow());
         }
       } else {
@@ -432,11 +818,14 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         }
         _lastSessionSnapshot = null;
         _inDungeon = false;
+        _offlineActivity = _resolvedTownOfflineActivity(config);
       }
 
       _initialized = true;
 
-      if (loaded.isFirstLaunch) {
+      if (loaded.isFirstLaunch ||
+          (!_inDungeon &&
+              !identical(_offlineActivity, loaded.offlineActivity))) {
         unawaited(_flushSaveNow());
       }
       if (loaded.loadError != null) {
@@ -448,6 +837,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           loaded.offlineResult.failureReason != null) {
         _showMessage(loaded.offlineResult.failureReason!);
       }
+      unawaited(_startupCloudSync(coordinator));
     }();
   }
 
@@ -538,6 +928,21 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     unawaited(_flushSaveNow());
   }
 
+  OfflineActivitySnapshot _resolvedTownOfflineActivity(
+    GameConfig config, {
+    bool keepContinueDungeon = false,
+  }) {
+    return _progressionService(config).resolveTownOfflineActivity(
+      current: _offlineActivity,
+      dungeons: config.dungeons.values,
+      cycle: _cycleProgress,
+      progresses: _progressMapWithCurrent(),
+      checkpointAtMs: _clock.nowMs,
+      preferredDungeonId: _preferredAutoFarmDungeonId,
+      keepContinueDungeon: keepContinueDungeon,
+    );
+  }
+
   void _selectPauseOffline() {
     setState(() {
       _offlineActivity = _offlineActivity.withPauseProgression();
@@ -571,6 +976,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       return;
     }
     setState(() {
+      _preferredAutoFarmDungeonId = dungeonId;
       _offlineActivity = _offlineActivity.withAutoFarming(
         dungeonId: dungeonId,
         checkpointAtMs: _clock.nowMs,
@@ -601,8 +1007,12 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   }
 
   void _acknowledgeOfflineSummary() {
+    final cfg = _config;
     setState(() {
       _offlineActivity = _offlineActivity.acknowledgePendingSummary();
+      if (!_inDungeon && cfg != null) {
+        _offlineActivity = _resolvedTownOfflineActivity(cfg);
+      }
       _game?.paused = false;
     });
     unawaited(_flushSaveNow());
@@ -618,90 +1028,116 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   void _scheduleSave() {
     _dirty = true;
     _saveDebounce?.cancel();
-    _saveDebounce = Timer(const Duration(seconds: 2), () {
+    final delay = _inDungeon
+        ? const Duration(seconds: 12)
+        : const Duration(seconds: 3);
+    _saveDebounce = Timer(delay, () {
       unawaited(_flushSaveNow());
     });
   }
 
   Future<void> _flushSaveNow() async {
     _saveDebounce?.cancel();
-    final coordinator = _coordinator;
-    final character = _character;
-    final inventory = _inventory;
-    final rewardProcessor = _rewardProcessor;
-    if (coordinator == null ||
-        character == null ||
-        inventory == null ||
-        rewardProcessor == null) {
+    if (_isSaving) {
+      _pendingSaveAfterCurrent = true;
       return;
     }
-    _dirty = false;
+    _isSaving = true;
     try {
-      final manager = _dungeonManager;
-      final worldLoaded = _inDungeon && (_game?.world.isLoaded ?? false);
-      final sim = worldLoaded ? _game?.world.simulation : null;
-      if (sim != null) {
-        _pendingRecoveredHp = null;
-        _pendingRecoveredSkillCooldowns = const {};
-      }
-      final hasActiveSession =
-          _inDungeon && (manager?.hasActiveSession ?? false);
-      final liveSession =
-          _inDungeon && manager != null && manager.session != null
-          ? manager.toActiveSessionSnapshot(
-              reviveCooldownTicks:
-                  sim?.reviveCooldownTicks ??
-                  _lastSessionSnapshot?.reviveCooldownTicks ??
-                  0,
-              playerStatus:
-                  sim?.playerStatus ??
-                  _lastSessionSnapshot?.playerStatus ??
-                  PlayerStatus.alive,
-            )
-          : _lastSessionSnapshot;
-
-      final cooldowns = <String, int>{
-        if (hasActiveSession && sim != null)
-          for (final entry in sim.skillStates.entries)
-            if (entry.value.cooldownTicksRemaining > 0)
-              entry.key: entry.value.cooldownTicksRemaining
-            else if (hasActiveSession)
-              ..._pendingRecoveredSkillCooldowns,
-      };
-
-      final mergedDungeonProgresses = <String, DungeonProgressSnapshot>{
-        ..._dungeonProgresses,
-        if (_dungeon.currentDungeonId.isNotEmpty)
-          _dungeon.currentDungeonId: _dungeon,
-      };
-      _dungeonProgresses = mergedDungeonProgresses;
-
-      await coordinator.saveFromRuntime(
-        character: character,
-        inventory: inventory,
-        dungeon: _dungeon,
-        dungeonProgresses: mergedDungeonProgresses,
-        cycleProgress: _cycleProgress,
-        rewardProcessor: rewardProcessor,
-        autoSkillEnabled: _autoSkill.value,
-        lastOfflineClaimAtMs: _lastOfflineClaimAtMs,
-        currentHp: hasActiveSession
-            ? (sim?.player.hp ?? _pendingRecoveredHp)
-            : null,
-        skillCooldownTicks: cooldowns,
-        activeDungeonSession: liveSession,
-        offlineActivity: _offlineActivity,
-        consecutiveDefeats: _consecutiveDefeats,
-        lastFailedDungeonId: _lastFailedDungeonId,
-        currencyService: _currencyService,
-        periodicQuestStates: _bossQuestService.toSnapshot(),
-        eventShopPurchases: _eventShopPurchaseRecords(),
-      );
-    } catch (e) {
-      _dirty = true;
-      if (mounted) _showMessage('Gagal menyimpan progres: $e');
+      do {
+        _pendingSaveAfterCurrent = false;
+        await _performSaveInternal();
+      } while (_pendingSaveAfterCurrent);
+    } finally {
+      _isSaving = false;
     }
   }
+
+  Future<void> _performSaveInternal() =>
+      PerfTracer.traceAsync('Autosave._performSaveInternal', () async {
+        final coordinator = _coordinator;
+        final character = _character;
+        final inventory = _inventory;
+        final rewardProcessor = _rewardProcessor;
+        if (coordinator == null ||
+            character == null ||
+            inventory == null ||
+            rewardProcessor == null) {
+          return;
+        }
+        _dirty = false;
+        try {
+          final manager = _dungeonManager;
+          final worldLoaded = _inDungeon && (_game?.world.isLoaded ?? false);
+          final sim = worldLoaded ? _game?.world.simulation : null;
+          if (sim != null) {
+            _pendingRecoveredHp = null;
+            _pendingRecoveredSkillCooldowns = const {};
+          }
+          final hasActiveSession =
+              _inDungeon && (manager?.hasActiveSession ?? false);
+          final liveSession =
+              _inDungeon && manager != null && manager.session != null
+              ? manager.toActiveSessionSnapshot(
+                  reviveCooldownTicks:
+                      sim?.reviveCooldownTicks ??
+                      _lastSessionSnapshot?.reviveCooldownTicks ??
+                      0,
+                  playerStatus:
+                      sim?.playerStatus ??
+                      _lastSessionSnapshot?.playerStatus ??
+                      PlayerStatus.alive,
+                )
+              : _lastSessionSnapshot;
+
+          final cooldowns = <String, int>{
+            if (hasActiveSession && sim != null)
+              for (final entry in sim.skillStates.entries)
+                if (entry.value.cooldownTicksRemaining > 0)
+                  entry.key: entry.value.cooldownTicksRemaining
+                else if (hasActiveSession)
+                  ..._pendingRecoveredSkillCooldowns,
+          };
+
+          final mergedDungeonProgresses = <String, DungeonProgressSnapshot>{
+            ..._dungeonProgresses,
+            if (_dungeon.currentDungeonId.isNotEmpty)
+              _dungeon.currentDungeonId: _dungeon,
+          };
+          _dungeonProgresses = mergedDungeonProgresses;
+
+          await coordinator.saveFromRuntime(
+            character: character,
+            inventory: inventory,
+            dungeon: _dungeon,
+            dungeonProgresses: mergedDungeonProgresses,
+            cycleProgress: _cycleProgress,
+            rewardProcessor: rewardProcessor,
+            autoSkillEnabled: _autoSkill.value,
+            lastOfflineClaimAtMs: _lastOfflineClaimAtMs,
+            currentHp: hasActiveSession
+                ? (sim?.player.hp ?? _pendingRecoveredHp)
+                : null,
+            skillCooldownTicks: cooldowns,
+            activeDungeonSession: liveSession,
+            offlineActivity: _offlineActivity,
+            consecutiveDefeats: _consecutiveDefeats,
+            lastFailedDungeonId: _lastFailedDungeonId,
+            currencyService: _currencyService,
+            periodicQuestStates: _bossQuestService.toSnapshot(),
+            eventShopPurchases: _eventShopPurchaseRecords(),
+            gachaPityStates: Map<String, GachaPityState>.unmodifiable(
+              _gachaPityStates,
+            ),
+            unlockedSpecializations: Set<String>.unmodifiable(
+              _unlockedSpecializations,
+            ),
+          );
+        } catch (e) {
+          _dirty = true;
+          if (mounted) _showMessage('Gagal menyimpan progres: $e');
+        }
+      });
 
   void _attachManagerListener(DungeonManager manager) {
     if (_managerListener != null) {
@@ -797,7 +1233,10 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
             event.session.dungeonId: updated,
           };
 
-          if (event.session.isBossEvent) {
+          if (dungeonDef?.isBossSpire == true ||
+              event.session.dungeonId.startsWith('boss_spire')) {
+            unawaited(_settleBossSpireVictory(event, dungeonDef));
+          } else if (event.session.isBossEvent) {
             unawaited(_settleBossQuestVictory(event, dungeonDef));
           } else if (dungeonDef != null &&
               dungeonDef.isAscension &&
@@ -815,6 +1254,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
             _cycleProgress = ascResult.cycleProgress;
             _dungeonProgresses = Map.of(ascResult.dungeonProgresses);
             _dungeon = _dungeonProgresses[event.session.dungeonId] ?? updated;
+            unawaited(_flushSaveThenCloudSync(SyncTrigger.ascension));
           } else {
             _dungeon = updated;
             _dungeonProgresses = nextProgressMap;
@@ -845,7 +1285,16 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
               ? PlayerStatus.runEnded
               : PlayerStatus.alive,
         );
-        if (_offlineActivity.mode == OfflineActivityMode.continueDungeon) {
+        if (cfg != null) {
+          if (event.finalStatus == DungeonSessionStatus.completed &&
+              dungeonDef != null &&
+              dungeonDef.isNormal &&
+              _preferredAutoFarmDungeonId == null) {
+            _preferredAutoFarmDungeonId = event.session.dungeonId;
+          }
+          _offlineActivity = _resolvedTownOfflineActivity(cfg);
+        } else if (_offlineActivity.mode ==
+            OfflineActivityMode.continueDungeon) {
           _offlineActivity = _offlineActivity.withPauseProgression();
         }
       }
@@ -859,6 +1308,175 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       _views?.refresh();
       unawaited(_flushSaveNow());
     }
+  }
+
+  void _toggleFavorite(String instanceId) {
+    final service = _equipmentService;
+    if (service != null && service.toggleFavorite(instanceId)) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+    }
+  }
+
+  BlacksmithEnhanceResult _handleEnhanceEquipment(String instanceId) {
+    final char = _character;
+    final inv = _inventory;
+    if (char == null || inv == null) {
+      return const BlacksmithEnhanceResult(
+        status: BlacksmithEnhanceStatus.itemNotFound,
+      );
+    }
+    const service = BlacksmithService();
+    final result = service.enhanceEquipment(
+      character: char,
+      inventory: inv,
+      instanceId: instanceId,
+      loadout: char.loadout,
+    );
+    if (result.isSuccess) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  AltarUpgradeResult _handleUpgradeAltarBlessing(AltarBlessingType type) {
+    final char = _character;
+    final curr = _currencyService;
+    if (char == null || curr == null) {
+      return const AltarUpgradeResult(
+        status: AltarUpgradeStatus.unknownBlessing,
+      );
+    }
+    const service = AltarService();
+    final result = service.upgradeBlessing(
+      character: char,
+      currencyService: curr,
+      type: type,
+    );
+    if (result.isSuccess) {
+      _rewardProcessor?.goldMultiplier =
+          1.0 + service.getGoldBonusPercent(curr.balances);
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  Future<bool> _handleExpandBagCapacity() async {
+    final char = _character;
+    final curr = _currencyService;
+    final inv = _inventory;
+    if (char == null || curr == null || inv == null) return false;
+
+    const service = BagExpansionService();
+    final result = service.upgrade(
+      character: char,
+      currencyService: curr,
+      inventory: inv,
+    );
+
+    if (result.isSuccess) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+      if (mounted) {
+        setState(() {});
+      }
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _handleTestNotification() async {
+    final scheduler = ref.read(notificationSchedulerProvider);
+    await scheduler.requestPermission();
+    await scheduler.sendTestNotification();
+    if (!mounted) return;
+    showAppNotification(
+      context,
+      message: 'Notifikasi tes dikirim! Periksa bilah status HP-mu.',
+      kind: AppNotificationKind.success,
+    );
+  }
+
+  Future<MysteryBoxOpenResult> _handleOpenMysteryBox(
+    MysteryBoxTier tier,
+    int count,
+  ) async {
+    final char = _character;
+    final inv = _inventory;
+    final cfg = _config;
+    if (char == null || inv == null || cfg == null) {
+      return const MysteryBoxOpenResult(
+        status: MysteryBoxOpenStatus.unknownTier,
+      );
+    }
+    final service = MysteryBoxService(
+      items: cfg.items,
+      equipmentFactory: EquipmentFactory(cfg.equipment),
+    );
+    final random = math.Random();
+    final result = service.openBox(
+      character: char,
+      inventory: inv,
+      tier: tier,
+      count: count,
+      random: random,
+    );
+    if (result.isSuccess) {
+      _views?.refresh();
+      await _flushSaveNow();
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  BlacksmithReforgeResult _handleReforgeEquipment(String instanceId) {
+    final char = _character;
+    final inv = _inventory;
+    if (char == null || inv == null) {
+      return const BlacksmithReforgeResult(
+        status: BlacksmithReforgeStatus.itemNotFound,
+      );
+    }
+    const service = BlacksmithService();
+    final result = service.reforgeEquipment(
+      character: char,
+      inventory: inv,
+      instanceId: instanceId,
+      loadout: char.loadout,
+    );
+    if (result.isSuccess) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  BlacksmithSalvageResult _handleSalvageEquipment(String instanceId) {
+    final char = _character;
+    final inv = _inventory;
+    if (char == null || inv == null) {
+      return const BlacksmithSalvageResult(
+        status: BlacksmithSalvageStatus.itemNotFound,
+      );
+    }
+    const service = BlacksmithService();
+    final result = service.salvageEquipment(
+      inventory: inv,
+      instanceId: instanceId,
+      loadout: char.loadout,
+    );
+    if (result.isSuccess) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
   }
 
   ShopService _shopServiceFor(GameConfig cfg) => ShopService(
@@ -1027,6 +1645,8 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       effectiveNowMs: effectiveNowMs,
       context: _shopContextFor(),
       currencyBalance: balance,
+      goldBalance: _character?.gold ?? 0,
+      inventory: _inventory,
       hasInventorySpace: hasSpace,
       purchaseCounts: _eventShopPurchases,
     );
@@ -1058,6 +1678,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       effectiveNowMs: effectiveNowMs,
       inventory: inventory,
       currencyService: currencyService,
+      character: character,
       context: _shopContextFor(),
       random: _shopRandom,
       purchaseCounts: _eventShopPurchases,
@@ -1082,6 +1703,12 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           balances: prevBalances,
           claimedIds: prevClaims,
         );
+        if (result.goldSpent > 0) {
+          character.addGold(result.goldSpent);
+        }
+        for (final mat in result.materialsSpent.entries) {
+          inventory.add(mat.key, mat.value);
+        }
         final eq = result.purchasedEquipment;
         if (eq != null) {
           inventory.removeEquipment(eq.id);
@@ -1167,6 +1794,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         _selectedDungeonId = nextSelected;
         _dungeon = _progressFor(nextSelected);
       }
+      _offlineActivity = _resolvedTownOfflineActivity(config);
     });
     unawaited(_flushSaveNow());
   }
@@ -1327,6 +1955,61 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     }
   }
 
+  Future<void> _settleBossSpireVictory(
+    DungeonEndedEvent event,
+    DungeonDefinition? dungeonDef,
+  ) async {
+    final coordinator = _coordinator;
+    final character = _character;
+    final inventory = _inventory;
+    final rewardProcessor = _rewardProcessor;
+    final currencyService = _currencyService;
+    final config = _config;
+    if (coordinator == null ||
+        character == null ||
+        inventory == null ||
+        rewardProcessor == null ||
+        currencyService == null ||
+        config == null ||
+        config.bossSpire == null) {
+      return;
+    }
+    final rawFloor =
+        dungeonDef?.order ??
+        int.tryParse(
+          event.session.dungeonId.replaceAll(RegExp(r'[^0-9]'), ''),
+        ) ??
+        1;
+    final floorNumber = rawFloor < 1 ? 1 : rawFloor;
+    try {
+      final result = await coordinator.settleBossSpireVictory(
+        floorNumber: floorNumber,
+        character: character,
+        inventory: inventory,
+        dungeon: _dungeon,
+        dungeonProgresses: _dungeonProgresses,
+        cycleProgress: _cycleProgress,
+        rewardProcessor: rewardProcessor,
+        currencyService: currencyService,
+        autoSkillEnabled: _autoSkill.value,
+        lastOfflineClaimAtMs: _lastOfflineClaimAtMs,
+        activeDungeonSession: _lastSessionSnapshot,
+        offlineActivity: _offlineActivity,
+        consecutiveDefeats: _consecutiveDefeats,
+        lastFailedDungeonId: _lastFailedDungeonId,
+      );
+      if (!mounted) return;
+      _views?.refresh();
+      setState(() {
+        _lastBossSpireResult = result;
+      });
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Gagal memproses hadiah Menara Bos: $e');
+      }
+    }
+  }
+
   Future<void> _enterBossRun(GameConfig config, Period period) async {
     final coordinator = _coordinator;
     final character = _character;
@@ -1391,53 +2074,320 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     });
   }
 
-  Widget _buildBossEventsOverlay(GameConfig config) {
-    final bossEvents = config.bossEvents!;
+  Future<void> _enterSpireRun(GameConfig config, int floorNumber) async {
+    final coordinator = _coordinator;
+    final character = _character;
+    final inventory = _inventory;
+    final rewardProcessor = _rewardProcessor;
+    final currencyService = _currencyService;
+    if (coordinator == null ||
+        character == null ||
+        inventory == null ||
+        rewardProcessor == null ||
+        config.bossSpire == null) {
+      _showMessage('Konfigurasi Menara Bos tidak tersedia.');
+      return;
+    }
+    var manager = _dungeonManager;
+    if (manager == null) {
+      manager = DungeonManager(
+        dungeons: config.dungeons,
+        encounterTracker: EncounterTracker(monsterCatalog: config.monsters),
+        clock: _clock,
+        difficultyService: DifficultyService(config.difficulty),
+      );
+      _dungeonManager = manager;
+      _attachManagerListener(manager);
+    }
+    _game?.detachSessionListeners();
+    manager.exitToTown();
+    _lastCompletionReward = null;
+    _lastAscensionResult = null;
+    _lastBossQuestResult = null;
+    _lastBossSpireResult = null;
+    _lastSessionSnapshot = null;
+    _pendingRecoveredHp = null;
+    _pendingRecoveredSkillCooldowns = const {};
+    if (_offlineActivity.mode == OfflineActivityMode.autoFarming ||
+        _offlineActivity.mode == OfflineActivityMode.continueDungeon) {
+      _offlineActivity = _offlineActivity.withPauseProgression();
+    }
+    final prepared = await coordinator.startBossSpireRun(
+      floorNumber: floorNumber,
+      dungeonManager: manager,
+      character: character,
+      inventory: inventory,
+      dungeon: _dungeon,
+      dungeonProgresses: _progressMapWithCurrent(),
+      cycleProgress: _cycleProgress,
+      rewardProcessor: rewardProcessor,
+      autoSkillEnabled: _autoSkill.value,
+      lastOfflineClaimAtMs: _lastOfflineClaimAtMs,
+      currencyService: currencyService,
+      offlineActivity: _offlineActivity,
+      consecutiveDefeats: _consecutiveDefeats,
+      lastFailedDungeonId: _lastFailedDungeonId,
+    );
+    _activeBossDifficultyProfile = prepared.difficultyProfile;
+    _lastSessionSnapshot = manager.toActiveSessionSnapshot();
+    if (!mounted) return;
+    setState(() {
+      _showBossEvents = false;
+      _showBossSpire = false;
+      _game = _newGame(config);
+      _inDungeon = true;
+    });
+  }
+
+  Widget _buildBossHubOverlay(GameConfig config) {
     final nowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
     final periodService = PeriodService(config: config.time);
-    final bossService = BossEventService(bossEvents);
-    final ref = bossService.resolveReference(
-      _cycleProgress,
-      _progressMapWithCurrent(),
-      config.dungeons,
-    );
-    final diffService = DifficultyService(config.difficulty);
-    final profile = diffService.profileFor(ref.dungeon, ref.cycleRank);
 
-    BossEventCardData buildCard(Period period, String label) {
-      final tier = bossEvents.tierFor(period);
-      final index = period == Period.daily
-          ? periodService.dayIndex(nowMs)
-          : periodService.weekIndex(nowMs);
-      final key = periodService.keyFor(period, nowMs);
-      final boss = bossService.bossFor(period, index);
-      final nextResetMs = periodService.nextResetMs(period, nowMs);
-      final remaining = Duration(
-        milliseconds: math.max(0, nextResetMs - nowMs),
+    BossEventCardData? dailyCard;
+    BossEventCardData? weeklyCard;
+    final bossEvents = config.bossEvents;
+    if (bossEvents != null) {
+      final bossService = BossEventService(bossEvents);
+      final ref = bossService.resolveReference(
+        _cycleProgress,
+        _progressMapWithCurrent(),
+        config.dungeons,
       );
-      final scaled = BossQuestService.computeScaledReward(
-        reward: tier.reward,
-        difficultyProfile: profile,
-      );
-      final isDone = _bossQuestService.isCompleted(tier.questId, key);
-      return BossEventCardData(
-        periodKeyId: period.name,
-        periodLabel: label,
-        bossName: boss.name,
-        referenceDungeonName: ref.dungeon.name,
-        recommendedLevel: ref.dungeon.recommendedLevel,
-        isCompleted: isDone,
-        remainingToReset: remaining,
-        rewardSummary:
-            '${scaled.aetherShard} Aether Shard • ${scaled.gold} Gold • ${scaled.exp} EXP',
-        onFight: () => unawaited(_enterBossRun(config, period)),
-      );
+      final diffService = DifficultyService(config.difficulty);
+      final profile = diffService.profileFor(ref.dungeon, ref.cycleRank);
+
+      BossEventCardData buildCard(Period period, String label) {
+        final tier = bossEvents.tierFor(period);
+        final index = period == Period.daily
+            ? periodService.dayIndex(nowMs)
+            : periodService.weekIndex(nowMs);
+        final key = periodService.keyFor(period, nowMs);
+        final boss = bossService.bossFor(period, index);
+        final nextResetMs = periodService.nextResetMs(period, nowMs);
+        final remaining = Duration(
+          milliseconds: math.max(0, nextResetMs - nowMs),
+        );
+        final scaled = BossQuestService.computeScaledReward(
+          reward: tier.reward,
+          difficultyProfile: profile,
+        );
+        final isDone = _bossQuestService.isCompleted(tier.questId, key);
+        return BossEventCardData(
+          periodKeyId: period.name,
+          periodLabel: label,
+          bossName: boss.name,
+          referenceDungeonName: ref.dungeon.name,
+          recommendedLevel: ref.dungeon.recommendedLevel,
+          isCompleted: isDone,
+          remainingToReset: remaining,
+          rewardSummary:
+              '${scaled.aetherShard} Aether Shard • ${scaled.gold} Gold • ${scaled.exp} EXP',
+          onFight: () => unawaited(_enterBossRun(config, period)),
+        );
+      }
+
+      dailyCard = buildCard(Period.daily, 'Daily Boss');
+      weeklyCard = buildCard(Period.weekly, 'Weekly Boss');
     }
 
-    return BossEventsOverlay(
-      daily: buildCard(Period.daily, 'Daily Boss'),
-      weekly: buildCard(Period.weekly, 'Weekly Boss'),
-      onClose: () => setState(() => _showBossEvents = false),
+    final spireConfig = config.bossSpire;
+    BossSpireProgress? spireProgress;
+    Duration? spireRemaining;
+    if (spireConfig != null) {
+      final spireService = BossSpireService(spireConfig);
+      final cycleKey = periodService.biweeklyKey(nowMs);
+      final nextResetMs = periodService.nextBiweeklyResetMs(nowMs);
+      spireRemaining = Duration(
+        milliseconds: math.max<int>(0, nextResetMs - nowMs),
+      );
+      final claimedIds = _rewardProcessor?.claimedEventIds ?? const <String>{};
+      spireProgress = spireService.getProgress(claimedIds, cycleKey: cycleKey);
+    }
+
+    return BossHubOverlay(
+      daily: dailyCard,
+      weekly: weeklyCard,
+      spireConfig: spireConfig,
+      spireProgress: spireProgress,
+      playerLevel: _character?.level ?? 1,
+      spireRemainingToReset: spireRemaining,
+      onFightSpireFloor: spireConfig != null
+          ? (floor) => unawaited(_enterSpireRun(config, floor))
+          : null,
+      initialTab: _showBossSpire && !_showBossEvents ? 1 : 0,
+      onClose: () => setState(() {
+        _showBossEvents = false;
+        _showBossSpire = false;
+      }),
+    );
+  }
+
+  Widget _buildAltarOverlay(GameConfig config) {
+    final views = _views;
+    if (views == null) return const SizedBox.shrink();
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () => setState(() => _showAltar = false),
+            child: Container(color: Colors.black54),
+          ),
+        ),
+        AltarOverlay(
+          characterSnapshot: views.characterView,
+          getBalances: () => _currencyService?.balances ?? const {},
+          onUpgradeBlessing: _handleUpgradeAltarBlessing,
+          onClose: () => setState(() => _showAltar = false),
+        ),
+      ],
+    );
+  }
+
+  GachaService? _gachaServiceFor(GameConfig cfg) {
+    final gachaConfig = cfg.gacha;
+    if (gachaConfig == null) return null;
+    return GachaService(
+      gachaConfig: gachaConfig,
+      items: cfg.items,
+      specializations: cfg.specializations.definitions,
+      equipmentFactory: EquipmentFactory(cfg.equipment),
+      periodService: const PeriodService(),
+    );
+  }
+
+  PlayerSaveSnapshot _currentGachaSnapshot() {
+    final char = _character!;
+    final inv = _inventory!;
+    return PlayerSaveSnapshot(
+      character: char.toSnapshot(),
+      inventory: inv.toSnapshot(),
+      dungeon: _dungeon,
+      dungeonProgresses: Map<String, DungeonProgressSnapshot>.unmodifiable(
+        _dungeonProgresses,
+      ),
+      cycleProgress: _cycleProgress,
+      currencies: _currencyService?.toSnapshot() ?? const {},
+      gachaPityStates: Map<String, GachaPityState>.unmodifiable(
+        _gachaPityStates,
+      ),
+      unlockedSpecializations: Set<String>.unmodifiable(
+        _unlockedSpecializations,
+      ),
+    );
+  }
+
+  void _applyGachaSnapshot(PlayerSaveSnapshot updated) {
+    _inventory?.restore(updated.inventory);
+    _currencyService?.restoreState(
+      balances: updated.currencies,
+      claimedIds: _currencyService?.claimedIds ?? const {},
+    );
+    _gachaPityStates = Map<String, GachaPityState>.of(updated.gachaPityStates);
+    _unlockedSpecializations = Set<String>.of(updated.unlockedSpecializations);
+    _views?.setUnlockedSpecializations(_unlockedSpecializations);
+    unawaited(_flushSaveNow());
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<GachaPullSessionResult> _handleGachaPull(
+    GameConfig cfg,
+    GachaBannerType bannerType,
+    int count,
+  ) async {
+    final service = _gachaServiceFor(cfg);
+    if (service == null || _character == null || _inventory == null) {
+      return GachaPullSessionResult(
+        status: GachaPullStatus.bannerNotFound,
+        bannerType: bannerType,
+      );
+    }
+    final nowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
+    final snap = _currentGachaSnapshot();
+    final result = count == 10
+        ? service.pullTen(
+            snapshot: snap,
+            bannerType: bannerType,
+            nowMs: nowMs,
+            random: _shopRandom,
+          )
+        : service.pullOnce(
+            snapshot: snap,
+            bannerType: bannerType,
+            nowMs: nowMs,
+            random: _shopRandom,
+          );
+    if (result.isSuccess && result.updatedSnapshot != null) {
+      _applyGachaSnapshot(result.updatedSnapshot!);
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  Future<SanctuaryExchangeResult> _handleSanctuaryExchangeWeapon(
+    GameConfig cfg,
+    String weaponId,
+  ) async {
+    final service = _gachaServiceFor(cfg);
+    if (service == null || _character == null || _inventory == null) {
+      return const SanctuaryExchangeResult(
+        status: SanctuaryExchangeStatus.invalidTarget,
+      );
+    }
+    final result = service.exchangeSanctuaryWeapon(
+      snapshot: _currentGachaSnapshot(),
+      weaponId: weaponId,
+      random: _shopRandom,
+    );
+    if (result.isSuccess && result.updatedSnapshot != null) {
+      _applyGachaSnapshot(result.updatedSnapshot!);
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  Future<SanctuaryExchangeResult> _handleSanctuaryExchangeClass(
+    GameConfig cfg,
+    String classId,
+  ) async {
+    final service = _gachaServiceFor(cfg);
+    if (service == null || _character == null || _inventory == null) {
+      return const SanctuaryExchangeResult(
+        status: SanctuaryExchangeStatus.invalidTarget,
+      );
+    }
+    final result = service.exchangeSanctuaryClass(
+      snapshot: _currentGachaSnapshot(),
+      classId: classId,
+    );
+    if (result.isSuccess && result.updatedSnapshot != null) {
+      _applyGachaSnapshot(result.updatedSnapshot!);
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
+  Widget _buildGachaOverlay(GameConfig config) {
+    final service = _gachaServiceFor(config);
+    if (service == null) return const SizedBox.shrink();
+    final nowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
+    final shards = _currencyService?.balance(kAetherShardCurrencyId) ?? 0;
+    final prisms = _currencyService?.balance(kSoulPrismCurrencyId) ?? 0;
+    return GachaOverlay(
+      gachaService: service,
+      aetherShards: shards,
+      soulPrisms: prisms,
+      pityStates: _gachaPityStates,
+      unlockedSpecializations: _unlockedSpecializations,
+      nowMs: nowMs,
+      onPull: (bannerType, count) =>
+          _handleGachaPull(config, bannerType, count),
+      onExchangeWeapon: (weaponId) =>
+          _handleSanctuaryExchangeWeapon(config, weaponId),
+      onExchangeClass: (classId) =>
+          _handleSanctuaryExchangeClass(config, classId),
+      onClose: () => setState(() => _showGacha = false),
     );
   }
 
@@ -1463,7 +2413,9 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       }
       _lastCompletionReward = null;
       _lastAscensionResult = null;
-      if (_offlineActivity.mode == OfflineActivityMode.continueDungeon) {
+      if (cfg != null) {
+        _offlineActivity = _resolvedTownOfflineActivity(cfg);
+      } else if (_offlineActivity.mode == OfflineActivityMode.continueDungeon) {
         _offlineActivity = _offlineActivity.withPauseProgression();
       }
       _game = null;
@@ -1475,154 +2427,190 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   @override
   Widget build(BuildContext context) {
     final config = ref.watch(gameConfigProvider);
-    return Scaffold(
-      body: SafeArea(
-        child: config.when(
-          data: (cfg) => FutureBuilder<void>(
-            future: _ensureInitialized(cfg),
-            builder: (context, snapshot) {
-              if (!_initialized &&
-                  snapshot.connectionState != ConnectionState.done) {
-                return const LoadingState(title: 'Menyiapkan Camp Aether...');
-              }
-              if (snapshot.hasError && !_initialized) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: PanelFrame(
-                        showCornerOrnaments: true,
-                        borderColor: AppColors.emberRed,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              color: AppColors.emberRed,
-                              size: 32,
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(
-                              'Gagal menginisialisasi data progres:\n${snapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBackNavigation();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: config.when(
+            data: (cfg) => FutureBuilder<void>(
+              future: _ensureInitialized(cfg),
+              builder: (context, snapshot) {
+                if (!_initialized &&
+                    snapshot.connectionState != ConnectionState.done) {
+                  return const LoadingState(title: 'Menyiapkan Camp Aether...');
+                }
+                if (snapshot.hasError && !_initialized) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: PanelFrame(
+                          showCornerOrnaments: true,
+                          borderColor: AppColors.emberRed,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: AppColors.emberRed,
+                                size: 32,
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                'Gagal menginisialisasi data progres:\n${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  );
+                }
+                final activeSelectedId = _resolveSelectedDungeonId(cfg);
+                final selectedProgress = activeSelectedId != null
+                    ? _progressFor(activeSelectedId)
+                    : _dungeon;
+                final selectedDef = activeSelectedId != null
+                    ? cfg.dungeons[activeSelectedId]
+                    : null;
+                final content = !_inDungeon
+                    ? TownHubView(
+                        character: _character!,
+                        views: _views!,
+                        items: cfg.items,
+                        dungeonProgress: selectedProgress,
+                        dungeonDefinition: selectedDef,
+                        cycleProgress: _cycleProgress,
+                        difficultyConfig: cfg.difficulty,
+                        farmingConfig: cfg.farming,
+                        consecutiveDefeats: _consecutiveDefeats,
+                        lastFailedDungeonId: _lastFailedDungeonId,
+                        selectedDungeonId: activeSelectedId,
+                        onSelectDungeon: (id) => _selectDungeon(cfg, id),
+                        onEnterDungeon: () => _enterDungeon(cfg),
+                        onEnterDungeonById: (id) =>
+                            _enterDungeon(cfg, dungeonId: id),
+                        onSwitchCycleRank: (rank) =>
+                            _switchCycleRank(cfg, rank),
+                        onEquip: _equip,
+                        onUnequip: _unequip,
+                        onToggleFavorite: _toggleFavorite,
+                        bagLevelProvider: () =>
+                            _currencyService?.balance(
+                              kBagExpansionCurrencyId,
+                            ) ??
+                            0,
+                        onExpandBag: _handleExpandBagCapacity,
+                        onChooseSpecialization: _chooseSpecialization,
+                        onUpgradeSkill: _upgradeSkill,
+                        settings: _audioService.settingsNotifier,
+                        onSettingsChanged: _updateSettings,
+                        onTestSfx: () =>
+                            unawaited(_audioService.playSfx(AudioCue.loot)),
+                        offlineActivity: _offlineActivity,
+                        availableDungeons: cfg.dungeons,
+                        dungeonProgresses: _dungeonProgresses,
+                        onSelectAutoFarming: _selectAutoFarming,
+                        shopCatalog: cfg.shop,
+                        shopService: _shopServiceFor(cfg),
+                        shopContext: _shopContextFor(),
+                        onShopBuy: (entryId) => _buyFromShop(cfg, entryId),
+                        onShopSellEquipment: (instanceId) =>
+                            _sellEquipmentFromShop(cfg, instanceId),
+                        onShopSellMaterialBulk: (itemId, qty) =>
+                            _sellMaterialBulkFromShop(cfg, itemId, qty),
+                        onShopSellBatch: (eqIds, matQtys) =>
+                            _sellBatchFromShop(cfg, eqIds, matQtys),
+                        eventShopData: _eventShopViewDataFor(cfg),
+                        onEventShopBuy: cfg.eventShop != null
+                            ? (entryId) => _buyFromEventShop(cfg, entryId)
+                            : null,
+                        aetherShard:
+                            _currencyService?.balance(kAetherShardCurrencyId) ??
+                            0,
+                        onOpenBossEvents:
+                            (cfg.bossEvents != null || cfg.bossSpire != null)
+                            ? () => setState(() => _showBossEvents = true)
+                            : null,
+                        onOpenBossSpire: cfg.bossSpire != null
+                            ? () => setState(() => _showBossSpire = true)
+                            : null,
+                        onRequestNotificationPermission: () => ref
+                            .read(notificationSchedulerProvider)
+                            .requestPermission(),
+                        onTestNotification: _handleTestNotification,
+                        cloudSyncSection: _buildCloudSyncSection(cfg),
+                        onEnhanceEquipment: _handleEnhanceEquipment,
+                        onReforgeEquipment: _handleReforgeEquipment,
+                        onSalvageEquipment: _handleSalvageEquipment,
+                        getAltarBalances: () =>
+                            _currencyService?.balances ?? const {},
+                        onUpgradeAltarBlessing: _handleUpgradeAltarBlessing,
+                        onOpenAltar: () => setState(() => _showAltar = true),
+                        onOpenGacha: cfg.gacha != null
+                            ? () => setState(() => _showGacha = true)
+                            : null,
+                        onOpenMysteryBox: _handleOpenMysteryBox,
+                      )
+                    : _buildGame(cfg);
+                final pendingSummary = _offlineActivity.pendingSummary;
+                final showOfflineSummary =
+                    pendingSummary != null && !pendingSummary.acknowledged;
+                return Stack(
+                  children: [
+                    content,
+                    if (!_inDungeon &&
+                        (_showBossEvents || _showBossSpire) &&
+                        (cfg.bossEvents != null || cfg.bossSpire != null))
+                      _buildBossHubOverlay(cfg),
+                    if (!_inDungeon && _showAltar) _buildAltarOverlay(cfg),
+                    if (!_inDungeon && _showGacha && cfg.gacha != null)
+                      _buildGachaOverlay(cfg),
+                    if (showOfflineSummary)
+                      OfflineSummaryOverlay(
+                        summary: pendingSummary,
+                        items: cfg.items,
+                        dungeons: cfg.dungeons,
+                        selectedDungeonId: _offlineActivity.selectedDungeonId,
+                        onAcknowledge: _acknowledgeOfflineSummary,
+                      ),
+                  ],
                 );
-              }
-              final activeSelectedId = _resolveSelectedDungeonId(cfg);
-              final selectedProgress = activeSelectedId != null
-                  ? _progressFor(activeSelectedId)
-                  : _dungeon;
-              final selectedDef = activeSelectedId != null
-                  ? cfg.dungeons[activeSelectedId]
-                  : null;
-              final content = !_inDungeon
-                  ? TownHubView(
-                      character: _character!,
-                      views: _views!,
-                      items: cfg.items,
-                      dungeonProgress: selectedProgress,
-                      dungeonDefinition: selectedDef,
-                      cycleProgress: _cycleProgress,
-                      difficultyConfig: cfg.difficulty,
-                      farmingConfig: cfg.farming,
-                      consecutiveDefeats: _consecutiveDefeats,
-                      lastFailedDungeonId: _lastFailedDungeonId,
-                      selectedDungeonId: activeSelectedId,
-                      onSelectDungeon: (id) => _selectDungeon(cfg, id),
-                      onEnterDungeon: () => _enterDungeon(cfg),
-                      onEnterDungeonById: (id) =>
-                          _enterDungeon(cfg, dungeonId: id),
-                      onSwitchCycleRank: (rank) => _switchCycleRank(cfg, rank),
-                      onEquip: _equip,
-                      onUnequip: _unequip,
-                      onChooseSpecialization: _chooseSpecialization,
-                      onUpgradeSkill: _upgradeSkill,
-                      settings: _audioService.settingsNotifier,
-                      onSettingsChanged: _updateSettings,
-                      onTestSfx: () =>
-                          unawaited(_audioService.playSfx(AudioCue.loot)),
-                      offlineActivity: _offlineActivity,
-                      availableDungeons: cfg.dungeons,
-                      dungeonProgresses: _dungeonProgresses,
-                      onSelectPauseOffline: _selectPauseOffline,
-                      onSelectAutoFarming: _selectAutoFarming,
-                      shopCatalog: cfg.shop,
-                      shopService: _shopServiceFor(cfg),
-                      shopContext: _shopContextFor(),
-                      onShopBuy: (entryId) => _buyFromShop(cfg, entryId),
-                      onShopSellEquipment: (instanceId) =>
-                          _sellEquipmentFromShop(cfg, instanceId),
-                      onShopSellMaterialBulk: (itemId, qty) =>
-                          _sellMaterialBulkFromShop(cfg, itemId, qty),
-                      onShopSellBatch: (eqIds, matQtys) =>
-                          _sellBatchFromShop(cfg, eqIds, matQtys),
-                      eventShopData: _eventShopViewDataFor(cfg),
-                      onEventShopBuy: cfg.eventShop != null
-                          ? (entryId) => _buyFromEventShop(cfg, entryId)
-                          : null,
-                      aetherShard:
-                          _currencyService?.balance(kAetherShardCurrencyId) ??
-                          0,
-                      onOpenBossEvents: cfg.bossEvents != null
-                          ? () => setState(() => _showBossEvents = true)
-                          : null,
-                      onRequestNotificationPermission: () => ref
-                          .read(notificationSchedulerProvider)
-                          .requestPermission(),
-                    )
-                  : _buildGame(cfg);
-              final pendingSummary = _offlineActivity.pendingSummary;
-              final showOfflineSummary =
-                  pendingSummary != null && !pendingSummary.acknowledged;
-              return Stack(
-                children: [
-                  content,
-                  if (!_inDungeon && _showBossEvents && cfg.bossEvents != null)
-                    _buildBossEventsOverlay(cfg),
-                  if (showOfflineSummary)
-                    OfflineSummaryOverlay(
-                      summary: pendingSummary,
-                      items: cfg.items,
-                      dungeons: cfg.dungeons,
-                      selectedDungeonId: _offlineActivity.selectedDungeonId,
-                      onAcknowledge: _acknowledgeOfflineSummary,
+              },
+            ),
+            loading: () =>
+                const LoadingState(title: 'Memuat Konfigurasi Dunia...'),
+            error: (error, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: PanelFrame(
+                    showCornerOrnaments: true,
+                    borderColor: AppColors.emberRed,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.emberRed,
+                          size: 32,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Gagal memuat konfigurasi game:\n$error',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                     ),
-                ],
-              );
-            },
-          ),
-          loading: () =>
-              const LoadingState(title: 'Memuat Konfigurasi Dunia...'),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: PanelFrame(
-                  showCornerOrnaments: true,
-                  borderColor: AppColors.emberRed,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: AppColors.emberRed,
-                        size: 32,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Gagal memuat konfigurasi game:\n$error',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -1644,6 +2632,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     inventory: _inventory!,
     autoSkill: _autoSkill,
     dungeonManager: _dungeonManager,
+    dungeonBiome: _dungeonManager?.activeDungeon?.biome,
     roomTransitionDelaySeconds: widget.roomTransitionDelaySeconds,
     views: _views,
     equipmentService: _equipmentService,
@@ -1696,21 +2685,21 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         onTap: onPressed,
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 32),
+          constraints: const BoxConstraints(minHeight: 28),
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.sm + 1,
-              vertical: 6,
+              vertical: 4,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 14, color: color),
+                Icon(icon, size: 13, color: color),
                 const SizedBox(width: 4),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                     color: color,
                     letterSpacing: 0.15,
@@ -1727,116 +2716,152 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   Widget _buildGame(GameConfig config) {
     final game = _game ??= _newGame(config);
 
-    return GameWidget<EchoesGame>(
-      key: ObjectKey(game), // game baru = widget baru
-      game: game,
-      initialActiveOverlays: const [GameOverlays.hud, GameOverlays.menuButtons],
-      overlayBuilderMap: {
-        GameOverlays.hud: (context, g) => HudOverlay(state: g.hud),
-        GameOverlays.menuButtons: (context, g) {
-          final continueOffline =
-              _offlineActivity.mode == OfflineActivityMode.continueDungeon &&
-              !_offlineActivity.isPaused;
-          return _DungeonCompactMenuCluster(
-            game: g,
-            continueOffline: continueOffline,
-            onToggleAutoSkill: (on) {
-              g.autoSkill.value = !on;
-              unawaited(_flushSaveNow());
-            },
-            onToggleOffline: continueOffline
-                ? _selectPauseOffline
-                : _selectContinueDungeon,
-            onTogglePanel: (panel) => _togglePanel(g, panel),
-            onReturnToTown: _returnToTown,
-            chipBuilder: _compactChipButton,
-          );
+    return RepaintBoundary(
+      child: GameWidget<EchoesGame>(
+        key: ObjectKey(game), // game baru = widget baru
+        game: game,
+        initialActiveOverlays: const [
+          GameOverlays.hud,
+          GameOverlays.menuButtons,
+        ],
+        overlayBuilderMap: {
+          GameOverlays.hud: (context, g) =>
+              RepaintBoundary(child: HudOverlay(state: g.hud)),
+          GameOverlays.menuButtons: (context, g) {
+            final continueOffline =
+                _offlineActivity.mode == OfflineActivityMode.continueDungeon &&
+                !_offlineActivity.isPaused;
+            return RepaintBoundary(
+              child: _DungeonCompactMenuCluster(
+                game: g,
+                continueOffline: continueOffline,
+                onToggleAutoSkill: (on) {
+                  g.autoSkill.value = !on;
+                  unawaited(_flushSaveNow());
+                },
+                onToggleOffline: continueOffline
+                    ? _selectPauseOffline
+                    : _selectContinueDungeon,
+                onTogglePanel: (panel) => _togglePanel(g, panel),
+                onReturnToTown: _returnToTown,
+                chipBuilder: _compactChipButton,
+              ),
+            );
+          },
+          GameOverlays.inventory: (context, g) => InventoryOverlay(
+            entries: g.views.stacks,
+            onClose: () => g.overlays.remove(GameOverlays.inventory),
+          ),
+          GameOverlays.equipment: (context, g) => EquipmentOverlay(
+            snapshot: g.views.equipment,
+            items: config.items,
+            onEquip: g.equip,
+            onUnequip: g.unequip,
+            onToggleFavorite: g.toggleFavorite,
+            bagLevelProvider: () =>
+                _currencyService?.balance(kBagExpansionCurrencyId) ?? 0,
+            playerGoldProvider: () => _character?.gold ?? 0,
+            onExpandBag: _handleExpandBagCapacity,
+            onClose: () => g.overlays.remove(GameOverlays.equipment),
+          ),
+          GameOverlays.character: (context, g) => CharacterOverlay(
+            snapshot: g.views.characterView,
+            onChooseSpecialization: g.chooseSpecialization,
+            onUpgradeSkill: g.upgradeSkill,
+            onClose: () => g.overlays.remove(GameOverlays.character),
+          ),
+          GameOverlays.settings: (context, g) => SettingsOverlay(
+            settings: _audioService.settingsNotifier,
+            onChanged: _updateSettings,
+            onTestSfx: () => unawaited(_audioService.playSfx(AudioCue.loot)),
+            onRequestNotificationPermission: () =>
+                ref.read(notificationSchedulerProvider).requestPermission(),
+            onTestNotification: _handleTestNotification,
+            cloudSyncSection: _buildCloudSyncSection(config),
+            onClose: () => g.overlays.remove(GameOverlays.settings),
+          ),
+          GameOverlays.blacksmith: (context, g) => BlacksmithOverlay(
+            snapshot: g.views.equipment,
+            items: config.items,
+            inventoryEntries: g.views.stacks,
+            characterSnapshot: g.views.characterView,
+            onEnhanceEquipment: _handleEnhanceEquipment,
+            onReforgeEquipment: _handleReforgeEquipment,
+            onSalvageEquipment: _handleSalvageEquipment,
+            onClose: () => g.overlays.remove(GameOverlays.blacksmith),
+          ),
+          GameOverlays.altar: (context, g) => AltarOverlay(
+            characterSnapshot: g.views.characterView,
+            getBalances: () => _currencyService?.balances ?? const {},
+            onUpgradeBlessing: _handleUpgradeAltarBlessing,
+            onClose: () => g.overlays.remove(GameOverlays.altar),
+          ),
+          GameOverlays.runEnded: (context, _) {
+            final failedDef = _dungeonManager?.activeDungeon;
+            final isAscensionRun = failedDef?.isAscension ?? false;
+            return RunEndedOverlay(
+              subtitle: isAscensionRun
+                  ? 'Ascension Rank tidak berubah dan loot terkonfirmasi tetap disimpan.'
+                  : null,
+              onRetry: () {
+                unawaited(_flushSaveNow());
+                _enterDungeon(config, dungeonId: failedDef?.id);
+              },
+              onReturnToTown: _returnToTown,
+            );
+          },
+          GameOverlays.dungeonCompleted: (context, _) {
+            final manager = _dungeonManager;
+            final selectedId = _resolveSelectedDungeonId(config);
+            final dungeon =
+                manager?.activeDungeon ??
+                (selectedId != null ? config.dungeons[selectedId] : null);
+            final dungeonName = dungeon?.name ?? 'Dungeon';
+            final clearedCount = manager?.session?.clearedRoomIds.length ?? 0;
+            final isFinalBoss =
+                dungeon != null &&
+                dungeon.rooms.values.any(
+                  (room) => room.spawns.any(
+                    (spawn) =>
+                        config.monsters[spawn.monsterId]?.isFinalBoss == true,
+                  ),
+                );
+            final isAscension = dungeon?.isAscension ?? false;
+            final isBossEvent = dungeon?.isBossEvent ?? false;
+            final isBossSpire = dungeon?.isBossSpire ?? false;
+            final ascResult = _lastAscensionResult;
+            return DungeonCompletedOverlay(
+              dungeonName: dungeonName,
+              clearedRoomsCount: clearedCount,
+              isFinalBoss: isFinalBoss,
+              isAscension: isAscension,
+              previousAscensionRank: isAscension
+                  ? ascResult?.previousRank
+                  : null,
+              newAscensionRank: isAscension
+                  ? (ascResult?.newRank ?? _cycleProgress.ascensionRank)
+                  : null,
+              completionReward: _lastCompletionReward,
+              bossQuestMessage: isBossSpire
+                  ? (_lastBossSpireResult?.userMessage ?? 'Menara Bos Selesai!')
+                  : (isBossEvent
+                        ? (_lastBossQuestResult?.userMessage ??
+                              'Memproses hadiah boss quest...')
+                        : null),
+              onRetry: (isAscension || isBossEvent || isBossSpire)
+                  ? null
+                  : () {
+                      unawaited(_flushSaveNow());
+                      _enterDungeon(
+                        config,
+                        dungeonId: manager?.activeDungeon?.id,
+                      );
+                    },
+              onReturnToTown: _returnToTown,
+            );
+          },
         },
-        GameOverlays.inventory: (context, g) => InventoryOverlay(
-          entries: g.views.stacks,
-          onClose: () => g.overlays.remove(GameOverlays.inventory),
-        ),
-        GameOverlays.equipment: (context, g) => EquipmentOverlay(
-          snapshot: g.views.equipment,
-          items: config.items,
-          onEquip: g.equip,
-          onUnequip: g.unequip,
-          onClose: () => g.overlays.remove(GameOverlays.equipment),
-        ),
-        GameOverlays.character: (context, g) => CharacterOverlay(
-          snapshot: g.views.characterView,
-          onChooseSpecialization: g.chooseSpecialization,
-          onUpgradeSkill: g.upgradeSkill,
-          onClose: () => g.overlays.remove(GameOverlays.character),
-        ),
-        GameOverlays.settings: (context, g) => SettingsOverlay(
-          settings: _audioService.settingsNotifier,
-          onChanged: _updateSettings,
-          onTestSfx: () => unawaited(_audioService.playSfx(AudioCue.loot)),
-          onRequestNotificationPermission: () =>
-              ref.read(notificationSchedulerProvider).requestPermission(),
-          onClose: () => g.overlays.remove(GameOverlays.settings),
-        ),
-        GameOverlays.runEnded: (context, _) {
-          final failedDef = _dungeonManager?.activeDungeon;
-          final isAscensionRun = failedDef?.isAscension ?? false;
-          return RunEndedOverlay(
-            subtitle: isAscensionRun
-                ? 'Ascension Rank tidak berubah dan loot terkonfirmasi tetap disimpan.'
-                : null,
-            onRetry: () {
-              unawaited(_flushSaveNow());
-              _enterDungeon(config, dungeonId: failedDef?.id);
-            },
-            onReturnToTown: _returnToTown,
-          );
-        },
-        GameOverlays.dungeonCompleted: (context, _) {
-          final manager = _dungeonManager;
-          final selectedId = _resolveSelectedDungeonId(config);
-          final dungeon =
-              manager?.activeDungeon ??
-              (selectedId != null ? config.dungeons[selectedId] : null);
-          final dungeonName = dungeon?.name ?? 'Dungeon';
-          final clearedCount = manager?.session?.clearedRoomIds.length ?? 0;
-          final isFinalBoss =
-              dungeon != null &&
-              dungeon.rooms.values.any(
-                (room) => room.spawns.any(
-                  (spawn) =>
-                      config.monsters[spawn.monsterId]?.isFinalBoss == true,
-                ),
-              );
-          final isAscension = dungeon?.isAscension ?? false;
-          final isBossEvent = dungeon?.isBossEvent ?? false;
-          final ascResult = _lastAscensionResult;
-          return DungeonCompletedOverlay(
-            dungeonName: dungeonName,
-            clearedRoomsCount: clearedCount,
-            isFinalBoss: isFinalBoss,
-            isAscension: isAscension,
-            previousAscensionRank: isAscension ? ascResult?.previousRank : null,
-            newAscensionRank: isAscension
-                ? (ascResult?.newRank ?? _cycleProgress.ascensionRank)
-                : null,
-            completionReward: _lastCompletionReward,
-            bossQuestMessage: isBossEvent
-                ? (_lastBossQuestResult?.userMessage ??
-                      'Memproses hadiah boss quest...')
-                : null,
-            onRetry: (isAscension || isBossEvent)
-                ? null
-                : () {
-                    unawaited(_flushSaveNow());
-                    _enterDungeon(
-                      config,
-                      dungeonId: manager?.activeDungeon?.id,
-                    );
-                  },
-            onReturnToTown: _returnToTown,
-          );
-        },
-      },
+      ),
     );
   }
 }
@@ -1930,6 +2955,31 @@ class _DungeonCompactMenuClusterState
                         ),
                       ),
                       const SizedBox(height: 4),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: widget.game.autoSkill,
+                        builder: (context, on, _) => _drawerItem(
+                          key: const Key('hud_auto_skill_button'),
+                          icon: on ? Icons.flash_on : Icons.flash_off,
+                          label: 'Auto Skill: ${on ? 'ON' : 'OFF'}',
+                          color: on ? ext.expBar : AppColors.textSecondary,
+                          onTap: () => widget.onToggleAutoSkill(on),
+                        ),
+                      ),
+                      _drawerItem(
+                        key: const Key('hud_offline_button'),
+                        icon: widget.continueOffline
+                            ? Icons.play_circle_outline
+                            : Icons.pause_circle_outline,
+                        label: widget.continueOffline
+                            ? 'Lanjut Offline: ON'
+                            : 'Lanjut Offline: OFF',
+                        subtitle: 'Saat aplikasi ditutup',
+                        color: widget.continueOffline
+                            ? ext.success
+                            : AppColors.textSecondary,
+                        onTap: widget.onToggleOffline,
+                      ),
+                      const Divider(height: 10),
                       _drawerItem(
                         icon: Icons.inventory_2_outlined,
                         label: 'Tas',
@@ -1965,42 +3015,12 @@ class _DungeonCompactMenuClusterState
                 ),
                 const SizedBox(height: 6),
               ],
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                alignment: WrapAlignment.end,
-                children: [
-                  ValueListenableBuilder<bool>(
-                    valueListenable: widget.game.autoSkill,
-                    builder: (context, on, _) => widget.chipBuilder(
-                      key: const Key('hud_auto_skill_button'),
-                      icon: on ? Icons.flash_on : Icons.flash_off,
-                      label: 'Auto Skill: ${on ? 'ON' : 'OFF'}',
-                      accentColor: on ? ext.expBar : AppColors.textSecondary,
-                      onPressed: () => widget.onToggleAutoSkill(on),
-                    ),
-                  ),
-                  widget.chipBuilder(
-                    key: const Key('hud_offline_button'),
-                    icon: widget.continueOffline
-                        ? Icons.play_circle_outline
-                        : Icons.pause_circle_outline,
-                    label: widget.continueOffline
-                        ? 'Offline: Lanjut'
-                        : 'Offline: Pause',
-                    accentColor: widget.continueOffline
-                        ? ext.success
-                        : AppColors.textSecondary,
-                    onPressed: widget.onToggleOffline,
-                  ),
-                  widget.chipBuilder(
-                    key: const Key('hud_menu_toggle_button'),
-                    icon: _expanded ? Icons.close : Icons.menu,
-                    label: 'Menu',
-                    accentColor: ext.gold,
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                  ),
-                ],
+              widget.chipBuilder(
+                key: const Key('hud_menu_toggle_button'),
+                icon: _expanded ? Icons.close : Icons.menu,
+                label: 'Menu',
+                accentColor: ext.gold,
+                onPressed: () => setState(() => _expanded = !_expanded),
               ),
             ],
           ),
@@ -2010,12 +3030,15 @@ class _DungeonCompactMenuClusterState
   }
 
   Widget _drawerItem({
+    Key? key,
     required IconData icon,
     required String label,
+    String? subtitle,
     required VoidCallback onTap,
     Color color = AppColors.textPrimary,
   }) {
     return InkWell(
+      key: key,
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Padding(
@@ -2026,15 +3049,31 @@ class _DungeonCompactMenuClusterState
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 8),
             Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

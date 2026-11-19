@@ -13,6 +13,7 @@ class EquipmentSnapshot {
     required this.equipped,
     required this.bag,
     required this.stats,
+    this.maxCapacity,
   });
 
   factory EquipmentSnapshot.from(Inventory inventory, PlayerCharacter c) {
@@ -20,12 +21,14 @@ class EquipmentSnapshot {
       equipped: Map.of(c.loadout.equipped),
       bag: inventory.equipmentSnapshot(),
       stats: c.stats,
+      maxCapacity: inventory.maxEquipmentCapacity,
     );
   }
 
   final Map<EquipmentSlot, EquipmentInstance> equipped;
   final List<EquipmentInstance> bag;
   final CombatStats stats;
+  final int? maxCapacity;
 }
 
 class SkillEntry {
@@ -56,9 +59,13 @@ class CharacterSnapshot {
     required this.specializations,
     required this.skills,
     this.skillNames = const {},
+    this.unlockedSpecializations = const {},
   });
 
-  factory CharacterSnapshot.from(PlayerCharacter c) {
+  factory CharacterSnapshot.from(
+    PlayerCharacter c, {
+    Set<String> unlockedSpecializations = const {},
+  }) {
     // Tampilkan skill umum dan skill milik specialization yang dipilih.
     final visible =
         c.skillCatalog.values
@@ -102,6 +109,9 @@ class CharacterSnapshot {
           }(),
       ],
       skillNames: {for (final s in c.skillCatalog.values) s.id: s.name},
+      unlockedSpecializations: Set<String>.unmodifiable(
+        unlockedSpecializations,
+      ),
     );
   }
 
@@ -114,25 +124,44 @@ class CharacterSnapshot {
   final List<SpecializationDefinition> specializations;
   final List<SkillEntry> skills;
   final Map<String, String> skillNames;
+  final Set<String> unlockedSpecializations;
 }
 
 /// Jembatan antara domain (Inventory, PlayerCharacter) dan overlay Flutter.
 /// Panggil [refresh] setiap kali isi inventory, stat, atau build berubah.
 class InventoryViews {
-  InventoryViews({required this.inventory, required this.character})
-    : stacks = ValueNotifier(inventory.snapshot()),
-      equipment = ValueNotifier(EquipmentSnapshot.from(inventory, character)),
-      characterView = ValueNotifier(CharacterSnapshot.from(character));
+  InventoryViews({
+    required this.inventory,
+    required this.character,
+    Set<String> unlockedSpecializations = const {},
+  }) : _unlockedSpecializations = Set<String>.from(unlockedSpecializations),
+       stacks = ValueNotifier(inventory.snapshot()),
+       equipment = ValueNotifier(EquipmentSnapshot.from(inventory, character)),
+       characterView = ValueNotifier(
+         CharacterSnapshot.from(
+           character,
+           unlockedSpecializations: unlockedSpecializations,
+         ),
+       );
 
   final Inventory inventory;
   final PlayerCharacter character;
+  Set<String> _unlockedSpecializations;
   final ValueNotifier<List<InventoryEntry>> stacks;
   final ValueNotifier<EquipmentSnapshot> equipment;
   final ValueNotifier<CharacterSnapshot> characterView;
 
+  void setUnlockedSpecializations(Set<String> unlocked) {
+    _unlockedSpecializations = Set<String>.from(unlocked);
+    refresh();
+  }
+
   void refresh() {
     stacks.value = inventory.snapshot();
     equipment.value = EquipmentSnapshot.from(inventory, character);
-    characterView.value = CharacterSnapshot.from(character);
+    characterView.value = CharacterSnapshot.from(
+      character,
+      unlockedSpecializations: _unlockedSpecializations,
+    );
   }
 }

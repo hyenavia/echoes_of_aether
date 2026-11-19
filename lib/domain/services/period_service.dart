@@ -38,6 +38,38 @@ class PeriodService {
     return days >= 0 ? days ~/ 7 : ((days + 1) ~/ 7) - 1;
   }
 
+  /// Indeks siklus dua mingguan (14 hari) sejak `config.epochMonday` (0 = dua minggu pertama).
+  int biweekIndex(int nowMs, {Duration? offset}) {
+    final days = dayIndex(nowMs, offset: offset);
+    return days >= 0 ? days ~/ 14 : ((days + 1) ~/ 14) - 1;
+  }
+
+  /// Mengembalikan kunci periode siklus dua mingguan ('YYYY-MM-DD' hari Senin awal siklus).
+  String biweeklyKey(int nowMs, {Duration? offset}) {
+    final bIndex = biweekIndex(nowMs, offset: offset);
+    final epochUtc =
+        config.tryParseEpochMondayUtc() ?? DateTime.utc(2026, 11, 16);
+    final cycleMonday = epochUtc.add(Duration(days: bIndex * 14));
+    return _formatDate(cycleMonday);
+  }
+
+  /// Epoch ms waktu reset siklus dua mingguan berikutnya pada zona waktu lokal efektif.
+  int nextBiweeklyResetMs(int nowMs, {Duration? offset}) {
+    final tz = _resolveOffset(nowMs, offset: offset);
+    final bIndex = biweekIndex(nowMs, offset: offset);
+    final nextIndex = bIndex + 1;
+    final epochUtc =
+        config.tryParseEpochMondayUtc() ?? DateTime.utc(2026, 11, 16);
+    final nextCycleMondayUtc = epochUtc.add(Duration(days: nextIndex * 14));
+    final nextWallUtc = DateTime.utc(
+      nextCycleMondayUtc.year,
+      nextCycleMondayUtc.month,
+      nextCycleMondayUtc.day,
+      config.resetHour,
+    );
+    return nextWallUtc.millisecondsSinceEpoch - tz.inMilliseconds;
+  }
+
   /// Epoch ms reset berikutnya untuk [period] pada zona waktu lokal efektif.
   int nextResetMs(Period period, int nowMs, {Duration? offset}) {
     final tz = _resolveOffset(nowMs, offset: offset);

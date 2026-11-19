@@ -2,22 +2,29 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import '../../domain/entities/boss_event.dart';
+import '../../domain/entities/boss_spire.dart';
 import '../../domain/entities/clock_state.dart';
 import '../../domain/entities/cycle_progress.dart';
 import '../../domain/entities/dungeon_definition.dart';
 import '../../domain/entities/enemy_definition.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/event_shop_purchase.dart';
+import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/periodic_quest_state.dart';
+import '../../domain/entities/currency_config.dart';
 import '../../domain/entities/player_character.dart';
 import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/entities/player_status.dart';
+import '../../domain/repositories/game_settings_repository.dart';
 import '../../domain/repositories/player_progress_repository.dart';
+import '../../domain/services/altar_service.dart';
+import '../../domain/services/bag_expansion_service.dart';
 import '../../domain/services/boss_event_service.dart';
 import '../../domain/services/boss_quest_service.dart';
+import '../../domain/services/boss_spire_service.dart';
 import '../../domain/services/clock_guard.dart';
 import '../../domain/services/combat_simulation.dart';
 import '../../domain/services/currency_service.dart';
@@ -26,6 +33,7 @@ import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_manager.dart';
 import '../../domain/services/equipment_factory.dart';
 import '../../domain/services/game_clock.dart';
+import '../../domain/services/offline_equipment_cleanup_service.dart';
 import '../../domain/services/offline_progression_service.dart';
 import '../../domain/services/period_service.dart';
 import '../../domain/services/reward_processor.dart';
@@ -52,6 +60,8 @@ class LoadedGameSession {
     this.currencies = const {},
     this.clockState = const ClockState(),
     this.periodicQuestStates = const [],
+    this.gachaPityStates = const {},
+    this.unlockedSpecializations = const {},
   });
 
   final PlayerCharacter character;
@@ -74,6 +84,8 @@ class LoadedGameSession {
   final Map<String, int> currencies;
   final ClockState clockState;
   final List<PeriodicQuestState> periodicQuestStates;
+  final Map<String, GachaPityState> gachaPityStates;
+  final Set<String> unlockedSpecializations;
 
   bool get hasRecoverableDungeonSession =>
       activeDungeonSession?.isRecoverable ?? false;
@@ -111,15 +123,47 @@ class GameSessionCoordinator {
   Future<void> _offlineQueue = Future<void>.value();
   int _highWaterTimestampMs = 0;
   ClockState _clockState = const ClockState();
+  int? _serverOffsetMs;
+  bool _isServerClockOnline = false;
   Object? lastSaveError;
 
   ClockState get clockState => _clockState;
 
-  /// Waktu efektif saat ini yang dijaga [ClockGuard] (jam mundur ditahan ke
-  /// `lastSeenAtMs`) tanpa memutasi `_clockState`.
-  int get effectiveClockMs => _clockGuard
-      .resolve(current: _clockState, rawNowMs: math.max(0, _nowMs()))
-      .effectiveMs;
+  int? get serverOffsetMs => _serverOffsetMs;
+
+  bool get isUsingServerClock => ClockGuard.shouldUseServerTime(
+    serverOffsetMs: _serverOffsetMs,
+    isOnline: _isServerClockOnline,
+    serverTimeToleranceMs: config.cloud.serverTimeToleranceMs,
+  );
+
+  /// Memperbarui offset jam server hasil kalibrasi `clock/ping` saat online
+  /// (atau menandai mode offline agar jam perangkat dipakai dengan `ClockGuard`).
+  void updateServerClock({int? serverOffsetMs, required bool isOnline}) {
+    _isServerClockOnline = isOnline;
+    if (serverOffsetMs != null) {
+      _serverOffsetMs = serverOffsetMs;
+    }
+  }
+
+  ClockReading _resolveClock({
+    required ClockState current,
+    required int rawNowMs,
+  }) => _clockGuard.resolve(
+    current: current,
+    rawNowMs: rawNowMs,
+    serverOffsetMs: _serverOffsetMs,
+    isOnline: _isServerClockOnline,
+    serverTimeToleranceMs: config.cloud.serverTimeToleranceMs,
+  );
+
+  /// Waktu efektif saat ini yang dijaga [ClockGuard] (memakai waktu server
+  /// saat online dengan selisih melebihi toleransi, atau jam perangkat dengan
+  /// proteksi mundur `lastSeenAtMs`) tanpa memutasi `_clockState`.
+  int get effectiveClockMs => _resolveClock(
+    current: _clockState,
+    rawNowMs: math.max(0, _nowMs()),
+  ).effectiveMs;
 
   /// Menjalankan boot load, memproses aktivitas offline secara eksklusif,
   /// lalu memangkas `ClaimedRewards` yang sudah kedaluwarsa secara aman.
@@ -362,6 +406,8 @@ class GameSessionCoordinator {
           currencies: currencySnapshot,
           clockState: existing.clockState,
           periodicQuestStates: existing.periodicQuestStates,
+          gachaPityStates: existing.gachaPityStates,
+          unlockedSpecializations: existing.unlockedSpecializations,
         ),
       );
     });
@@ -399,6 +445,7 @@ class GameSessionCoordinator {
       config: config.progression,
       skillCatalog: config.skills,
       specializationConfig: config.specializations,
+      itemCatalog: config.items,
       statsCalculator: DerivedStatsCalculator(
         pctCaps: config.equipment.pctCaps,
       ),
@@ -415,14 +462,19 @@ class GameSessionCoordinator {
 
     final now = math.max(0, _nowMs());
     if (loaded == null) {
-      _highWaterTimestampMs = math.max(_highWaterTimestampMs, now);
-      _clockState = _clockGuard
-          .resolve(current: _clockState, rawNowMs: now)
-          .state;
+      inventory.maxEquipmentCapacity = const BagExpansionService()
+          .calculateCapacity(0);
+      final firstClock = _resolveClock(current: _clockState, rawNowMs: now);
+      _clockState = firstClock.state;
+      final firstEffectiveNow = firstClock.effectiveMs;
+      _highWaterTimestampMs = math.max(
+        _highWaterTimestampMs,
+        firstEffectiveNow,
+      );
       final initialSession = GameSessionSnapshot(
-        lastActiveAtMs: now,
-        lastSavedAtMs: now,
-        lastOfflineClaimAtMs: now,
+        lastActiveAtMs: firstEffectiveNow,
+        lastSavedAtMs: firstEffectiveNow,
+        lastOfflineClaimAtMs: firstEffectiveNow,
         autoSkillEnabled: true,
       );
       final rewardProcessor = RewardProcessor(
@@ -434,7 +486,7 @@ class GameSessionCoordinator {
       );
       final offlineResult = OfflineProgressionResult.none(
         status: OfflineProgressionStatus.firstLaunch,
-        claimAtMs: now,
+        claimAtMs: firstEffectiveNow,
       );
       final sortedNormals =
           config.dungeons.values.where((d) => d.isNormal).toList()
@@ -468,14 +520,29 @@ class GameSessionCoordinator {
       );
     }
 
-    final clockReading = _clockGuard.resolve(
+    final clockReading = _resolveClock(
       current: loaded.clockState,
       rawNowMs: now,
     );
     _clockState = clockReading.state;
+    // Saat online dengan selisih jam server melampaui toleransi, offline
+    // progression dihitung terhadap waktu server (`raw + offset`). Saat
+    // offline, `raw` tetap diteruskan agar deteksi `invalidClock` terjaga.
+    final effectiveNow = isUsingServerClock
+        ? math.max(0, now + _serverOffsetMs!)
+        : now;
 
     character.restoreSnapshot(loaded.character);
     inventory.restore(loaded.inventory);
+    final bagLevel = loaded.currencies[kBagExpansionCurrencyId] ?? 0;
+    inventory.maxEquipmentCapacity = const BagExpansionService()
+        .calculateCapacity(bagLevel);
+    const altarService = AltarService();
+    character.updateAltarBonus(
+      altarService.getAltarStatBonus(loaded.currencies),
+    );
+    final goldMultiplier =
+        1.0 + altarService.getGoldBonusPercent(loaded.currencies);
     final claimedIds = {...loaded.claimedEventIds};
     final rewardProcessor = RewardProcessor(
       character: character,
@@ -485,6 +552,7 @@ class GameSessionCoordinator {
       lootService: offlineService.lootService,
       equipmentFactory: EquipmentFactory(config.equipment),
       claimedEventIds: claimedIds,
+      goldMultiplier: goldMultiplier,
     );
 
     final previousHighWater = math.max(
@@ -530,7 +598,7 @@ class GameSessionCoordinator {
       inventory: inventory,
       config: config,
       session: workingSession,
-      nowMs: now,
+      nowMs: effectiveNow,
       offlineActivity: workingActivity,
       activeDungeonSession: workingActiveSession,
       dungeonProgress: workingDungeon,
@@ -577,7 +645,7 @@ class GameSessionCoordinator {
 
         final batchCheckpointMs = isBatchInterrupted
             ? math.max(previousHighWater, workingActivity.lastCheckpointAtMs)
-            : math.max(now, previousHighWater);
+            : math.max(effectiveNow, previousHighWater);
 
         final batchClaimAtMs = isBatchInterrupted
             ? math.max(
@@ -592,7 +660,7 @@ class GameSessionCoordinator {
         workingSession = loaded.session.copyWith(
           lastActiveAtMs: isBatchInterrupted
               ? batchCheckpointMs
-              : math.max(now, loaded.session.lastActiveAtMs),
+              : math.max(effectiveNow, loaded.session.lastActiveAtMs),
           lastSavedAtMs: batchCheckpointMs,
           lastOfflineClaimAtMs: batchClaimAtMs,
         );
@@ -657,6 +725,100 @@ class GameSessionCoordinator {
           break;
         }
         aggregatedResult = _mergeResults(aggregatedResult, currentBatch);
+      }
+
+      if (repository is GameSettingsRepository) {
+        final settings = await (repository as GameSettingsRepository)
+            .loadSettings();
+        if (settings.autoSalvageOfflineEquipment) {
+          final cleanup = const OfflineEquipmentCleanupService()
+              .cleanupAfterOffline(
+                inventory: inventory,
+                loadout: character.loadout,
+                config: config,
+              );
+          if (cleanup.salvagedCount > 0) {
+            final prevSummary = workingActivity.pendingSummary;
+            if (prevSummary != null) {
+              workingActivity = OfflineActivitySnapshot(
+                mode: workingActivity.mode,
+                state: workingActivity.state,
+                selectedDungeonId: workingActivity.selectedDungeonId,
+                activeRunId: workingActivity.activeRunId,
+                lastCheckpointAtMs: workingActivity.lastCheckpointAtMs,
+                processedOfflineDurationMs:
+                    workingActivity.processedOfflineDurationMs,
+                simulationSeed: workingActivity.simulationSeed,
+                failurePolicy: workingActivity.failurePolicy,
+                pendingSummary: OfflineSummarySnapshot(
+                  eventId: prevSummary.eventId,
+                  mode: prevSummary.mode,
+                  finalState: prevSummary.finalState,
+                  effectiveElapsedMs: prevSummary.effectiveElapsedMs,
+                  cappedAtMaxDuration: prevSummary.cappedAtMaxDuration,
+                  runsAttempted: prevSummary.runsAttempted,
+                  runsCompleted: prevSummary.runsCompleted,
+                  runsFailed: prevSummary.runsFailed,
+                  roomsCleared: prevSummary.roomsCleared,
+                  encountersCleared: prevSummary.encountersCleared,
+                  expGained: prevSummary.expGained,
+                  goldGained: prevSummary.goldGained,
+                  levelsGained: prevSummary.levelsGained,
+                  addedStacks: prevSummary.addedStacks,
+                  overflowStacks: prevSummary.overflowStacks,
+                  addedEquipmentCount: math.max(
+                    0,
+                    prevSummary.addedEquipmentCount - cleanup.salvagedCount,
+                  ),
+                  droppedEquipmentCount: prevSummary.droppedEquipmentCount,
+                  autoSoldEquipmentCount: prevSummary.autoSoldEquipmentCount,
+                  autoSoldEquipmentGold: prevSummary.autoSoldEquipmentGold,
+                  autoSalvagedEquipmentCount:
+                      prevSummary.autoSalvagedEquipmentCount +
+                      cleanup.salvagedCount,
+                  autoSalvagedScrapCount:
+                      prevSummary.autoSalvagedScrapCount + cleanup.scrapGained,
+                  acknowledged: prevSummary.acknowledged,
+                  generatedAtMs: prevSummary.generatedAtMs,
+                  cycleRank: prevSummary.cycleRank,
+                  failureReason: prevSummary.failureReason,
+                ),
+              );
+            }
+            final baseCharSnap = character.toSnapshot();
+            final isRecoverable = workingActiveSession?.isRecoverable == true;
+            await saveSnapshot(
+              PlayerSaveSnapshot(
+                playerId: loaded.playerId,
+                character: PlayerCharacterSnapshot(
+                  progress: baseCharSnap.progress,
+                  specializationId: baseCharSnap.specializationId,
+                  skillLevels: baseCharSnap.skillLevels,
+                  skillCooldownTicks: isRecoverable
+                      ? simSkillCooldowns
+                      : const {},
+                  equipped: baseCharSnap.equipped,
+                  currentHp: isRecoverable ? simHp : null,
+                ),
+                inventory: inventory.toSnapshot(),
+                dungeon: workingDungeon,
+                dungeonProgresses: Map.unmodifiable(workingProgresses),
+                cycleProgress: workingCycle,
+                session: workingSession,
+                claimedEventIds: claimedIds,
+                activeDungeonSession: workingActiveSession,
+                offlineActivity: workingActivity,
+                shopPurchases: loaded.shopPurchases,
+                eventShopPurchases: loaded.eventShopPurchases,
+                currencies: loaded.currencies,
+                clockState: _clockState,
+                periodicQuestStates: loaded.periodicQuestStates,
+                gachaPityStates: loaded.gachaPityStates,
+                unlockedSpecializations: loaded.unlockedSpecializations,
+              ),
+            );
+          }
+        }
       }
     } else {
       // Tidak menjalankan simulasi (paused / invalidClock / zeroElapsed /
@@ -747,6 +909,8 @@ class GameSessionCoordinator {
       currencies: loaded.currencies,
       clockState: _clockState,
       periodicQuestStates: loaded.periodicQuestStates,
+      gachaPityStates: loaded.gachaPityStates,
+      unlockedSpecializations: loaded.unlockedSpecializations,
     );
   }
 
@@ -756,7 +920,10 @@ class GameSessionCoordinator {
 
     final effectiveNowMs = math.max(
       _clockState.lastSeenAtMs,
-      math.max(0, _nowMs()),
+      _resolveClock(
+        current: _clockState,
+        rawNowMs: math.max(0, _nowMs()),
+      ).effectiveMs,
     );
     final cutoffMs = effectiveNowMs - config.claimedRewards.retentionMs;
     if (cutoffMs <= 0) return;
@@ -937,13 +1104,17 @@ class GameSessionCoordinator {
     CurrencyService? currencyService,
     List<PeriodicQuestState> periodicQuestStates = const [],
     List<EventShopPurchaseRecord> eventShopPurchases = const [],
+    Map<String, GachaPityState> gachaPityStates = const {},
+    Set<String> unlockedSpecializations = const {},
     Set<String> extraClaimedEventIds = const {},
   }) {
     final now = math.max(0, _nowMs());
-    _clockState = _clockGuard
-        .resolve(current: _clockState, rawNowMs: now)
-        .state;
-    final monotonicSavedAtMs = math.max(now, _highWaterTimestampMs);
+    final resolvedClock = _resolveClock(current: _clockState, rawNowMs: now);
+    _clockState = resolvedClock.state;
+    final monotonicSavedAtMs = math.max(
+      resolvedClock.effectiveMs,
+      _highWaterTimestampMs,
+    );
     final charSnap = character.toSnapshot();
     final updatedCharSnap = PlayerCharacterSnapshot(
       progress: charSnap.progress,
@@ -963,7 +1134,8 @@ class GameSessionCoordinator {
             id.startsWith('dungeon_clear:') ||
             id.startsWith('room_clear:') ||
             id.startsWith('ascension:') ||
-            id.startsWith('bossquest:'))
+            id.startsWith('bossquest:') ||
+            id.startsWith('boss_spire:'))
           id,
       if (currencyService != null) ...currencyService.claimedIds,
       ...extraClaimedEventIds,
@@ -1003,6 +1175,8 @@ class GameSessionCoordinator {
         clockState: _clockState,
         periodicQuestStates: periodicQuestStates,
         eventShopPurchases: eventShopPurchases,
+        gachaPityStates: gachaPityStates,
+        unlockedSpecializations: unlockedSpecializations,
       ),
     );
   }
@@ -1026,9 +1200,10 @@ class GameSessionCoordinator {
     }
 
     final rawNow = math.max(0, _nowMs());
-    final effectiveNow = _clockGuard
-        .resolve(current: _clockState, rawNowMs: rawNow)
-        .effectiveMs;
+    final effectiveNow = _resolveClock(
+      current: _clockState,
+      rawNowMs: rawNow,
+    ).effectiveMs;
     final periodService = PeriodService(config: config.time);
     final periodKey = periodService.keyFor(period, effectiveNow);
     final periodIndex = period == Period.daily
@@ -1042,9 +1217,17 @@ class GameSessionCoordinator {
       dungeonProgresses,
       config.dungeons,
     );
-    final powerFactor = bossEvents.tierFor(period).powerFactor;
-    final difficultyProfile = DifficultyService(config.difficulty)
-        .profileForBoss(reference, powerFactor);
+    final basePowerFactor = bossEvents.tierFor(period).powerFactor;
+    final diffService = DifficultyService(config.difficulty);
+    final powerFactor = diffService.computeBossPowerFactor(
+      basePowerFactor,
+      reference.cycleRank,
+      period: period,
+    );
+    final difficultyProfile = diffService.profileForBoss(
+      reference,
+      powerFactor,
+    );
     final bossDungeon = bossService.buildBossDungeon(
       boss: boss,
       period: period,
@@ -1103,9 +1286,17 @@ class GameSessionCoordinator {
       dungeonProgresses,
       config.dungeons,
     );
-    final powerFactor = bossEvents.tierFor(period).powerFactor;
-    final difficultyProfile = DifficultyService(config.difficulty)
-        .profileForBoss(reference, powerFactor);
+    final basePowerFactor = bossEvents.tierFor(period).powerFactor;
+    final diffService = DifficultyService(config.difficulty);
+    final powerFactor = diffService.computeBossPowerFactor(
+      basePowerFactor,
+      reference.cycleRank,
+      period: period,
+    );
+    final difficultyProfile = diffService.profileForBoss(
+      reference,
+      powerFactor,
+    );
     final bossDungeon = bossService.buildBossDungeon(
       boss: boss,
       period: period,
@@ -1218,10 +1409,7 @@ class GameSessionCoordinator {
     }
     final tier = bossEvents.tierFor(period);
     final rawNow = math.max(0, _nowMs());
-    final resolved = _clockGuard.resolve(
-      current: _clockState,
-      rawNowMs: rawNow,
-    );
+    final resolved = _resolveClock(current: _clockState, rawNowMs: rawNow);
     final prevClockState = _clockState;
     _clockState = resolved.state;
 
@@ -1283,6 +1471,190 @@ class GameSessionCoordinator {
       rethrow;
     }
   }
+
+  /// Menyiapkan definisi dungeon, monster boss, dan arena untuk satu lantai Menara Bos.
+  PreparedBossSpireRun prepareBossSpireRun({required int floorNumber}) {
+    final spireConfig = config.bossSpire;
+    if (spireConfig == null) {
+      throw StateError('Konfigurasi boss_spire.json tidak tersedia.');
+    }
+    final floor = spireConfig.floorFor(floorNumber);
+    if (floor == null) {
+      throw ArgumentError.value(
+        floorNumber,
+        'floorNumber',
+        'Lantai $floorNumber tidak terdaftar di Menara Bos.',
+      );
+    }
+    final arenaLayout = BossSpireService.resolveArenaLayout(config);
+    if (arenaLayout == null || arenaLayout.isEmpty) {
+      throw StateError(
+        'Layout arena Menara Bos "${spireConfig.arenaMapRef}" tidak ditemukan.',
+      );
+    }
+
+    final spireService = BossSpireService(spireConfig);
+    final bossDungeon = spireService.buildFloorDungeon(
+      floor: floor,
+      arenaLayout: arenaLayout,
+    );
+    final bossMonster = floor.toEnemyDefinition(
+      spriteTemplate: config.monsters[floor.spriteRef],
+    );
+
+    return PreparedBossSpireRun(
+      floor: floor,
+      bossDungeon: bossDungeon,
+      bossMonster: bossMonster,
+      difficultyProfile: DifficultyProfile.identity,
+    );
+  }
+
+  /// Memulai sesi combat untuk lantai Menara Bos (Boss Spire).
+  Future<PreparedBossSpireRun> startBossSpireRun({
+    required int floorNumber,
+    required DungeonManager dungeonManager,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    CurrencyService? currencyService,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+    String? runId,
+  }) async {
+    final prepared = prepareBossSpireRun(floorNumber: floorNumber);
+    dungeonManager.startBossDungeon(
+      bossDungeon: prepared.bossDungeon,
+      bossMonster: prepared.bossMonster,
+      difficultyProfile: prepared.difficultyProfile,
+      bossEventId: prepared.floor.bossId,
+      periodKeyAtStart: 'spire_floor_${prepared.floor.floor}',
+      cycleRank: cycleProgress.ascensionRank,
+      runId: runId,
+    );
+    await saveFromRuntime(
+      character: character,
+      inventory: inventory,
+      dungeon: dungeon,
+      dungeonProgresses: dungeonProgresses,
+      cycleProgress: cycleProgress,
+      rewardProcessor: rewardProcessor,
+      autoSkillEnabled: autoSkillEnabled,
+      lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+      currentHp: currentHp,
+      skillCooldownTicks: skillCooldownTicks,
+      activeDungeonSession: dungeonManager.toActiveSessionSnapshot(),
+      offlineActivity: offlineActivity,
+      consecutiveDefeats: consecutiveDefeats,
+      lastFailedDungeonId: lastFailedDungeonId,
+      currencyService: currencyService,
+    );
+    return prepared;
+  }
+
+  /// Memproses kemenangan di lantai Menara Bos secara atomik dan idempoten.
+  Future<BossSpireSettlementResult> settleBossSpireVictory({
+    required int floorNumber,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required CurrencyService currencyService,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    ActiveDungeonSessionSnapshot? activeDungeonSession,
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+  }) async {
+    final spireConfig = config.bossSpire;
+    if (spireConfig == null) {
+      throw StateError('Konfigurasi boss_spire belum dimuat.');
+    }
+
+    final prevCharSnap = character.toSnapshot();
+    final prevBalances = currencyService.toSnapshot();
+    final prevCurrencyClaims = currencyService.claimedIds;
+    final workingClaimedIds = Set<String>.of(rewardProcessor.claimedEventIds);
+
+    final resolvedClock = _resolveClock(
+      current: _clockState,
+      rawNowMs: _nowMs(),
+    );
+    final periodService = PeriodService(config: config.time);
+    final cycleKey = periodService.biweeklyKey(resolvedClock.effectiveMs);
+
+    final spireService = BossSpireService(spireConfig);
+    final result = spireService.settleFloorVictory(
+      floorNumber: floorNumber,
+      character: character,
+      currencyService: currencyService,
+      claimedEventIds: workingClaimedIds,
+      cycleKey: cycleKey,
+    );
+    final claimId =
+        result.claimId ??
+        spireConfig.floorFor(floorNumber)?.claimIdFor(cycleKey) ??
+        spireConfig.floorFor(floorNumber)?.claimId ??
+        'boss_spire:$cycleKey:floor_$floorNumber';
+
+    try {
+      await saveFromRuntime(
+        character: character,
+        inventory: inventory,
+        dungeon: dungeon,
+        dungeonProgresses: dungeonProgresses,
+        cycleProgress: cycleProgress,
+        rewardProcessor: rewardProcessor,
+        autoSkillEnabled: autoSkillEnabled,
+        lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+        currentHp: currentHp,
+        skillCooldownTicks: skillCooldownTicks,
+        activeDungeonSession: activeDungeonSession,
+        offlineActivity: offlineActivity,
+        consecutiveDefeats: consecutiveDefeats,
+        lastFailedDungeonId: lastFailedDungeonId,
+        currencyService: currencyService,
+        extraClaimedEventIds: {claimId},
+      );
+      rewardProcessor.markClaimed(claimId);
+      return result;
+    } catch (_) {
+      character.restoreSnapshot(prevCharSnap);
+      currencyService.restoreState(
+        balances: prevBalances,
+        claimedIds: prevCurrencyClaims,
+      );
+      rethrow;
+    }
+  }
+}
+
+/// Paket data siap-pakai untuk memulai satu run di Menara Bos (Boss Spire).
+class PreparedBossSpireRun {
+  const PreparedBossSpireRun({
+    required this.floor,
+    required this.bossDungeon,
+    required this.bossMonster,
+    required this.difficultyProfile,
+  });
+
+  final BossSpireFloorConfig floor;
+  final DungeonDefinition bossDungeon;
+  final EnemyDefinition bossMonster;
+  final DifficultyProfile difficultyProfile;
 }
 
 /// Paket data siap-pakai untuk memulai atau memulihkan satu run Boss Event.

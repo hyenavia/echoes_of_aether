@@ -72,11 +72,13 @@ class DerivedStatsCalculator {
   CombatStats calculate({
     required CombatStats baseStats,
     EquipmentStats equipmentBonus = EquipmentStats.zero,
+    EquipmentStats altarBonus = EquipmentStats.zero,
     SpecializationDefinition? specialization,
     Iterable<SkillDefinition> passiveSkills = const [],
     int Function(String skillId)? skillLevelOf,
+    String? activeResonanceClassId,
   }) {
-    var totalBonus = equipmentBonus;
+    var totalBonus = equipmentBonus + altarBonus;
     for (final skill in passiveSkills) {
       if (!skill.isPassive) continue;
       final level = skillLevelOf?.call(skill.id) ?? 1;
@@ -86,6 +88,13 @@ class DerivedStatsCalculator {
     }
     if (specialization != null) {
       totalBonus = totalBonus + specialization.bonus;
+    }
+    if (activeResonanceClassId != null) {
+      if (activeResonanceClassId == 'gunslinger') {
+        totalBonus = totalBonus + const EquipmentStats(attackRange: 2.0);
+      } else if (activeResonanceClassId == 'necromancer') {
+        totalBonus = totalBonus + const EquipmentStats(lifesteal: 0.08);
+      }
     }
 
     final rawMaxHp = _applyPct(
@@ -119,6 +128,8 @@ class DerivedStatsCalculator {
         moveSpeed: baseStats.moveSpeed + totalBonus.moveSpeed,
         attackRange: baseRange + totalBonus.attackRange,
         skillHaste: baseStats.skillHaste + totalBonus.skillHaste,
+        lifesteal: baseStats.lifesteal + totalBonus.lifesteal,
+        spellVamp: baseStats.spellVamp + totalBonus.spellVamp,
       ),
     );
   }
@@ -155,6 +166,8 @@ class DerivedStatsCalculator {
         bounds.minSkillHaste,
         bounds.maxSkillHaste,
       ),
+      lifesteal: _clampDouble(stats.lifesteal, 0.0, 1.0),
+      spellVamp: _clampDouble(stats.spellVamp, 0.0, 1.0),
     );
   }
 

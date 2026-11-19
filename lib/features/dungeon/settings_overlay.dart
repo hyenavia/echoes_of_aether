@@ -14,6 +14,8 @@ class SettingsOverlay extends StatefulWidget {
     required this.onClose,
     this.onTestSfx,
     this.onRequestNotificationPermission,
+    this.onTestNotification,
+    this.cloudSyncSection,
   });
 
   final ValueListenable<GameSettingsData> settings;
@@ -21,6 +23,8 @@ class SettingsOverlay extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onTestSfx;
   final Future<bool> Function()? onRequestNotificationPermission;
+  final Future<void> Function()? onTestNotification;
+  final Widget? cloudSyncSection;
 
   @override
   State<SettingsOverlay> createState() => _SettingsOverlayState();
@@ -80,10 +84,10 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.settings_outlined,
+                      const AetherSymbolMark(
+                        variant: AetherSymbolVariant.mark,
                         size: 20,
-                        color: AppColors.antiqueGold,
+                        glow: true,
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
@@ -282,6 +286,22 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                     s.copyWith(notifyQuietHoursEnabled: v),
                                   ),
                                 ),
+                                const Divider(height: AppSpacing.sm),
+                                SwitchListTile(
+                                  key: const Key(
+                                    'settings_offline_auto_salvage',
+                                  ),
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text('Auto-Bongkar Gear AFK'),
+                                  subtitle: const Text(
+                                    'Rare–Legendary sisakan 3 terbaik/slot (Combat Power); sisanya jadi Aether Scrap',
+                                  ),
+                                  value: s.autoSalvageOfflineEquipment,
+                                  onChanged: (v) => widget.onChanged(
+                                    s.copyWith(autoSalvageOfflineEquipment: v),
+                                  ),
+                                ),
                                 if (_permissionMessage != null) ...[
                                   const SizedBox(height: AppSpacing.xs),
                                   Text(
@@ -294,6 +314,62 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                     ),
                                   ),
                                 ],
+                                if (widget.onTestNotification != null) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: SecondaryButton(
+                                      key: const Key(
+                                        'settings_test_notification_btn',
+                                      ),
+                                      label: 'Tes Notifikasi',
+                                      icon: Icons.notifications_active_outlined,
+                                      onPressed: widget.onTestNotification,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (widget.cloudSyncSection != null) ...[
+                            const SizedBox(height: AppSpacing.md),
+                            widget.cloudSyncSection!,
+                          ],
+                          const SizedBox(height: AppSpacing.md),
+                          const SectionHeader(
+                            title: 'Tentang Game',
+                            useSerif: true,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          PanelFrame(
+                            backgroundColor: AppColors.surfaceDark,
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const AetherLogo(
+                                  variant: AetherLogoVariant.primary,
+                                  width: 170,
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  'Echoes of Aether • Idle Dungeon RPG',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                    fontSize: 10,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'v1.0.0 • Living Aether Camp • Offline-First',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.aetherBlue.withValues(
+                                      alpha: 0.8,
+                                    ),
+                                    fontSize: 9,
+                                  ),
+                                ),
                               ],
                             ),
                           ),

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../entities/dungeon_definition.dart';
 import '../entities/dungeon_session.dart';
 import '../entities/enemy_definition.dart';
@@ -290,11 +292,11 @@ class DungeonManager {
         'Sesi dungeon "${_session!.dungeonId}" (${_session!.runId}) masih aktif.',
       );
     }
-    if (!bossDungeon.isBossEvent) {
+    if (!bossDungeon.isBossEvent && !bossDungeon.isBossSpire) {
       throw ArgumentError.value(
         bossDungeon.kind,
         'bossDungeon.kind',
-        'Harus bertipe bossDaily atau bossWeekly.',
+        'Harus bertipe bossDaily, bossWeekly, atau bossSpire.',
       );
     }
 
@@ -536,7 +538,12 @@ class DungeonManager {
         );
       }
 
-      final spawns = List<RoomSpawnConfig>.unmodifiable(room.spawns);
+      final spawns = resolveRoomSpawns(
+        room: room,
+        cycleRank: _session?.cycleRank ?? 0,
+        grid: grid,
+        dungeon: dungeon,
+      );
       _activeRoom = room;
       _activeGrid = grid;
       _preparedSpawns = spawns;
@@ -918,6 +925,132 @@ class DungeonManager {
       _lastPlayerCell = null;
       _lastEvaluation = null;
     }
+  }
+
+  static List<RoomSpawnConfig> resolveRoomSpawns({
+    required RoomDefinition room,
+    required int cycleRank,
+    required NavigationGrid grid,
+    DungeonDefinition? dungeon,
+  }) {
+    if (cycleRank <= 0 || room.spawns.isEmpty) {
+      return List<RoomSpawnConfig>.unmodifiable(room.spawns);
+    }
+
+    if (room.completionCondition.type !=
+        RoomCompletionConditionType.defeatRequiredEnemies) {
+      return List<RoomSpawnConfig>.unmodifiable(room.spawns);
+    }
+
+    final isEliteRoom =
+        room.type == RoomType.elite || room.spawns.any((s) => s.isElite);
+    final isBossRoom =
+        room.type == RoomType.boss || room.spawns.any((s) => s.isBoss);
+    if (!isEliteRoom && !isBossRoom) {
+      return List<RoomSpawnConfig>.unmodifiable(room.spawns);
+    }
+
+    final primarySpawn = room.spawns.firstWhere(
+      (s) => s.isBoss || s.isElite,
+      orElse: () => room.spawns.first,
+    );
+
+    if (dungeon?.isAscension == true && isBossRoom) {
+      return List<RoomSpawnConfig>.unmodifiable(room.spawns);
+    }
+
+    final guardCount = isBossRoom
+        ? math.min(3, 1 + cycleRank ~/ 2)
+        : math.min(2, 1 + (cycleRank - 1) ~/ 2);
+
+    if (guardCount <= 0) {
+      return List<RoomSpawnConfig>.unmodifiable(room.spawns);
+    }
+
+    final guardMonsterId = _findGuardMonsterId(room, dungeon);
+    if (guardMonsterId == null) {
+      return List<RoomSpawnConfig>.unmodifiable(room.spawns);
+    }
+
+    final occupied = <GridPoint>{
+      room.entryPosition,
+      room.exitPosition,
+      for (final sp in room.spawns) sp.position,
+    };
+
+    const candidateOffsets = [
+      GridPoint(-2, 0),
+      GridPoint(2, 0),
+      GridPoint(0, -2),
+      GridPoint(0, 2),
+      GridPoint(-1, -1),
+      GridPoint(1, -1),
+      GridPoint(-1, 1),
+      GridPoint(1, 1),
+      GridPoint(-2, -1),
+      GridPoint(2, -1),
+      GridPoint(-2, 1),
+      GridPoint(2, 1),
+      GridPoint(-3, 0),
+      GridPoint(3, 0),
+      GridPoint(0, -3),
+      GridPoint(0, 3),
+    ];
+
+    final dynamicGuards = <RoomSpawnConfig>[];
+    var guardIndex = 0;
+    for (final offset in candidateOffsets) {
+      if (dynamicGuards.length >= guardCount) break;
+      final cell = GridPoint(
+        primarySpawn.position.x + offset.x,
+        primarySpawn.position.y + offset.y,
+      );
+      if (!grid.inBounds(cell.x, cell.y) || !grid.isWalkable(cell.x, cell.y)) {
+        continue;
+      }
+      if (occupied.contains(cell)) continue;
+
+      occupied.add(cell);
+      dynamicGuards.add(
+        RoomSpawnConfig(
+          id: 'guard_${room.id}_${guardIndex++}',
+          monsterId: guardMonsterId,
+          position: cell,
+          quantity: 1,
+          required: true,
+          spawnGroup: primarySpawn.spawnGroup,
+          statModifier: const SpawnStatModifier(
+            hpMultiplier: 0.6,
+            atkMultiplier: 0.7,
+          ),
+        ),
+      );
+    }
+
+    return List<RoomSpawnConfig>.unmodifiable([
+      ...room.spawns,
+      ...dynamicGuards,
+    ]);
+  }
+
+  static String? _findGuardMonsterId(
+    RoomDefinition room,
+    DungeonDefinition? dungeon,
+  ) {
+    if (dungeon == null) return null;
+    for (final r in dungeon.rooms.values) {
+      if (r.id == room.id ||
+          r.type == RoomType.boss ||
+          r.type == RoomType.elite) {
+        continue;
+      }
+      for (final sp in r.spawns) {
+        if (!sp.isElite && !sp.isBoss) {
+          return sp.monsterId;
+        }
+      }
+    }
+    return null;
   }
 
   void _emit(DungeonRuntimeEvent event) {

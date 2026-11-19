@@ -10,6 +10,8 @@ class CombatStats {
     this.moveSpeed = 1.0,
     this.attackRange = 1.0,
     this.skillHaste = 0.0,
+    this.lifesteal = 0.0,
+    this.spellVamp = 0.0,
   });
 
   final int maxHp;
@@ -34,6 +36,12 @@ class CombatStats {
   /// Pengurangan cooldown skill (0.1 = 10% lebih cepat).
   final double skillHaste;
 
+  /// Persentase pemulihan HP dari damage serangan dasar (0.1 = 10%).
+  final double lifesteal;
+
+  /// Persentase pemulihan HP dari damage skill aktif (0.1 = 10%).
+  final double spellVamp;
+
   CombatStats withAttackRange(double range) => CombatStats(
     maxHp: maxHp,
     atk: atk,
@@ -44,5 +52,7 @@ class CombatStats {
     moveSpeed: moveSpeed,
     attackRange: range,
     skillHaste: skillHaste,
+    lifesteal: lifesteal,
+    spellVamp: spellVamp,
   );
 }

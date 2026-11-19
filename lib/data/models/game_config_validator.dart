@@ -8,6 +8,7 @@ import '../../domain/entities/equipment.dart';
 import '../../domain/entities/equipment_config.dart';
 import '../../domain/entities/event_shop_config.dart';
 import '../../domain/entities/farming_config.dart';
+import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/notification_config.dart';
@@ -42,8 +43,10 @@ class GameConfigValidator {
     _validateNotifications(config.notifications);
     _validateCloud(config.cloud);
     _validateBossEvents(config);
+    _validateBossSpire(config);
     _validateShop(config);
     _validateEventShop(config);
+    _validateGacha(config);
     for (final table in config.lootTables.values) {
       for (final entry in table.entries) {
         if (!config.items.containsKey(entry.itemId)) {
@@ -146,6 +149,27 @@ class GameConfigValidator {
           throw ConfigException(
             'specializations.json: specialization "${spec.id}" memiliki affinity '
             'negatif untuk "${entry.key}".',
+          );
+        }
+      }
+      final sigWeapon = spec.signatureWeaponId;
+      if (sigWeapon != null &&
+          config.items.isNotEmpty &&
+          !config.items.containsKey(sigWeapon)) {
+        throw ConfigException(
+          'specializations.json: specialization "${spec.id}" merujuk signature_weapon_id '
+          '"$sigWeapon" yang tidak ada di items.json.',
+        );
+      }
+    }
+    if (config.specializations.definitions.isNotEmpty) {
+      for (final item in config.items.values) {
+        final sigClass = item.equipment?.signatureClassId;
+        if (sigClass != null &&
+            !config.specializations.definitions.containsKey(sigClass)) {
+          throw ConfigException(
+            'items.json: item "${item.id}" merujuk signature_class_id "$sigClass" '
+            'yang tidak ada di specializations.json.',
           );
         }
       }
@@ -459,6 +483,30 @@ class GameConfigValidator {
       max: 5.0,
     );
     requireFiniteRange(
+      'elite_hp_per_rank',
+      difficulty.eliteHpPerRank,
+      min: 0.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'elite_atk_per_rank',
+      difficulty.eliteAtkPerRank,
+      min: 0.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'boss_hp_per_rank',
+      difficulty.bossHpPerRank,
+      min: 0.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'boss_atk_per_rank',
+      difficulty.bossAtkPerRank,
+      min: 0.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
       'drop.rare_chance_per_rank',
       difficulty.drop.rareChancePerRank,
       min: 0.0,
@@ -481,6 +529,211 @@ class GameConfigValidator {
       difficulty.drop.maxRollBonus,
       min: 0.0,
       max: 2.0,
+    );
+    final m = difficulty.mechanics;
+    if (m.minAscensionRank < 0 || m.minAscensionRank > 1000) {
+      throw ConfigException(
+        'game_config.json: difficulty.mechanics.min_ascension_rank harus 0..1000 '
+        '(nilai: ${m.minAscensionRank}).',
+      );
+    }
+    requireFiniteRange(
+      'mechanics.stoneskin_damage_reduction',
+      m.stoneskinDamageReduction,
+      min: 0.0,
+      max: 0.95,
+    );
+    requireFiniteRange(
+      'mechanics.stoneskin_hp_threshold',
+      m.stoneskinHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    requireFiniteRange(
+      'mechanics.berserk_hp_threshold',
+      m.berserkHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    requireFiniteRange(
+      'mechanics.berserk_atk_multiplier',
+      m.berserkAtkMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.berserk_speed_multiplier',
+      m.berserkSpeedMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.elite_heavy_strike_cooldown_seconds',
+      m.eliteHeavyStrikeCooldownSeconds,
+      min: 0.5,
+      max: 60.0,
+    );
+    requireFiniteRange(
+      'mechanics.elite_heavy_strike_multiplier',
+      m.eliteHeavyStrikeMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.boss_aoe_cooldown_seconds',
+      m.bossAoeCooldownSeconds,
+      min: 0.5,
+      max: 60.0,
+    );
+    requireFiniteRange(
+      'mechanics.boss_aoe_radius',
+      m.bossAoeRadius,
+      min: 0.5,
+      max: 20.0,
+    );
+    requireFiniteRange(
+      'mechanics.boss_aoe_multiplier',
+      m.bossAoeMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.boss_summon_hp_threshold',
+      m.bossSummonHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    if (m.bossSummonCount < 1 || m.bossSummonCount > 10) {
+      throw ConfigException(
+        'game_config.json: difficulty.mechanics.boss_summon_count harus 1..10 '
+        '(nilai: ${m.bossSummonCount}).',
+      );
+    }
+    requireFiniteRange(
+      'mechanics.daily_elemental_ward_reduction',
+      m.dailyElementalWardReduction,
+      min: 0.0,
+      max: 0.95,
+    );
+    requireFiniteRange(
+      'mechanics.daily_elemental_ward_duration_seconds',
+      m.dailyElementalWardDurationSeconds,
+      min: 0.5,
+      max: 60.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_elemental_ward_hp_threshold',
+      m.dailyElementalWardHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_blazing_surge_cooldown_seconds',
+      m.dailyBlazingSurgeCooldownSeconds,
+      min: 0.5,
+      max: 60.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_blazing_surge_radius',
+      m.dailyBlazingSurgeRadius,
+      min: 0.5,
+      max: 15.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_blazing_surge_multiplier',
+      m.dailyBlazingSurgeMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_enraged_rush_hp_threshold',
+      m.dailyEnragedRushHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_enraged_rush_atk_multiplier',
+      m.dailyEnragedRushAtkMultiplier,
+      min: 1.0,
+      max: 5.0,
+    );
+    requireFiniteRange(
+      'mechanics.daily_enraged_rush_speed_multiplier',
+      m.dailyEnragedRushSpeedMultiplier,
+      min: 1.0,
+      max: 5.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_life_siphon_cooldown_seconds',
+      m.weeklyLifeSiphonCooldownSeconds,
+      min: 0.5,
+      max: 60.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_life_siphon_multiplier',
+      m.weeklyLifeSiphonMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_life_siphon_heal_ratio',
+      m.weeklyLifeSiphonHealRatio,
+      min: 0.0,
+      max: 1.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_cataclysm_cooldown_seconds',
+      m.weeklyCataclysmCooldownSeconds,
+      min: 0.5,
+      max: 60.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_cataclysm_radius',
+      m.weeklyCataclysmRadius,
+      min: 0.5,
+      max: 15.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_cataclysm_multiplier',
+      m.weeklyCataclysmMultiplier,
+      min: 1.0,
+      max: 10.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_summon_hp_threshold',
+      m.weeklySummonHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    if (m.weeklySummonCount < 1 || m.weeklySummonCount > 10) {
+      throw ConfigException(
+        'game_config.json: difficulty.mechanics.weekly_summon_count harus 1..10 '
+        '(nilai: ${m.weeklySummonCount}).',
+      );
+    }
+    requireFiniteRange(
+      'mechanics.weekly_final_stand_hp_threshold',
+      m.weeklyFinalStandHpThreshold,
+      min: 0.0,
+      max: 1.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_final_stand_atk_multiplier',
+      m.weeklyFinalStandAtkMultiplier,
+      min: 1.0,
+      max: 5.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_final_stand_speed_multiplier',
+      m.weeklyFinalStandSpeedMultiplier,
+      min: 1.0,
+      max: 5.0,
+    );
+    requireFiniteRange(
+      'mechanics.weekly_final_stand_damage_reduction',
+      m.weeklyFinalStandDamageReduction,
+      min: 0.0,
+      max: 0.95,
     );
     requireFiniteRange(
       'max_multiplier',
@@ -721,7 +974,11 @@ class GameConfigValidator {
         }
         if (boss.baseStats.hp < 1 ||
             boss.baseStats.atk < 0 ||
-            boss.baseStats.def < 0) {
+            boss.baseStats.def < 0 ||
+            boss.baseStats.lifesteal < 0 ||
+            boss.baseStats.lifesteal > 1.0 ||
+            boss.baseStats.spellVamp < 0 ||
+            boss.baseStats.spellVamp > 1.0) {
           throw ConfigException(
             'boss_events.json: boss "$bid" memiliki base_stats tidak valid.',
           );
@@ -735,6 +992,96 @@ class GameConfigValidator {
       throw const ConfigException(
         'boss_events.json: daily."quest_id" dan weekly."quest_id" tidak boleh sama.',
       );
+    }
+  }
+
+  void _validateBossSpire(GameConfig config) {
+    final spire = config.bossSpire;
+    if (spire == null) return;
+
+    final mapRef = spire.arenaMapRef.trim();
+    if (mapRef.isEmpty) {
+      throw const ConfigException(
+        'boss_spire.json: "arena_map_ref" tidak boleh kosong.',
+      );
+    }
+    final hasMapLayout =
+        config.mapLayouts.containsKey(mapRef) ||
+        config.dungeons.values.any(
+          (d) => d.rooms.values.any((r) => r.mapRef == mapRef),
+        );
+    if ((config.mapLayouts.isNotEmpty || config.dungeons.isNotEmpty) &&
+        !hasMapLayout) {
+      throw ConfigException(
+        'boss_spire.json: arena_map_ref "$mapRef" tidak ditemukan di dungeons.json.',
+      );
+    }
+
+    if (spire.floors.isEmpty) {
+      throw const ConfigException(
+        'boss_spire.json: "floors" tidak boleh kosong.',
+      );
+    }
+
+    final seenFloors = <int>{};
+    final seenBossIds = <String>{};
+
+    for (var i = 0; i < spire.floors.length; i++) {
+      final floor = spire.floors[i];
+      final where = 'floors[$i]';
+
+      if (!seenFloors.add(floor.floor)) {
+        throw ConfigException(
+          'boss_spire.json: lantai ganda ${floor.floor} pada $where.',
+        );
+      }
+      if (!seenBossIds.add(floor.bossId)) {
+        throw ConfigException(
+          'boss_spire.json: boss_id ganda "${floor.bossId}" pada $where.',
+        );
+      }
+      if (floor.bossName.trim().isEmpty) {
+        throw ConfigException(
+          'boss_spire.json: lantai ${floor.floor} memiliki boss_name kosong.',
+        );
+      }
+      if (config.monsters.isNotEmpty &&
+          !config.monsters.containsKey(floor.spriteRef)) {
+        throw ConfigException(
+          'boss_spire.json: lantai ${floor.floor} boss "${floor.bossId}" merujuk sprite_ref "${floor.spriteRef}" yang tidak ada di monsters.json.',
+        );
+      }
+      final tint = floor.spriteTint;
+      if (tint != null && !MonsterConfigParser.isValidHexTint(tint)) {
+        throw ConfigException(
+          'boss_spire.json: lantai ${floor.floor} boss "${floor.bossId}" memiliki sprite_tint tidak valid: "$tint".',
+        );
+      }
+      if (floor.baseStats.hp <= 0 ||
+          floor.baseStats.atk < 0 ||
+          floor.baseStats.def < 0) {
+        throw ConfigException(
+          'boss_spire.json: lantai ${floor.floor} boss "${floor.bossId}" memiliki base_stats tidak valid.',
+        );
+      }
+      if (floor.firstClearReward.exp < 0 || floor.firstClearReward.gold < 0) {
+        throw ConfigException(
+          'boss_spire.json: lantai ${floor.floor} reward exp/gold tidak boleh negatif.',
+        );
+      }
+      for (final curr in floor.firstClearReward.currency.entries) {
+        if (curr.value < 0) {
+          throw ConfigException(
+            'boss_spire.json: lantai ${floor.floor} reward.currency."${curr.key}" tidak boleh negatif.',
+          );
+        }
+        if (config.currencies.isNotEmpty &&
+            !config.currencies.containsKey(curr.key)) {
+          throw ConfigException(
+            'boss_spire.json: lantai ${floor.floor} reward.currency merujuk "${curr.key}" yang tidak ada di game_config.json.',
+          );
+        }
+      }
     }
   }
 
@@ -944,6 +1291,7 @@ class GameConfigValidator {
       ItemRarity.rare,
       ItemRarity.epic,
       ItemRarity.legendary,
+      ItemRarity.mythical,
     ];
     ItemRarity? lowerRarity;
     int? lowerMaxPrice;
@@ -1032,7 +1380,8 @@ class GameConfigValidator {
         'event_shop.json: "currency_id" tidak boleh kosong.',
       );
     }
-    if (config.currencies.isNotEmpty &&
+    if (eventShop.currencyId != 'barter' &&
+        config.currencies.isNotEmpty &&
         !config.currencies.containsKey(eventShop.currencyId)) {
       throw ConfigException(
         'event_shop.json: currency_id "${eventShop.currencyId}" '
@@ -1077,10 +1426,28 @@ class GameConfigValidator {
           'event_shop.json: id entri duplikat "${entry.id}".',
         );
       }
-      if (entry.price <= 0) {
+      if (!entry.isBarter && entry.price <= 0) {
         throw ConfigException(
           'event_shop.json: entri "${entry.id}" memiliki price <= 0 (${entry.price}).',
         );
+      }
+      if (entry.goldPrice < 0) {
+        throw ConfigException(
+          'event_shop.json: entri "${entry.id}" memiliki gold_price < 0 (${entry.goldPrice}).',
+        );
+      }
+      for (final mat in entry.materialCosts.entries) {
+        if (mat.value <= 0) {
+          throw ConfigException(
+            'event_shop.json: entri "${entry.id}" material_costs["${mat.key}"] harus > 0.',
+          );
+        }
+        final matDef = config.items[mat.key];
+        if (matDef == null || matDef.category != ItemCategory.material) {
+          throw ConfigException(
+            'event_shop.json: entri "${entry.id}" material "${mat.key}" tidak ditemukan atau bukan material.',
+          );
+        }
       }
 
       final item = config.items[entry.itemId];
@@ -1154,6 +1521,98 @@ class GameConfigValidator {
           '($epicsInSlot) dan legendary ($legendariesInSlot) tidak seimbang.',
         );
       }
+    }
+  }
+
+  void _validateGacha(GameConfig config) {
+    final gacha = config.gacha;
+    if (gacha == null) return;
+
+    if (gacha.cycleDays < 1) {
+      throw const ConfigException('gacha_banners.json: cycle_days harus >= 1.');
+    }
+    if (gacha.costPerPull < 1) {
+      throw const ConfigException(
+        'gacha_banners.json: cost_per_pull harus >= 1.',
+      );
+    }
+    if (gacha.costPerTenPull < gacha.costPerPull) {
+      throw const ConfigException(
+        'gacha_banners.json: cost_per_ten_pull harus >= cost_per_pull.',
+      );
+    }
+    if (!config.currencies.containsKey(gacha.currencyId)) {
+      throw ConfigException(
+        'gacha_banners.json: currency_id "${gacha.currencyId}" tidak terdaftar di game_config.json.',
+      );
+    }
+    if (!config.currencies.containsKey(gacha.duplicateCurrencyId)) {
+      throw ConfigException(
+        'gacha_banners.json: duplicate_currency_id "${gacha.duplicateCurrencyId}" tidak terdaftar di game_config.json.',
+      );
+    }
+    if (gacha.banners.isEmpty) {
+      throw const ConfigException(
+        'gacha_banners.json: banners tidak boleh kosong.',
+      );
+    }
+
+    for (final banner in gacha.banners.values) {
+      if (banner.hardPity < 1) {
+        throw ConfigException(
+          'gacha_banners.json: banner "${banner.id}" memiliki hard_pity < 1.',
+        );
+      }
+      if (banner.baseRate <= 0 || banner.baseRate >= 1.0) {
+        throw ConfigException(
+          'gacha_banners.json: banner "${banner.id}" memiliki base_rate tidak valid (${banner.baseRate}).',
+        );
+      }
+      if (banner.type == GachaBannerType.classBanner) {
+        for (final classId in banner.featuredPool) {
+          if (!config.specializations.definitions.containsKey(classId)) {
+            throw ConfigException(
+              'gacha_banners.json: banner "${banner.id}" merujuk specialization '
+              '"$classId" yang tidak ada di specializations.json.',
+            );
+          }
+        }
+        for (final classId in banner.standardPool) {
+          if (!config.specializations.definitions.containsKey(classId)) {
+            throw ConfigException(
+              'gacha_banners.json: banner "${banner.id}" merujuk specialization '
+              '"$classId" yang tidak ada di specializations.json.',
+            );
+          }
+        }
+      } else if (banner.type == GachaBannerType.weaponBanner) {
+        for (final weaponId in banner.featuredPool) {
+          final item = config.items[weaponId];
+          if (item == null || !item.isEquipment) {
+            throw ConfigException(
+              'gacha_banners.json: banner "${banner.id}" merujuk item '
+              '"$weaponId" yang tidak ada di items.json atau bukan equipment.',
+            );
+          }
+        }
+        for (final weaponId in banner.standardPool) {
+          final item = config.items[weaponId];
+          if (item == null || !item.isEquipment) {
+            throw ConfigException(
+              'gacha_banners.json: banner "${banner.id}" merujuk item '
+              '"$weaponId" yang tidak ada di items.json atau bukan equipment.',
+            );
+          }
+        }
+      }
+    }
+
+    final exchange = gacha.sanctuaryExchange;
+    if (!config.currencies.containsKey(exchange.currencyId)) {
+      throw ConfigException(
+        'gacha_banners.json: sanctuary_exchange.currency_id "${exchange.currencyId}" '
+        'tidak terdaftar di game_config.json.',
+      );
     }
   }
 }

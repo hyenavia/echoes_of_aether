@@ -218,7 +218,7 @@ void main() {
         expect(find.text('Progres room tertinggi: 1 / 1'), findsOneWidget);
         expect(find.text('Total dungeon selesai: 2'), findsOneWidget);
 
-        // Buka Bag -> sub-tab Tas (InventoryOverlay) & Perlengkapan (EquipmentOverlay)
+        // Buka Bag -> sub-tab Equipment & Item
         await tester.tap(find.text('Bag'));
         await tester.pump();
         expect(find.text('Tas perlengkapan (1)'), findsOneWidget);
@@ -227,15 +227,17 @@ void main() {
         await tester.pump();
         expect(character.loadout.instanceIn(EquipmentSlot.weapon)?.id, 'eq_1');
 
-        await tester.tap(find.text('Tas'));
+        await tester.tap(find.text('Item'));
         await tester.pump();
         expect(find.text('Slime Gel'), findsOneWidget);
 
-        // Buka Hero lewat HeroShowcaseCard dan pilih spesialisasi
+        // Buka Hero lewat HeroShowcaseCard -> pindah ke Kelas & Skill -> pilih spesialisasi
         await tester.tap(find.text('Adventure'));
         await tester.pump();
         await tester.ensureVisible(find.byKey(const Key('hero_showcase_card')));
         await tester.tap(find.byKey(const Key('hero_showcase_card')));
+        await tester.pump();
+        await tester.tap(find.text('Kelas & Skill'));
         await tester.pump();
         await tester.ensureVisible(find.text('Pilih'));
         await tester.tap(find.text('Pilih'));

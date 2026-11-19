@@ -4,6 +4,7 @@ import '../entities/equipment.dart';
 import '../entities/event_shop_config.dart';
 import '../entities/inventory.dart';
 import '../entities/item_definition.dart';
+import '../entities/player_character.dart';
 import '../entities/shop_config.dart';
 import 'currency_service.dart';
 import 'equipment_factory.dart';
@@ -24,6 +25,9 @@ final class EventShopBuySuccess extends EventShopBuyResult {
     required this.newPurchaseCount,
     required this.itemId,
     required this.periodKey,
+    this.goldSpent = 0,
+    this.materialsSpent = const {},
+    this.remainingGold,
     this.purchasedEquipment,
     this.wasDuplicate = false,
   });
@@ -34,6 +38,9 @@ final class EventShopBuySuccess extends EventShopBuyResult {
   final int newPurchaseCount;
   final String itemId;
   final String periodKey;
+  final int goldSpent;
+  final Map<String, int> materialsSpent;
+  final int? remainingGold;
   final EquipmentInstance? purchasedEquipment;
   final bool wasDuplicate;
 }
@@ -99,6 +106,9 @@ class EventShopOfferView {
     required this.requirementCheck,
     required this.canAfford,
     required this.hasInventorySpace,
+    this.goldBalance = 0,
+    this.materialBalances = const {},
+    this.materialNames = const {},
   });
 
   final EventShopEntry entry;
@@ -108,6 +118,9 @@ class EventShopOfferView {
   final RequirementCheck requirementCheck;
   final bool canAfford;
   final bool hasInventorySpace;
+  final int goldBalance;
+  final Map<String, int> materialBalances;
+  final Map<String, String> materialNames;
 
   bool get limitReached => purchasedCount >= weeklyLimit;
 
@@ -117,7 +130,7 @@ class EventShopOfferView {
   bool get canAttemptBuy => requirementsMet && !limitReached;
 }
 
-/// Snapshot tampilan read-only Weekly Event Shop untuk widget UI.
+/// Snapshot tampilan read-only Weekly Event Shop / Dungeon Outpost untuk widget UI.
 class EventShopViewData {
   const EventShopViewData({
     required this.currencyId,
@@ -125,6 +138,9 @@ class EventShopViewData {
     required this.periodKey,
     required this.remainingToReset,
     required this.offers,
+    this.goldBalance = 0,
+    this.materialBalances = const {},
+    this.materialNames = const {},
   });
 
   final String currencyId;
@@ -132,6 +148,11 @@ class EventShopViewData {
   final String periodKey;
   final Duration remainingToReset;
   final List<EventShopOfferView> offers;
+  final int goldBalance;
+  final Map<String, int> materialBalances;
+  final Map<String, String> materialNames;
+
+  bool get isBarterShop => currencyId == 'barter';
 }
 
 /// Layanan domain murni untuk Weekly Event Shop (M13 Stage 3):
@@ -216,13 +237,30 @@ class EventShopService {
   EventShopViewData buildViewData({
     required int effectiveNowMs,
     required ShopPlayerContext context,
-    required int currencyBalance,
+    int currencyBalance = 0,
     required bool hasInventorySpace,
+    int goldBalance = 0,
+    Map<String, int> materialBalances = const {},
+    Inventory? inventory,
     Map<(String, String), int>? purchaseCounts,
     Duration? offset,
   }) {
     final periodKey = periodKeyAt(effectiveNowMs, offset: offset);
     final entries = activeEntriesAt(effectiveNowMs, offset: offset);
+
+    final resolvedMaterials = <String, int>{...materialBalances};
+    final materialNames = <String, String>{};
+    for (final entry in entries) {
+      for (final matId in entry.materialCosts.keys) {
+        if (inventory != null) {
+          resolvedMaterials[matId] = inventory.quantityOf(matId);
+        } else {
+          resolvedMaterials.putIfAbsent(matId, () => 0);
+        }
+        materialNames[matId] = items[matId]?.name ?? matId;
+      }
+    }
+
     final offers = <EventShopOfferView>[];
     for (final entry in entries) {
       final itemDef = items[entry.itemId];
@@ -230,6 +268,18 @@ class EventShopService {
       final purchased =
           purchaseCounts?[(entry.id, periodKey)] ??
           context.eventPurchasedCountFor(entry.id, periodKey);
+
+      final bool canAfford;
+      if (entry.isBarter) {
+        final hasGold = goldBalance >= entry.goldPrice;
+        final hasMats = entry.materialCosts.entries.every(
+          (m) => (resolvedMaterials[m.key] ?? 0) >= m.value,
+        );
+        canAfford = hasGold && hasMats;
+      } else {
+        canAfford = currencyBalance >= entry.price;
+      }
+
       offers.add(
         EventShopOfferView(
           entry: entry,
@@ -237,8 +287,11 @@ class EventShopService {
           purchasedCount: purchased,
           weeklyLimit: catalog.weeklyPurchaseLimit,
           requirementCheck: check(entry, context),
-          canAfford: currencyBalance >= entry.price,
+          canAfford: canAfford,
           hasInventorySpace: hasInventorySpace,
+          goldBalance: goldBalance,
+          materialBalances: Map<String, int>.unmodifiable(resolvedMaterials),
+          materialNames: Map<String, String>.unmodifiable(materialNames),
         ),
       );
     }
@@ -251,11 +304,14 @@ class EventShopService {
         milliseconds: remainingToResetMs(effectiveNowMs, offset: offset),
       ),
       offers: List<EventShopOfferView>.unmodifiable(offers),
+      goldBalance: goldBalance,
+      materialBalances: Map<String, int>.unmodifiable(resolvedMaterials),
+      materialNames: Map<String, String>.unmodifiable(materialNames),
     );
   }
 
-  /// Membeli satu entri Event Shop pada minggu berjalan.
-  /// Seluruh kondisi divalidasi terlebih dahulu sebelum mengurangi mata uang,
+  /// Membeli satu entri Event Shop / Dungeon Outpost pada minggu berjalan.
+  /// Seluruh kondisi divalidasi terlebih dahulu sebelum mengurangi mata uang/material,
   /// menambah equipment (`fixed_stats`), atau menambah hitungan pembelian.
   EventShopBuyResult buy({
     required String entryId,
@@ -263,6 +319,7 @@ class EventShopService {
     required Inventory inventory,
     required CurrencyService currencyService,
     required ShopPlayerContext context,
+    PlayerCharacter? character,
     math.Random? random,
     Map<(String, String), int>? purchaseCounts,
     Duration? timeZoneOffset,
@@ -281,7 +338,9 @@ class EventShopService {
       return EventShopBuySuccess(
         currencyId: catalog.currencyId,
         currencySpent: 0,
-        remainingBalance: currencyService.balance(catalog.currencyId),
+        remainingBalance: catalog.currencyId == 'barter'
+            ? 0
+            : currencyService.balance(catalog.currencyId),
         newPurchaseCount: currentPurchases,
         itemId: entry?.itemId ?? entryId,
         periodKey: periodKey,
@@ -321,6 +380,99 @@ class EventShopService {
       );
     }
 
+    if (entry.isBarter) {
+      final goldBalance = character?.gold ?? 0;
+      if (entry.goldPrice > 0 && goldBalance < entry.goldPrice) {
+        return EventShopBuyInsufficientCurrency(
+          currencyId: 'gold',
+          requiredAmount: entry.goldPrice,
+          currentBalance: goldBalance,
+        );
+      }
+      for (final mat in entry.materialCosts.entries) {
+        final owned = inventory.quantityOf(mat.key);
+        if (owned < mat.value) {
+          return EventShopBuyInsufficientCurrency(
+            currencyId: mat.key,
+            requiredAmount: mat.value,
+            currentBalance: owned,
+          );
+        }
+      }
+      if (!inventory.hasEquipmentSpace) {
+        return const EventShopBuyInventoryFull();
+      }
+
+      // Validasi lolos -> mutasi atomik Gold + Material + Equipment + Counter.
+      if (entry.goldPrice > 0) {
+        final spentGold = character?.spendGold(entry.goldPrice) ?? false;
+        if (!spentGold) {
+          return EventShopBuyInsufficientCurrency(
+            currencyId: 'gold',
+            requiredAmount: entry.goldPrice,
+            currentBalance: character?.gold ?? 0,
+          );
+        }
+      }
+
+      final deductedMats = <String, int>{};
+      for (final mat in entry.materialCosts.entries) {
+        if (!inventory.remove(mat.key, mat.value)) {
+          // Rollback jika gagal di tengah jalan
+          if (entry.goldPrice > 0) {
+            character?.addGold(entry.goldPrice);
+          }
+          for (final prev in deductedMats.entries) {
+            inventory.add(prev.key, prev.value);
+          }
+          return EventShopBuyInsufficientCurrency(
+            currencyId: mat.key,
+            requiredAmount: mat.value,
+            currentBalance: inventory.quantityOf(mat.key),
+          );
+        }
+        deductedMats[mat.key] = mat.value;
+      }
+
+      final candidate = equipmentFactory.create(
+        instanceId: inventory.nextEquipmentId(),
+        definition: itemDef,
+        random: random ?? math.Random(0),
+      );
+      final added = inventory.addEquipment(candidate);
+      if (!added) {
+        if (entry.goldPrice > 0) {
+          character?.addGold(entry.goldPrice);
+        }
+        for (final prev in deductedMats.entries) {
+          inventory.add(prev.key, prev.value);
+        }
+        return const EventShopBuyInventoryFull();
+      }
+
+      final nextPurchaseCount = currentPurchases + 1;
+      if (purchaseCounts != null) {
+        purchaseCounts[(entry.id, periodKey)] = nextPurchaseCount;
+      }
+      if (normalizedActionId != null) {
+        tracker.add(normalizedActionId);
+      }
+
+      return EventShopBuySuccess(
+        currencyId: 'barter',
+        currencySpent: 0,
+        remainingBalance: 0,
+        goldSpent: entry.goldPrice,
+        materialsSpent: Map<String, int>.unmodifiable(deductedMats),
+        remainingGold: character?.gold,
+        newPurchaseCount: nextPurchaseCount,
+        itemId: itemDef.id,
+        periodKey: periodKey,
+        purchasedEquipment: candidate,
+      );
+    }
+
+    // Legacy currency path (non-barter custom catalog)
     final currentBalance = currencyService.balance(catalog.currencyId);
     if (currentBalance < entry.price) {
       return EventShopBuyInsufficientCurrency(
@@ -334,7 +486,6 @@ class EventShopService {
       return const EventShopBuyInventoryFull();
     }
 
-    // Seluruh validasi lolos -> mutasi atomik shard + equipment + counter.
     final prevBalances = currencyService.toSnapshot();
     final prevClaims = currencyService.claimedIds;
     final spendResult = currencyService.spend(catalog.currencyId, entry.price);

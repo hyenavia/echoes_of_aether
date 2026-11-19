@@ -6,7 +6,7 @@ enum SkillType { active, passive }
 enum SkillEffectType { damage, healing, statModifier }
 
 /// Tipe damage untuk skill bertipe [SkillEffectType.damage].
-enum SkillDamageType { physical, magic }
+enum SkillDamageType { physical, magic, trueDamage }
 
 /// Sasaran skill: satu musuh, semua musuh di sekitar target utama, atau diri
 /// sendiri (untuk healing).

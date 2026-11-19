@@ -78,7 +78,7 @@ class FlameAudioBackend implements AudioBackend {
 
     final pending = _pendingPools.putIfAbsent(
       file,
-      () => FlameAudio.createPool(file, minPlayers: 1, maxPlayers: 3),
+      () => FlameAudio.createPool(file, minPlayers: 1, maxPlayers: 1),
     );
     try {
       final pool = await pending;
@@ -154,11 +154,14 @@ class AudioService {
   }
 
   static const String bgmForestFile = 'bgm_forest.wav';
+  static const int minGlobalSfxIntervalMs = 50;
 
   final AudioBackend _backend;
   final int Function() _nowMs;
   final ValueNotifier<GameSettingsData> settingsNotifier;
   final Map<AudioCue, int> _lastPlayedAtMs = {};
+  int _lastGlobalSfxAtMs = 0;
+  bool _sfxBusy = false;
 
   bool _preloaded = false;
   bool _bgmPlaying = false;
@@ -237,16 +240,25 @@ class AudioService {
   Future<void> playSfx(AudioCue cue) async {
     final current = settingsNotifier.value;
     if (!current.sfxEnabled || current.sfxVolume <= 0) return;
+    if (_sfxBusy) return;
 
     final now = _nowMs();
+    if (now - _lastGlobalSfxAtMs < minGlobalSfxIntervalMs) return;
+
     final last = _lastPlayedAtMs[cue];
     if (last != null && (now - last) < cue.cooldownMs) {
       return;
     }
     _lastPlayedAtMs[cue] = now;
-    await _runSafe(
-      () => _backend.playSfx(cue.assetFile, volume: current.sfxVolume),
-    );
+    _lastGlobalSfxAtMs = now;
+    _sfxBusy = true;
+    try {
+      await _runSafe(
+        () => _backend.playSfx(cue.assetFile, volume: current.sfxVolume),
+      );
+    } finally {
+      _sfxBusy = false;
+    }
   }
 
   Future<void> dispose() async {

@@ -20,6 +20,8 @@ class EventShopConfigParser {
     'item_id',
     'tier',
     'price',
+    'gold_price',
+    'material_costs',
     'requirements',
   };
 
@@ -98,8 +100,46 @@ class EventShopConfigParser {
     );
     final tier = _parseTier(map['tier'], '$path.tier');
 
-    final rawPrice = map['price'];
-    if (rawPrice is! int || rawPrice <= 0) {
+    var goldPrice = 0;
+    if (map.containsKey('gold_price')) {
+      final rawGold = map['gold_price'];
+      if (rawGold is! int || rawGold < 0) {
+        throw ConfigException(
+          '$_file: $path.gold_price harus berupa integer >= 0.',
+        );
+      }
+      goldPrice = rawGold;
+    }
+
+    final materialCosts = <String, int>{};
+    if (map.containsKey('material_costs')) {
+      final rawMats = map['material_costs'];
+      if (rawMats is! Map<String, dynamic>) {
+        throw ConfigException(
+          '$_file: $path.material_costs harus berupa object.',
+        );
+      }
+      for (final entry in rawMats.entries) {
+        final matId = entry.key.trim();
+        final qty = entry.value;
+        if (matId.isEmpty || qty is! int || qty <= 0) {
+          throw ConfigException(
+            '$_file: $path.material_costs["${entry.key}"] harus berupa integer > 0.',
+          );
+        }
+        materialCosts[matId] = qty;
+      }
+    }
+
+    final hasBarter = goldPrice > 0 || materialCosts.isNotEmpty;
+    var price = 0;
+    if (map.containsKey('price')) {
+      final rawPrice = map['price'];
+      if (rawPrice is! int || rawPrice < 0 || (!hasBarter && rawPrice == 0)) {
+        throw ConfigException('$_file: $path.price harus berupa integer > 0.');
+      }
+      price = rawPrice;
+    } else if (!hasBarter) {
       throw ConfigException('$_file: $path.price harus berupa integer > 0.');
     }
 
@@ -130,7 +170,9 @@ class EventShopConfigParser {
       id: id,
       itemId: itemId,
       tier: tier,
-      price: rawPrice,
+      price: price,
+      goldPrice: goldPrice,
+      materialCosts: Map<String, int>.unmodifiable(materialCosts),
       requirements: List<PurchaseRequirement>.unmodifiable(requirements),
     );
   }

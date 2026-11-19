@@ -42,11 +42,66 @@ class Combatant {
 
   int hp;
 
+  /// Nilai perisai (shield/barrier) saat ini. Menyerap damage sebelum mengurangi [hp].
+  int shield = 0;
+
+  /// Kapasitas maksimum perisai (0 jika tidak dibatasi).
+  int maxShield = 0;
+
   /// Sisa tick sebelum boleh menyerang lagi.
   int cooldownTicks = 0;
 
   /// Selama > 0, serangan yang mengenai combatant ini tidak memberi damage.
   int invulnerableTicks = 0;
+
+  /// Cooldown (tick) skill khusus monster Elite (Heavy Strike).
+  int eliteSpecialCooldownTicks = 0;
+
+  /// Cooldown (tick) skill Ground Slam AoE milik Boss.
+  int bossAoECooldownTicks = 0;
+
+  /// Penanda apakah Boss sudah pernah memanggil minion guards dalam encounter ini.
+  bool hasSummonedMinions = false;
+
+  /// Penanda status Berserk/Enraged saat HP jatuh di bawah ambang batas (Elite / Boss).
+  bool isEnraged = false;
+
+  /// Penanda apakah Boss sudah pernah memicu Elemental Ward dalam encounter ini.
+  bool hasTriggeredWard = false;
+
+  /// Sisa tick durasi Elemental Ward (selama > 0, menyerap damage sesuai reduksi).
+  int elementalWardTicks = 0;
+
+  /// Cooldown (tick) skill Life Siphon milik Weekly Boss.
+  int lifeSiphonCooldownTicks = 0;
+
+  /// Penanda status Final Stand saat HP Weekly Boss jatuh di bawah ambang batas final.
+  bool isFinalStand = false;
+
+  /// Penanda status Shadow Mark dari Voidblade Signature Resonance.
+  bool isShadowMarked = false;
+  int shadowMarkTicks = 0;
+
+  /// Penanda durasi Freeze dari Chronomancer Signature Resonance.
+  int freezeTicks = 0;
+  bool get isFrozen => freezeTicks > 0;
+
+  /// Penanda status Shock (+15% damage diterima) dari Stormcaller Signature Resonance.
+  bool isShocked = false;
+  int shockTicks = 0;
+
+  /// Sisa tick masa hidup (lifetime) untuk minion temporer seperti Shadow Minion Necromancer.
+  int lifetimeTicks = 0;
+
+  bool get isDailyBoss =>
+      isBoss &&
+      ((definitionId?.startsWith('daily_') ?? false) ||
+          id.startsWith('daily_'));
+
+  bool get isWeeklyBoss =>
+      isBoss &&
+      ((definitionId?.startsWith('weekly_') ?? false) ||
+          id.startsWith('weekly_'));
 
   String? targetId;
   GridPoint? plannedGoal;
@@ -90,6 +145,39 @@ class Combatant {
   void heal(int amount) {
     if (!isAlive || amount <= 0) return;
     hp = math.min(stats.maxHp, hp + amount);
+  }
+
+  /// Menambahkan perisai pelindung sebesar [amount].
+  void addShield(int amount, {int? max}) {
+    if (!isAlive || amount <= 0) return;
+    if (max != null && max > 0) {
+      maxShield = math.max(maxShield, max);
+      shield = math.min(maxShield, shield + amount);
+    } else {
+      maxShield = math.max(maxShield, shield + amount);
+      shield += amount;
+    }
+  }
+
+  /// Menyerap [incomingDamage] menggunakan [shield] terlebih dahulu.
+  /// Mengembalikan sisa damage yang belum terserap oleh perisai.
+  int absorbDamage(int incomingDamage) {
+    if (incomingDamage <= 0) return 0;
+    if (shield <= 0) return incomingDamage;
+    if (shield >= incomingDamage) {
+      shield -= incomingDamage;
+      return 0;
+    } else {
+      final unabsorbed = incomingDamage - shield;
+      shield = 0;
+      return unabsorbed;
+    }
+  }
+
+  /// Menghapus perisai saat ini.
+  void clearShield() {
+    shield = 0;
+    maxShield = 0;
   }
 
   /// Menempatkan combatant pada [cell] baru serta membersihkan target dan

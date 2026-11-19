@@ -4,6 +4,7 @@ import '../entities/boss_event.dart';
 import '../entities/combat_stats.dart';
 import '../entities/difficulty_config.dart';
 import '../entities/dungeon_definition.dart';
+import 'period_service.dart';
 
 /// Profil pengali kesulitan efektif untuk satu dungeon run.
 class DifficultyProfile {
@@ -15,6 +16,11 @@ class DifficultyProfile {
     this.rewardMultiplier = 1.0,
     this.rareDropChanceMultiplier = 1.0,
     this.equipmentRollBonus = 0.0,
+    this.eliteHpMultiplier = 1.0,
+    this.eliteAtkMultiplier = 1.0,
+    this.bossHpMultiplier = 1.0,
+    this.bossAtkMultiplier = 1.0,
+    this.cycleRank = 0,
   });
 
   static const DifficultyProfile identity = DifficultyProfile();
@@ -27,6 +33,11 @@ class DifficultyProfile {
   final double rewardMultiplier;
   final double rareDropChanceMultiplier;
   final double equipmentRollBonus;
+  final double eliteHpMultiplier;
+  final double eliteAtkMultiplier;
+  final double bossHpMultiplier;
+  final double bossAtkMultiplier;
+  final int cycleRank;
 
   bool get isIdentity =>
       multiplier == 1.0 &&
@@ -35,7 +46,12 @@ class DifficultyProfile {
       defMultiplier == 1.0 &&
       rewardMultiplier == 1.0 &&
       rareDropChanceMultiplier == 1.0 &&
-      equipmentRollBonus == 0.0;
+      equipmentRollBonus == 0.0 &&
+      eliteHpMultiplier == 1.0 &&
+      eliteAtkMultiplier == 1.0 &&
+      bossHpMultiplier == 1.0 &&
+      bossAtkMultiplier == 1.0 &&
+      cycleRank == 0;
 }
 
 /// Layanan domain deterministik untuk menghitung pengali kesulitan stat monster,
@@ -134,6 +150,31 @@ class DifficultyService {
         ? maxRollBonus
         : rawRollBonus.clamp(0.0, maxRollBonus);
 
+    final safeEliteHpBonus = math.max(0.0, config.eliteHpPerRank);
+    final safeEliteAtkBonus = math.max(0.0, config.eliteAtkPerRank);
+    final safeBossHpBonus = math.max(0.0, config.bossHpPerRank);
+    final safeBossAtkBonus = math.max(0.0, config.bossAtkPerRank);
+
+    final rawEliteHp = hpMultiplier * (1.0 + safeEliteHpBonus * safeRank);
+    final eliteHpMultiplier = !rawEliteHp.isFinite
+        ? safeMax
+        : math.min(rawEliteHp, safeMax);
+
+    final rawEliteAtk = atkMultiplier * (1.0 + safeEliteAtkBonus * safeRank);
+    final eliteAtkMultiplier = !rawEliteAtk.isFinite
+        ? safeMax
+        : math.min(rawEliteAtk, safeMax);
+
+    final rawBossHp = hpMultiplier * (1.0 + safeBossHpBonus * safeRank);
+    final bossHpMultiplier = !rawBossHp.isFinite
+        ? safeMax
+        : math.min(rawBossHp, safeMax);
+
+    final rawBossAtk = atkMultiplier * (1.0 + safeBossAtkBonus * safeRank);
+    final bossAtkMultiplier = !rawBossAtk.isFinite
+        ? safeMax
+        : math.min(rawBossAtk, safeMax);
+
     return DifficultyProfile(
       multiplier: multiplier,
       hpMultiplier: hpMultiplier,
@@ -142,7 +183,31 @@ class DifficultyService {
       rewardMultiplier: rewardMultiplier,
       rareDropChanceMultiplier: rareDropChanceMultiplier,
       equipmentRollBonus: equipmentRollBonus,
+      eliteHpMultiplier: eliteHpMultiplier,
+      eliteAtkMultiplier: eliteAtkMultiplier,
+      bossHpMultiplier: bossHpMultiplier,
+      bossAtkMultiplier: bossAtkMultiplier,
+      cycleRank: safeRank,
     );
+  }
+
+  /// Menghitung faktor pengali kekuatan Boss Event bertingkat berdasarkan
+  /// [basePowerFactor] dan tingkat ascension [cycleRank].
+  ///
+  /// - Pada Rank 0: mempertahankan pengali awal yang aman (1.25x - 1.5x).
+  /// - Pada Rank 1..4: meningkat secara bertahap dan seimbang menuju tantangan end-game.
+  /// - Pada Rank 5+: mencapai batas pengali yang seimbang (hingga 1.50x untuk Daily Boss dan 2.00x untuk Weekly Boss).
+  double computeBossPowerFactor(
+    double basePowerFactor,
+    int cycleRank, {
+    Period? period,
+  }) {
+    if (cycleRank <= 0) return basePowerFactor;
+    final isWeekly = period == Period.weekly || basePowerFactor >= 1.4;
+    final targetMax = isWeekly ? 2.0 : 1.5;
+    final initial = basePowerFactor;
+    final progress = math.min(1.0, cycleRank / 5.0);
+    return initial + (targetMax - initial) * progress;
   }
 
   /// Menghitung [DifficultyProfile] untuk Boss Event berdasarkan [reference]
@@ -173,27 +238,52 @@ class DifficultyService {
       rewardMultiplier: base.rewardMultiplier,
       rareDropChanceMultiplier: base.rareDropChanceMultiplier,
       equipmentRollBonus: base.equipmentRollBonus,
+      eliteHpMultiplier: scaleStat(base.eliteHpMultiplier),
+      eliteAtkMultiplier: scaleStat(base.eliteAtkMultiplier),
+      bossHpMultiplier: scaleStat(base.bossHpMultiplier),
+      bossAtkMultiplier: scaleStat(base.bossAtkMultiplier),
+      cycleRank: reference.cycleRank,
     );
   }
 
   /// Menskalakan stat HP, ATK, dan DEF monster menggunakan [profile].
+  /// Jika [isBoss] atau [isElite] true, pengali khusus tier pada rank bersangkutan diterapkan.
   /// Stat sekunder (attackSpeed, critRate, dll.) tetap dipertahankan.
-  CombatStats scaleMonsterStats(CombatStats base, DifficultyProfile profile) {
-    if (profile.hpMultiplier == 1.0 &&
-        profile.atkMultiplier == 1.0 &&
-        profile.defMultiplier == 1.0) {
+  CombatStats scaleMonsterStats(
+    CombatStats base,
+    DifficultyProfile profile, {
+    bool isElite = false,
+    bool isBoss = false,
+  }) {
+    final effectiveHpMul = isBoss
+        ? profile.bossHpMultiplier
+        : (isElite ? profile.eliteHpMultiplier : profile.hpMultiplier);
+    final effectiveAtkMul = isBoss
+        ? profile.bossAtkMultiplier
+        : (isElite ? profile.eliteAtkMultiplier : profile.atkMultiplier);
+    final effectiveDefMul = profile.defMultiplier;
+
+    if (effectiveHpMul == 1.0 &&
+        effectiveAtkMul == 1.0 &&
+        effectiveDefMul == 1.0) {
       return base;
     }
     return CombatStats(
-      maxHp: _scalePositiveInt(base.maxHp, profile.hpMultiplier, minResult: 1),
-      atk: _scalePositiveInt(base.atk, profile.atkMultiplier, minResult: 1),
-      def: _scalePositiveInt(base.def, profile.defMultiplier, minResult: 0),
+      maxHp: _scalePositiveInt(base.maxHp, effectiveHpMul, minResult: 1),
+      atk: _scalePositiveInt(base.atk, effectiveAtkMul, minResult: 1),
+      def: _scalePositiveInt(base.def, effectiveDefMul, minResult: 0),
       attackSpeed: base.attackSpeed,
       critRate: base.critRate,
       critDamage: base.critDamage,
       moveSpeed: base.moveSpeed,
       attackRange: base.attackRange,
       skillHaste: base.skillHaste,
+      lifesteal: isBoss && profile.cycleRank >= 1
+          ? math.min(0.05, math.max(base.lifesteal, 0.005 * profile.cycleRank))
+          : base.lifesteal,
+      spellVamp: isBoss && profile.cycleRank >= 1
+          ? math.min(0.06, math.max(base.spellVamp, 0.008 * profile.cycleRank))
+          : base.spellVamp,
     );
   }
 

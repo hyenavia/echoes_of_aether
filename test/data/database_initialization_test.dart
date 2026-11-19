@@ -11,11 +11,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('AppDatabase initialization & schema v3', () {
-    test('membuka koneksi in-memory, memverifikasi schemaVersion 3, dan baca-tulis dasar', () async {
+    test('membuka koneksi in-memory, memverifikasi schemaVersion 9, dan baca-tulis dasar', () async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 8);
+      expect(db.schemaVersion, 10);
       await db.initialize();
 
       await db

@@ -6,6 +6,10 @@ import '../../domain/repositories/game_config_repository.dart';
 import '../../domain/services/damage_calculator.dart';
 import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_progression_service.dart';
+import '../../domain/services/equipment_factory.dart';
+import '../../domain/services/gacha_service.dart';
+import '../../domain/services/weapon_resonance_service.dart';
+import 'game_clock_provider.dart';
 
 final gameConfigRepositoryProvider = Provider<GameConfigRepository>(
   (ref) => AssetGameConfigRepository(),
@@ -44,4 +48,23 @@ final dungeonProgressionServiceProvider = Provider<DungeonProgressionService>((
     return DungeonProgressionService(config.difficulty);
   }
   return const DungeonProgressionService();
+});
+
+/// Provider terpusat [GachaService] dari konfigurasi gacha dan period service.
+final gachaServiceProvider = Provider<GachaService?>((ref) {
+  final config = ref.watch(gameConfigProvider).asData?.value;
+  if (config == null || config.gacha == null) return null;
+  final periodService = ref.watch(periodServiceProvider);
+  return GachaService(
+    gachaConfig: config.gacha!,
+    items: config.items,
+    specializations: config.specializations.definitions,
+    equipmentFactory: EquipmentFactory(config.equipment),
+    periodService: periodService,
+  );
+});
+
+/// Provider terpusat [WeaponResonanceService].
+final weaponResonanceServiceProvider = Provider<WeaponResonanceService>((ref) {
+  return const WeaponResonanceService();
 });

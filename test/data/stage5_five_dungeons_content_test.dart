@@ -84,37 +84,48 @@ void main() {
       final expectedSpecs =
           <
             String,
-            ({int order, double scale, int recLevel, String? unlockReq})
+            ({
+              int order,
+              double scale,
+              int recLevel,
+              String? unlockReq,
+              int roomsCount,
+            })
           >{
             'forgotten_forest': (
               order: 1,
               scale: 1.0,
               recLevel: 5,
               unlockReq: null,
+              roomsCount: 5,
             ),
             'crystal_cavern': (
               order: 2,
               scale: 1.5,
               recLevel: 8,
               unlockReq: 'forgotten_forest',
+              roomsCount: 6,
             ),
             'ancient_crypt': (
               order: 3,
               scale: 2.25,
               recLevel: 16,
               unlockReq: 'crystal_cavern',
+              roomsCount: 7,
             ),
             'ashen_wasteland': (
               order: 4,
               scale: 3.375,
               recLevel: 25,
               unlockReq: 'ancient_crypt',
+              roomsCount: 7,
             ),
             'aether_sanctum': (
               order: 5,
               scale: 5.0625,
               recLevel: 35,
               unlockReq: 'ashen_wasteland',
+              roomsCount: 5,
             ),
           };
 
@@ -126,7 +137,7 @@ void main() {
         expect(d.difficultyScale, closeTo(spec.scale, 1e-6));
         expect(d.recommendedLevel, spec.recLevel);
         expect(d.unlockRequiresDungeonId, spec.unlockReq);
-        expect(d.roomOrder, hasLength(5));
+        expect(d.roomOrder, hasLength(spec.roomsCount));
 
         for (final roomId in d.roomOrder) {
           expect(
@@ -137,11 +148,14 @@ void main() {
           );
         }
 
-        expect(d.roomById(d.roomOrder[0])!.type, RoomType.normal);
-        expect(d.roomById(d.roomOrder[1])!.type, RoomType.normal);
-        expect(d.roomById(d.roomOrder[2])!.type, RoomType.normal);
-        expect(d.roomById(d.roomOrder[3])!.type, RoomType.elite);
-        expect(d.roomById(d.roomOrder[4])!.type, RoomType.boss);
+        for (var i = 0; i < d.roomOrder.length - 2; i++) {
+          expect(d.roomById(d.roomOrder[i])!.type, RoomType.normal);
+        }
+        expect(
+          d.roomById(d.roomOrder[d.roomOrder.length - 2])!.type,
+          RoomType.elite,
+        );
+        expect(d.roomById(d.roomOrder.last)!.type, RoomType.boss);
       }
     });
 
@@ -352,7 +366,10 @@ void main() {
         );
         expect(outcome.runsCompleted, 1);
         expect(outcome.runsFailed, 0);
-        expect(outcome.roomsCleared, 5);
+        expect(
+          outcome.roomsCleared,
+          config.dungeons[dungeonId]!.roomOrder.length,
+        );
         expect(outcome.updatedDungeonProgress.clearedInCycleRank, 0);
         expect(outcome.updatedDungeonProgress.clearsCount, 1);
         expect(outcome.expGained, greaterThan(0));

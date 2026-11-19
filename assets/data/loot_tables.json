@@ -111,21 +111,63 @@
         },
         {
           "item_id": "ranger_blade",
-          "chance": 0.12
+          "chance": 0.04
+        },
+        {
+          "item_id": "composite_warbow",
+          "chance": 0.04
+        },
+        {
+          "item_id": "sage_scepter",
+          "chance": 0.04
+        },
+        {
+          "item_id": "knight_helm",
+          "chance": 0.04
+        },
+        {
+          "item_id": "knight_armor",
+          "chance": 0.04
         },
         {
           "item_id": "guardian_amulet",
-          "chance": 0.12
+          "chance": 0.04
         },
         {
           "item_id": "aether_blade",
-          "chance": 0.03
+          "chance": 0.005
+        },
+        {
+          "item_id": "windforce_bow",
+          "chance": 0.005
+        },
+        {
+          "item_id": "archmage_staff",
+          "chance": 0.005
+        },
+        {
+          "item_id": "aether_helm",
+          "chance": 0.005
+        },
+        {
+          "item_id": "aether_armor",
+          "chance": 0.005
+        },
+        {
+          "item_id": "aether_ring",
+          "chance": 0.005
         }
       ]
     },
     {
       "id": "boss_loot",
       "entries": [
+        {
+          "item_id": "boss_remnant",
+          "chance": 1.0,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
         {
           "item_id": "ancient_fragment",
           "chance": 1.0,
@@ -138,11 +180,51 @@
         },
         {
           "item_id": "aether_blade",
-          "chance": 0.25
+          "chance": 0.05
+        },
+        {
+          "item_id": "windforce_bow",
+          "chance": 0.04
+        },
+        {
+          "item_id": "archmage_staff",
+          "chance": 0.04
+        },
+        {
+          "item_id": "aether_helm",
+          "chance": 0.04
+        },
+        {
+          "item_id": "aether_armor",
+          "chance": 0.04
+        },
+        {
+          "item_id": "aether_ring",
+          "chance": 0.04
+        },
+        {
+          "item_id": "celestial_blade",
+          "chance": 0.013
+        },
+        {
+          "item_id": "celestial_recurve",
+          "chance": 0.013
+        },
+        {
+          "item_id": "cosmic_staff",
+          "chance": 0.013
+        },
+        {
+          "item_id": "celestial_crown",
+          "chance": 0.013
+        },
+        {
+          "item_id": "celestial_plate",
+          "chance": 0.013
         },
         {
           "item_id": "heart_of_aether",
-          "chance": 0.08
+          "chance": 0.015
         }
       ]
     },
@@ -163,7 +245,23 @@
         },
         {
           "item_id": "ranger_blade",
-          "chance": 0.15
+          "chance": 0.03
+        },
+        {
+          "item_id": "composite_warbow",
+          "chance": 0.03
+        },
+        {
+          "item_id": "sage_scepter",
+          "chance": 0.03
+        },
+        {
+          "item_id": "knight_helm",
+          "chance": 0.03
+        },
+        {
+          "item_id": "knight_armor",
+          "chance": 0.03
         }
       ]
     },
@@ -318,6 +416,12 @@
       "id": "crystal_boss_loot",
       "entries": [
         {
+          "item_id": "boss_remnant",
+          "chance": 1.0,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
           "item_id": "ancient_fragment",
           "chance": 1.0,
           "min_quantity": 3,
@@ -427,6 +531,12 @@
     {
       "id": "crypt_boss_loot",
       "entries": [
+        {
+          "item_id": "boss_remnant",
+          "chance": 1.0,
+          "min_quantity": 1,
+          "max_quantity": 3
+        },
         {
           "item_id": "ancient_fragment",
           "chance": 1.0,
@@ -543,6 +653,12 @@
     {
       "id": "ashen_boss_loot",
       "entries": [
+        {
+          "item_id": "boss_remnant",
+          "chance": 1.0,
+          "min_quantity": 2,
+          "max_quantity": 3
+        },
         {
           "item_id": "ancient_fragment",
           "chance": 1.0,
@@ -661,6 +777,12 @@
     {
       "id": "sanctum_boss_loot",
       "entries": [
+        {
+          "item_id": "boss_remnant",
+          "chance": 1.0,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
         {
           "item_id": "ancient_fragment",
           "chance": 1.0,

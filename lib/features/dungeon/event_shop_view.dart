@@ -36,15 +36,41 @@ class _EventShopViewState extends State<EventShopView> {
   bool _feedbackIsError = false;
   bool _busy = false;
 
+  String _describeCost(EventShopOfferView offer) {
+    if (!offer.entry.isBarter) {
+      return '${NumberFormatter.format(offer.entry.price)} Aether Shard';
+    }
+    final parts = <String>[];
+    if (offer.entry.goldPrice > 0) {
+      parts.add('${NumberFormatter.format(offer.entry.goldPrice)} Gold');
+    }
+    for (final mat in offer.entry.materialCosts.entries) {
+      final matName = offer.materialNames[mat.key] ?? mat.key;
+      parts.add('${NumberFormatter.format(mat.value)}x $matName');
+    }
+    return parts.join(' + ');
+  }
+
+  String _currencyLabel(String currencyId) {
+    if (currencyId == 'gold') return 'Gold';
+    if (currencyId == 'aether_shard') return 'Aether Shard';
+    return widget.data.materialNames[currencyId] ?? currencyId;
+  }
+
   Future<void> _handleBuy(EventShopOfferView offer) async {
     if (_busy || !offer.canAttemptBuy) return;
+    final costText = _describeCost(offer);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Konfirmasi Pembelian Event'),
+        title: Text(
+          offer.entry.isBarter
+              ? 'Konfirmasi Barter Outpost'
+              : 'Konfirmasi Pembelian Event',
+        ),
         content: Text(
-          'Beli ${offer.item.name} seharga '
-          '${NumberFormatter.format(offer.entry.price)} Aether Shard?\n'
+          '${offer.entry.isBarter ? 'Tukar' : 'Beli'} ${offer.item.name} seharga '
+          '$costText?\n'
           'Item event memiliki stat tetap dan tidak dapat dijual kembali.',
         ),
         actions: [
@@ -55,7 +81,9 @@ class _EventShopViewState extends State<EventShopView> {
           FilledButton(
             key: const Key('event_shop_confirm_buy'),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Konfirmasi Beli'),
+            child: Text(
+              offer.entry.isBarter ? 'Konfirmasi Barter' : 'Konfirmasi Beli',
+            ),
           ),
         ],
       ),
@@ -68,17 +96,21 @@ class _EventShopViewState extends State<EventShopView> {
       if (!mounted) return;
       setState(() {
         switch (result) {
-          case EventShopBuySuccess(:final currencySpent):
+          case EventShopBuySuccess(:final currencySpent, :final goldSpent):
             _feedbackIsError = false;
-            _feedbackMessage =
-                'Berhasil membeli ${offer.item.name} (${NumberFormatter.format(currencySpent)} Aether Shard).';
+            _feedbackMessage = offer.entry.isBarter
+                ? 'Berhasil barter ${offer.item.name}'
+                      '${goldSpent > 0 ? ' (${NumberFormatter.format(goldSpent)} Gold + Material)' : ''}.'
+                : 'Berhasil membeli ${offer.item.name} (${NumberFormatter.format(currencySpent)} Aether Shard).';
           case EventShopBuyInsufficientCurrency(
+            :final currencyId,
             :final requiredAmount,
             :final currentBalance,
           ):
             _feedbackIsError = true;
+            final label = _currencyLabel(currencyId);
             _feedbackMessage =
-                'Aether Shard tidak cukup (butuh ${NumberFormatter.format(requiredAmount)}, '
+                '$label tidak cukup (butuh ${NumberFormatter.format(requiredAmount)}, '
                 'dimiliki ${NumberFormatter.format(currentBalance)}).';
           case EventShopBuyRequirementNotMet(:final failedRequirements):
             _feedbackIsError = true;
@@ -131,10 +163,34 @@ class _EventShopViewState extends State<EventShopView> {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              ResourceChip.aetherShard(
-                widget.data.balance,
-                key: const Key('event_shop_shard_balance'),
-              ),
+              if (widget.data.isBarterShop) ...[
+                ResourceChip.gold(
+                  widget.data.goldBalance,
+                  key: const Key('event_shop_gold_balance'),
+                ),
+                for (final mat in widget.data.materialBalances.entries)
+                  Container(
+                    key: Key('event_shop_mat_${mat.key}'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs + 2,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceDark,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(color: ext.panelInnerBorder),
+                    ),
+                    child: Text(
+                      '${widget.data.materialNames[mat.key] ?? mat.key}: '
+                      '${NumberFormatter.format(mat.value)}',
+                      style: AppTypography.numeric(theme.textTheme.labelSmall),
+                    ),
+                  ),
+              ] else
+                ResourceChip.aetherShard(
+                  widget.data.balance,
+                  key: const Key('event_shop_shard_balance'),
+                ),
               Text(
                 'Pergantian minggu: $countdown',
                 key: const Key('event_shop_reset_countdown'),
@@ -236,7 +292,7 @@ class _EventShopViewState extends State<EventShopView> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Harga: ${NumberFormatter.format(offer.entry.price)} Aether Shard'
+                                  '${offer.entry.isBarter ? 'Barter' : 'Harga'}: ${_describeCost(offer)}'
                                   ' • Batas: ${offer.purchasedCount}/${offer.weeklyLimit}'
                                   ' • Tidak dapat dijual',
                                   style: AppTypography.numeric(

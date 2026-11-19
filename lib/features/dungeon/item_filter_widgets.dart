@@ -7,7 +7,8 @@ import '../../domain/entities/item_definition.dart';
 enum ItemCategoryFilter {
   all,
   weapon,
-  armor,
+  head,
+  body,
   accessory,
   material,
   consumable,
@@ -17,7 +18,8 @@ enum ItemCategoryFilter {
 String itemCategoryFilterLabel(ItemCategoryFilter filter) => switch (filter) {
   ItemCategoryFilter.all => 'Semua',
   ItemCategoryFilter.weapon => 'Senjata',
-  ItemCategoryFilter.armor => 'Armor',
+  ItemCategoryFilter.head => 'Kepala',
+  ItemCategoryFilter.body => 'Badan',
   ItemCategoryFilter.accessory => 'Aksesori',
   ItemCategoryFilter.material => 'Material',
   ItemCategoryFilter.consumable => 'Consumable',
@@ -26,8 +28,8 @@ String itemCategoryFilterLabel(ItemCategoryFilter filter) => switch (filter) {
 
 String equipmentSlotCategoryLabel(EquipmentSlot slot) => switch (slot) {
   EquipmentSlot.weapon => 'Senjata',
-  EquipmentSlot.head => 'Armor • Kepala',
-  EquipmentSlot.body => 'Armor • Badan',
+  EquipmentSlot.head => 'Kepala',
+  EquipmentSlot.body => 'Badan',
   EquipmentSlot.accessory => 'Aksesori',
 };
 
@@ -50,6 +52,7 @@ String itemRarityLabel(ItemRarity rarity) => switch (rarity) {
   ItemRarity.rare => 'Rare',
   ItemRarity.epic => 'Epic',
   ItemRarity.legendary => 'Legendary',
+  ItemRarity.mythical => 'Mythical',
 };
 
 Color itemRarityColor(ItemRarity rarity) => AppColors.colorForRarity(rarity);
@@ -66,8 +69,8 @@ bool matchesEquipmentFilter(
   return switch (categoryFilter) {
     ItemCategoryFilter.all => true,
     ItemCategoryFilter.weapon => slot == EquipmentSlot.weapon,
-    ItemCategoryFilter.armor =>
-      slot == EquipmentSlot.head || slot == EquipmentSlot.body,
+    ItemCategoryFilter.head => slot == EquipmentSlot.head,
+    ItemCategoryFilter.body => slot == EquipmentSlot.body,
     ItemCategoryFilter.accessory => slot == EquipmentSlot.accessory,
     _ => false,
   };
@@ -84,9 +87,8 @@ bool matchesItemFilters(
   return switch (categoryFilter) {
     ItemCategoryFilter.all => true,
     ItemCategoryFilter.weapon => def.equipment?.slot == EquipmentSlot.weapon,
-    ItemCategoryFilter.armor =>
-      def.equipment?.slot == EquipmentSlot.head ||
-          def.equipment?.slot == EquipmentSlot.body,
+    ItemCategoryFilter.head => def.equipment?.slot == EquipmentSlot.head,
+    ItemCategoryFilter.body => def.equipment?.slot == EquipmentSlot.body,
     ItemCategoryFilter.accessory =>
       def.equipment?.slot == EquipmentSlot.accessory,
     ItemCategoryFilter.material => def.category == ItemCategory.material,

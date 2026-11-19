@@ -1,4 +1,5 @@
 import 'equipment.dart';
+import 'item_definition.dart';
 
 /// Definisi class specialization (GDD 4), dari specializations.json.
 class SpecializationDefinition {
@@ -10,11 +11,19 @@ class SpecializationDefinition {
     this.attackRange,
     this.unlockLevel,
     this.skillAffinities = const {},
+    this.rarity = ItemRarity.legendary,
+    this.signatureWeaponId,
   });
 
   final String id;
   final String name;
   final String description;
+
+  /// Kasta rarity class: Legendary untuk 3 class dasar, Mythical untuk class gacha.
+  final ItemRarity rarity;
+
+  /// Senjata signature yang bersinergi dengan class ini (jika ada).
+  final String? signatureWeaponId;
 
   /// Bonus stat yang selalu aktif selama specialization dipilih.
   final EquipmentStats bonus;

@@ -42,6 +42,17 @@ class EquipmentLoadout {
     return removed;
   }
 
+  /// Memperbarui instance equipment yang sedang dipakai di loadout (misalnya status favorit).
+  /// Mengembalikan `true` jika instance ditemukan dan diperbarui.
+  bool updateEquipment(EquipmentInstance updated) {
+    if (_equipped[updated.slot]?.id == updated.id) {
+      _equipped[updated.slot] = updated;
+      revision++;
+      return true;
+    }
+    return false;
+  }
+
   /// Memulihkan isi loadout dari data save (mengganti seluruh slot saat ini).
   void restore(Map<EquipmentSlot, EquipmentInstance> saved) {
     for (final entry in saved.entries) {
@@ -58,12 +69,12 @@ class EquipmentLoadout {
     revision++;
   }
 
-  /// Jumlah bonus stat dari semua equipment yang terpasang.
+  /// Jumlah bonus stat dari semua equipment yang terpasang (termasuk enhancement).
   EquipmentStats get totalBonus {
     var total = EquipmentStats.zero;
     for (final slot in EquipmentSlot.values) {
       final item = _equipped[slot];
-      if (item != null) total = total + item.rolledStats;
+      if (item != null) total = total + item.effectiveStats;
     }
     return total;
   }

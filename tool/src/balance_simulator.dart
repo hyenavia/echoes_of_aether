@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:echoes_of_aether/data/models/boss_events_config_parser.dart';
+import 'package:echoes_of_aether/data/models/boss_spire_config_parser.dart';
 import 'package:echoes_of_aether/data/models/dungeon_config_parser.dart';
 import 'package:echoes_of_aether/data/models/event_shop_config_parser.dart';
 import 'package:echoes_of_aether/data/models/game_config_parser.dart';
@@ -295,6 +296,9 @@ class BalanceSimulator {
       bossEvents: const BossEventsConfigParser().parse(
         read('boss_events.json'),
       ),
+      bossSpire: File('$assetsDir/boss_spire.json').existsSync()
+          ? const BossSpireConfigParser().parse(read('boss_spire.json'))
+          : null,
       shop: const ShopConfigParser().parse(read('shop.json')),
       eventShop: const EventShopConfigParser().parse(read('event_shop.json')),
     );
@@ -366,6 +370,7 @@ class BalanceSimulator {
         name: base.name,
         maxRarity: base.maxRarity,
         specializationId: canChooseSpec ? specializationId : null,
+        isAscension: false,
       );
     }
 
@@ -379,6 +384,7 @@ class BalanceSimulator {
       name: bonusPct > 0 ? 'T5 Legendary +$bonusPct%' : 'T5 Legendary',
       maxRarity: ItemRarity.legendary,
       specializationId: canChooseSpec ? specializationId : null,
+      isAscension: true,
     );
   }
 
@@ -389,6 +395,7 @@ class BalanceSimulator {
     required ItemRarity maxRarity,
     required String? specializationId,
     bool includeNonSellable = false,
+    bool isAscension = false,
   }) {
     final bySlot = <EquipmentSlot, ItemDefinition>{};
     for (final slot in EquipmentSlot.values) {
@@ -397,6 +404,7 @@ class BalanceSimulator {
             final eq = item.equipment;
             if (eq == null || eq.slot != slot) return false;
             if (!includeNonSellable && !item.sellable) return false;
+            if (!isAscension && _isAscensionTierItem(item.id)) return false;
             return item.rarity.index <= maxRarity.index;
           }).toList()..sort((a, b) {
             final rCmp = b.rarity.index.compareTo(a.rarity.index);
@@ -418,6 +426,26 @@ class BalanceSimulator {
       specializationId: specializationId,
       itemsBySlot: Map.unmodifiable(bySlot),
     );
+  }
+
+  static bool _isAscensionTierItem(String itemId) {
+    const ascensionItems = {
+      'celestial_blade',
+      'celestial_recurve',
+      'cosmic_staff',
+      'celestial_crown',
+      'celestial_plate',
+      'knight_helm',
+      'aether_helm',
+      'knight_armor',
+      'aether_armor',
+      'composite_warbow',
+      'windforce_bow',
+      'sage_scepter',
+      'archmage_staff',
+      'aether_ring',
+    };
+    return ascensionItems.contains(itemId);
   }
 
   static double _itemScore(EquipmentStats stats) =>

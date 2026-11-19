@@ -708,5 +708,129 @@ void main() {
       expect(rStrong.runsCompleted, greaterThan(rWeak.runsCompleted));
       expect(rStrong.encountersCleared, greaterThan(rWeak.encountersCleared));
     });
+
+    test('Auto-sell Common & Uncommon gear saat Offline Farming mengonversi gear sampah ke Gold dan menjaga tas tetap bersih', () {
+      const commonDagger = ItemDefinition(
+        id: 'common_dagger',
+        name: 'Common Dagger',
+        category: ItemCategory.equipment,
+        rarity: ItemRarity.common,
+        sellValue: 40,
+        equipment: EquipmentData(
+          slot: EquipmentSlot.weapon,
+          weaponType: 'dagger',
+          baseStats: EquipmentStats(atk: 5),
+        ),
+      );
+      const rareDagger = ItemDefinition(
+        id: 'rare_dagger',
+        name: 'Rare Dagger',
+        category: ItemCategory.equipment,
+        rarity: ItemRarity.rare,
+        sellValue: 300,
+        equipment: EquipmentData(
+          slot: EquipmentSlot.weapon,
+          weaponType: 'dagger',
+          baseStats: EquipmentStats(atk: 25),
+        ),
+      );
+
+      final customItems = {
+        ..._items,
+        commonDagger.id: commonDagger,
+        rareDagger.id: rareDagger,
+      };
+
+      const customLootTable = LootTable(
+        id: 'test_auto_sell_loot',
+        entries: [
+          LootEntry(
+            itemId: 'common_dagger',
+            chance: 1.0,
+            minQuantity: 1,
+            maxQuantity: 1,
+          ),
+          LootEntry(
+            itemId: 'rare_dagger',
+            chance: 1.0,
+            minQuantity: 1,
+            maxQuantity: 1,
+          ),
+        ],
+      );
+
+      final customMonsters = {
+        ..._config.monsters,
+        'forest_slime': const EnemyDefinition(
+          id: 'forest_slime',
+          name: 'Slime',
+          level: 1,
+          expReward: 10,
+          goldReward: 5,
+          lootTableId: 'test_auto_sell_loot',
+          stats: CombatStats(maxHp: 1, atk: 1, def: 0),
+        ),
+      };
+
+      final customConfig = GameConfig(
+        monsters: customMonsters,
+        damage: _config.damage,
+        difficulty: _config.difficulty,
+        farming: _config.farming,
+        revive: _config.revive,
+        progression: _progression,
+        equipment: _config.equipment,
+        dungeonCompletion: _config.dungeonCompletion,
+        items: customItems,
+        lootTables: {
+          ..._config.lootTables,
+          customLootTable.id: customLootTable,
+        },
+        skills: _config.skills,
+        specializations: _config.specializations,
+        dungeons: _config.dungeons,
+      );
+
+      final char = PlayerCharacter(config: _progression);
+      final inv = Inventory(definitions: customItems);
+      const cleared = DungeonProgressSnapshot(
+        currentDungeonId: 'forgotten_forest',
+        clearsCount: 1,
+        clearedInCycleRank: 0,
+      );
+
+      final result = service.process(
+        character: char,
+        inventory: inv,
+        config: customConfig,
+        session: const GameSessionSnapshot(lastSavedAtMs: 1000),
+        nowMs: 1000 + const Duration(minutes: 5).inMilliseconds,
+        offlineActivity: _configuredAutoFarm(seed: 42),
+        dungeonProgress: cleared,
+      );
+
+      // Run harus selesai minimal 1x
+      expect(result.runsCompleted, greaterThanOrEqualTo(1));
+
+      // Common Dagger otomatis terjual -> tidak masuk ke tas
+      expect(
+        inv.equipmentSnapshot().any((e) => e.definitionId == 'common_dagger'),
+        isFalse,
+      );
+
+      // Rare Dagger TIDAK otomatis terjual -> masuk ke tas
+      expect(
+        inv.equipmentSnapshot().any((e) => e.definitionId == 'rare_dagger'),
+        isTrue,
+      );
+
+      // Statistik auto-sold tercatat
+      expect(result.autoSoldEquipmentCount, greaterThan(0));
+      expect(result.autoSoldEquipmentGold, greaterThan(0));
+
+      // Gold karakter bertambah dan mencakup auto-sold equipment
+      expect(char.gold, result.goldGained);
+      expect(result.goldGained, greaterThan(result.autoSoldEquipmentGold));
+    });
   });
 }

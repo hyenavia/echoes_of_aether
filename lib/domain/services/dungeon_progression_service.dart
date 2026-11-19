@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../entities/cycle_progress.dart';
 import '../entities/difficulty_config.dart';
 import '../entities/dungeon_definition.dart';
+import '../entities/offline_activity.dart';
 import '../entities/player_save_snapshot.dart';
 import 'difficulty_service.dart';
 
@@ -97,6 +98,7 @@ class DungeonProgressionService {
         return isClearedInCurrentCycle(baseId, cycle, progresses);
       case DungeonKind.bossDaily:
       case DungeonKind.bossWeekly:
+      case DungeonKind.bossSpire:
         return false;
     }
   }
@@ -139,6 +141,57 @@ class DungeonProgressionService {
     }
 
     return clearedNormals.first.id;
+  }
+
+  /// Menentukan status aktivitas offline otomatis saat berada di Town atau
+  /// setelah run/ringkasan offline selesai:
+  /// - Jika ada ringkasan offline yang belum dibaca pemain, tetap dipertahankan.
+  /// - Jika ada dungeon normal yang sudah clear pada [cycle] saat ini,
+  ///   otomatis menyalakan [OfflineActivityMode.autoFarming] ke [preferredDungeonId]
+  ///   (atau target default terbaik dari [resolveFarmDungeonId]).
+  /// - Jika belum ada dungeon normal yang clear di [cycle] saat ini, kembali
+  ///   ke [OfflineActivityMode.pauseProgression].
+  OfflineActivitySnapshot resolveTownOfflineActivity({
+    required OfflineActivitySnapshot current,
+    required Iterable<DungeonDefinition> dungeons,
+    required CycleProgress cycle,
+    required Map<String, DungeonProgressSnapshot> progresses,
+    required int checkpointAtMs,
+    String? preferredDungeonId,
+    bool keepContinueDungeon = false,
+  }) {
+    final pendingSummary = current.pendingSummary;
+    if (pendingSummary != null && !pendingSummary.acknowledged) {
+      return current;
+    }
+    if (current.mode == OfflineActivityMode.continueDungeon &&
+        keepContinueDungeon) {
+      return current;
+    }
+
+    final fallbackPreferred =
+        preferredDungeonId ??
+        (current.mode == OfflineActivityMode.autoFarming
+            ? current.selectedDungeonId
+            : null);
+    final farmId = resolveFarmDungeonId(
+      dungeons: dungeons,
+      cycle: cycle,
+      progresses: progresses,
+      preferredDungeonId: fallbackPreferred,
+    );
+    if (farmId == null) {
+      return current.withPauseProgression();
+    }
+    if (current.mode == OfflineActivityMode.autoFarming &&
+        current.state == OfflineActivityState.configured &&
+        current.selectedDungeonId == farmId) {
+      return current;
+    }
+    return current.withAutoFarming(
+      dungeonId: farmId,
+      checkpointAtMs: checkpointAtMs,
+    );
   }
 
   /// Memperbarui [CycleProgress.lastNormalDungeonId] saat pemain memasuki

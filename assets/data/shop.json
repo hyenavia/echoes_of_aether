@@ -109,7 +109,7 @@
     }
   ],
   "sell": {
-    "sellable_categories": ["equipment", "material"],
+    "sellable_categories": ["equipment"],
     "confirm_min_rarity": "rare",
     "equipped_sellable": false,
     "max_sell_ratio": 0.4

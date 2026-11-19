@@ -17,6 +17,7 @@ class RarityLabel extends StatelessWidget {
     ItemRarity.rare => 'Rare',
     ItemRarity.epic => 'Epic',
     ItemRarity.legendary => 'Legendary',
+    ItemRarity.mythical => 'Mythical',
   };
 
   @override

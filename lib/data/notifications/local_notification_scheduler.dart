@@ -82,4 +82,23 @@ class LocalNotificationScheduler implements NotificationScheduler {
     final granted = await androidImpl?.requestNotificationsPermission();
     return granted ?? true;
   }
+
+  @override
+  Future<void> sendTestNotification() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+    await _ensureInitialized();
+    const androidDetails = AndroidNotificationDetails(
+      'notification_test',
+      'Tes Notifikasi',
+      channelDescription: 'Saluran pengujian notifikasi Echoes of Aether',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    await _plugin.show(
+      id: 9999,
+      title: 'Echoes of Aether',
+      body: 'Notifikasi berhasil aktif! Sistem pengingat siap bekerja di perangkatmu.',
+      notificationDetails: const NotificationDetails(android: androidDetails),
+    );
+  }
 }

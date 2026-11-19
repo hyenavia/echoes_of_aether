@@ -245,6 +245,8 @@ class ShopConfigParser {
         return ItemRarity.epic;
       case 'legendary':
         return ItemRarity.legendary;
+      case 'mythical':
+        return ItemRarity.mythical;
       default:
         throw ConfigException('shop.json: $path tidak dikenal ("$value").');
     }

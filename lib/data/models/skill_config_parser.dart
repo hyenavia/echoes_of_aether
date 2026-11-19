@@ -243,9 +243,10 @@ class SkillConfigParser {
   SkillDamageType _damageType(String raw, String where) => switch (raw) {
     'physical' => SkillDamageType.physical,
     'magic' => SkillDamageType.magic,
+    'true_damage' || 'trueDamage' => SkillDamageType.trueDamage,
     _ => throw ConfigException(
       'skills.json: $where."damage_type" tidak dikenal: "$raw" '
-      '(pilihan: physical, magic).',
+      '(pilihan: physical, magic, true_damage).',
     ),
   };
 

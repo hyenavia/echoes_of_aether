@@ -80,6 +80,7 @@ class EquipmentInstances extends Table {
   TextColumn get rarity => text()();
   TextColumn get rolledStatsJson => text()();
   IntColumn get enhancementLevel => integer().withDefault(const Constant(0))();
+  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {playerId, instanceId};
@@ -264,6 +265,27 @@ class LocalSaveBackups extends Table {
   BlobColumn get payload => blob().named('blob')();
 }
 
+/// Pity tracker gacha per tipe banner (Class Awakening vs Mythical Armory).
+@DataClassName('GachaPityStateRow')
+class GachaPityStates extends Table {
+  TextColumn get bannerType => text()();
+  IntColumn get pullCount => integer().withDefault(const Constant(0))();
+  BoolColumn get isGuaranteed => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {bannerType};
+}
+
+/// Daftar class specialization yang telah dibuka oleh pemain.
+@DataClassName('UnlockedSpecializationRow')
+class UnlockedSpecializations extends Table {
+  TextColumn get specializationId => text()();
+  IntColumn get unlockedAtMs => integer()();
+
+  @override
+  Set<Column> get primaryKey => {specializationId};
+}
+
 @DriftDatabase(
   tables: [
     GameSettings,
@@ -283,6 +305,8 @@ class LocalSaveBackups extends Table {
     EventShopPurchases,
     CloudSyncStates,
     LocalSaveBackups,
+    GachaPityStates,
+    UnlockedSpecializations,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -290,7 +314,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? _openDefaultConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -298,6 +322,10 @@ class AppDatabase extends _$AppDatabase {
       await transaction(() async {
         await m.createAll();
         await _createIndexes();
+        await customStatement(
+          "INSERT OR IGNORE INTO unlocked_specializations (specialization_id, unlocked_at_ms) "
+          "VALUES ('vanguard', 0), ('arcanist', 0), ('ranger', 0)",
+        );
       });
     },
     onUpgrade: (Migrator m, int from, int to) async {
@@ -355,10 +383,28 @@ class AppDatabase extends _$AppDatabase {
           await m.createTable(cloudSyncStates);
           await m.createTable(localSaveBackups);
         }
+        if (from < 9) {
+          if (from >= 2) {
+            await m.addColumn(
+              equipmentInstances,
+              equipmentInstances.isFavorite,
+            );
+          }
+        }
+        if (from < 10) {
+          await m.createTable(gachaPityStates);
+          await m.createTable(unlockedSpecializations);
+          await customStatement(
+            "INSERT OR IGNORE INTO unlocked_specializations (specialization_id, unlocked_at_ms) "
+            "VALUES ('vanguard', 0), ('arcanist', 0), ('ranger', 0)",
+          );
+        }
       });
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
+      await customStatement('PRAGMA journal_mode = WAL');
+      await customStatement('PRAGMA synchronous = NORMAL');
     },
   );
 

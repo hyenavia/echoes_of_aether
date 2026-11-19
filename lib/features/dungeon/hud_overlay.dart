@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
@@ -110,11 +112,25 @@ class HudOverlay extends StatelessWidget {
                             ),
                     ),
                   ),
+                  if (s.skills.isNotEmpty)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: AppSpacing.sm,
+                          right: maxWidth < 380 ? 44.0 : 0.0,
+                        ),
+                        child: _buildSkillBar(theme, ext, s.skills),
+                      ),
+                    ),
                   if (hasFeed)
                     Align(
                       alignment: Alignment.bottomLeft,
                       child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        padding: EdgeInsets.only(
+                          left: AppSpacing.sm,
+                          bottom: s.skills.isNotEmpty ? 76.0 : AppSpacing.sm,
+                        ),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: feedMaxWidth),
                           child: _buildCombatFeed(ext, s),
@@ -126,6 +142,34 @@ class HudOverlay extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSkillBar(
+    ThemeData theme,
+    EchoesThemeExtension ext,
+    List<HudSkillInfo> skills,
+  ) {
+    if (skills.isEmpty) return const SizedBox.shrink();
+
+    return PanelFrame(
+      key: const ValueKey<String>('hud_skill_bar'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 4,
+      ),
+      backgroundColor: AppColors.midnightForest.withValues(alpha: 0.88),
+      borderColor: ext.panelBorder.withValues(alpha: 0.75),
+      showCornerOrnaments: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < skills.length; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.xs + 2),
+            _SkillSlot(skill: skills[i]),
+          ],
+        ],
       ),
     );
   }
@@ -453,4 +497,170 @@ class _EncounterBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SkillSlot extends StatelessWidget {
+  const _SkillSlot({required this.skill});
+
+  final HudSkillInfo skill;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = EchoesTheme.of(context);
+    final theme = Theme.of(context);
+    final isReady = skill.isReady;
+
+    return Semantics(
+      label:
+          '${skill.name} ${isReady ? 'Siap' : 'Cooldown ${skill.remainingSeconds.toStringAsFixed(1)}s'}',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            key: ValueKey<String>('hud_skill_${skill.id}'),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.midnightForest.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(
+                color: isReady
+                    ? ext.gold.withValues(alpha: 0.85)
+                    : ext.panelInnerBorder,
+                width: isReady ? 1.5 : 1.0,
+              ),
+              boxShadow: isReady
+                  ? AppShadows.glow(ext.gold, alpha: 0.35)
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.sm - 1),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: skill.spritePath != null
+                        ? Image.asset(
+                            skill.spritePath!,
+                            width: 26,
+                            height: 26,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.none,
+                            errorBuilder: (_, _, _) => Icon(
+                              Icons.bolt_outlined,
+                              size: 18,
+                              color: isReady ? ext.gold : AppColors.textMuted,
+                            ),
+                          )
+                        : Icon(
+                            Icons.bolt_outlined,
+                            size: 18,
+                            color: isReady ? ext.gold : AppColors.textMuted,
+                          ),
+                  ),
+                  if (!isReady && skill.progress > 0) ...[
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _CooldownSweepPainter(
+                          progress: skill.progress,
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 2,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          skill.remainingSeconds >= 10
+                              ? '${skill.remainingSeconds.ceil()}s'
+                              : '${skill.remainingSeconds.toStringAsFixed(1)}s',
+                          style: AppTypography.numeric(
+                            theme.textTheme.labelSmall,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (isReady)
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: ext.success,
+                          shape: BoxShape.circle,
+                          boxShadow: AppShadows.glow(ext.success, alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            width: 42,
+            child: Text(
+              skill.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 8.5,
+                color: isReady ? ext.gold : AppColors.textMuted,
+                fontWeight: isReady ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CooldownSweepPainter extends CustomPainter {
+  const _CooldownSweepPainter({required this.progress});
+
+  /// 0.0 (ready) -> 1.0 (just cast, full cooldown remaining)
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0) return;
+
+    final paint = Paint()
+      ..color = const Color(0xB80B1411)
+      ..style = PaintingStyle.fill;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.max(size.width, size.height);
+    final sweepAngle = 2 * math.pi * progress;
+
+    final path = Path()
+      ..moveTo(center.dx, center.dy)
+      ..arcTo(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        sweepAngle,
+        false,
+      )
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CooldownSweepPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }

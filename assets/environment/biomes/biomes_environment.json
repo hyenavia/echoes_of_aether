@@ -1,0 +1,116 @@
+{
+  "version": "1.1.0",
+  "biomes": [
+    {
+      "id": "forgotten_forest",
+      "name": "Forgotten Forest",
+      "asset_source": "fantasy_dreamland",
+      "status": "integrated",
+      "description": "Ancient stone dungeon ruins surrounded by overgrown mystical forest. Uses Fantasy Dreamland tileset.",
+      "tiles": {
+        "floor0": "assets/environment/fantasy_dreamland/floor_stone_0.png",
+        "floor1": "assets/environment/fantasy_dreamland/floor_stone_1.png",
+        "floor2": "assets/environment/fantasy_dreamland/floor_stone_2.png",
+        "wall": "assets/environment/fantasy_dreamland/wall_stone.png",
+        "wall_top": "assets/environment/fantasy_dreamland/wall_stone_top.png",
+        "wall_face": "assets/environment/fantasy_dreamland/wall_stone_face.png",
+        "decor_pillar": "assets/environment/fantasy_dreamland/decor_pillar.png",
+        "decor_torch": "assets/environment/fantasy_dreamland/decor_torch.png",
+        "exit": "assets/environment/fantasy_dreamland/exit_arch.png"
+      },
+      "palette_tones": {
+        "stone": "#4C5580",
+        "moss": "#5A6599",
+        "soil": "#664133",
+        "highlight": "#B7C8CC"
+      }
+    },
+    {
+      "id": "crystal_cavern",
+      "name": "Crystal Cavern",
+      "asset_source": "mines_caves",
+      "status": "integrated",
+      "description": "Subterranean crystal caverns with luminescent cyan/blue veins and amethyst mineral formations. Uses Mines & Caves 03_Depth_Biomes/3_Crystal_Caverns.",
+      "tiles": {
+        "floor0": "assets/environment/mines_caves/floor_crystal_0.png",
+        "floor1": "assets/environment/mines_caves/floor_crystal_1.png",
+        "floor2": "assets/environment/mines_caves/floor_crystal_2.png",
+        "wall": "assets/environment/mines_caves/wall_crystal.png",
+        "wall_top": "assets/environment/mines_caves/wall_crystal_top.png",
+        "stalagmite": "assets/environment/mines_caves/stalagmite_crystal.png",
+        "crystal_cluster": "assets/environment/mines_caves/decor_crystal_cluster.png",
+        "exit": "assets/environment/mines_caves/exit_cave_stairs.png"
+      },
+      "palette_tones": {
+        "crystal_glow": "#8FF5DD",
+        "deep_stone": "#140E1A",
+        "amethyst_slate": "#5A2F6E",
+        "aether_cyan": "#5AB8E8"
+      }
+    },
+    {
+      "id": "ancient_crypt",
+      "name": "Ancient Crypt",
+      "asset_source": "fantasy_dreamland",
+      "status": "integrated",
+      "description": "Deep mausoleum and forgotten sepulchers. Uses Fantasy Dreamland sepulcher violet masonry and tomb stones.",
+      "tiles": {
+        "floor0": "assets/environment/fantasy_dreamland/floor_crypt_0.png",
+        "floor1": "assets/environment/fantasy_dreamland/floor_crypt_1.png",
+        "floor2": "assets/environment/fantasy_dreamland/floor_crypt_2.png",
+        "wall": "assets/environment/fantasy_dreamland/wall_crypt.png",
+        "wall_top": "assets/environment/fantasy_dreamland/wall_crypt_top.png",
+        "exit": "assets/environment/fantasy_dreamland/exit_arch.png"
+      },
+      "palette_tones": {
+        "tomb_violet": "#332833",
+        "crypt_slate": "#665166",
+        "bone": "#998299",
+        "relic": "#B297B2"
+      }
+    },
+    {
+      "id": "ashen_wasteland",
+      "name": "Ashen Wasteland",
+      "asset_source": "mines_caves",
+      "status": "integrated",
+      "description": "Volcanic magma fissure and charred basalt crust. Uses Mines & Caves 03_Depth_Biomes/6_Magma_Depths.",
+      "tiles": {
+        "floor0": "assets/environment/mines_caves/floor_magma_0.png",
+        "floor1": "assets/environment/mines_caves/floor_magma_1.png",
+        "floor2": "assets/environment/mines_caves/floor_magma_2.png",
+        "wall": "assets/environment/mines_caves/wall_magma.png",
+        "wall_top": "assets/environment/mines_caves/wall_magma_top.png",
+        "stalagmite": "assets/environment/mines_caves/stalagmite_magma.png",
+        "exit": "assets/environment/mines_caves/exit_cave_stairs.png"
+      },
+      "palette_tones": {
+        "charred_basalt": "#3D3D4F",
+        "molten_red": "#B8321E",
+        "magma_orange": "#F0602E",
+        "ash_dust": "#6B6F80"
+      }
+    },
+    {
+      "id": "aether_sanctum",
+      "name": "Aether Sanctum",
+      "asset_source": "hybrid_mines_caves_sanctum",
+      "status": "integrated",
+      "description": "High celestial marble temple with golden filigree and pure aether conduits. Uses Mines & Caves 03_Depth_Biomes/7_Ancient_Ruins_Abyss with celestial glowing rune floor.",
+      "tiles": {
+        "floor0": "assets/environment/mines_caves/floor_sanctum_0.png",
+        "floor1": "assets/environment/mines_caves/floor_sanctum_1.png",
+        "floor2": "assets/environment/mines_caves/floor_sanctum_2.png",
+        "wall": "assets/environment/mines_caves/wall_sanctum.png",
+        "wall_top": "assets/environment/mines_caves/wall_sanctum_top.png",
+        "exit": "assets/environment/fantasy_dreamland/exit_arch.png"
+      },
+      "palette_tones": {
+        "celestial_navy": "#140E1A",
+        "arcane_violet": "#5A2F6E",
+        "temple_marble": "#6B6F80",
+        "pure_aether": "#8FF5DD"
+      }
+    }
+  ]
+}

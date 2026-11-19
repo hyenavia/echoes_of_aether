@@ -5,6 +5,7 @@ import '../entities/clock_state.dart';
 import '../entities/cycle_progress.dart';
 import '../entities/equipment.dart';
 import '../entities/event_shop_purchase.dart';
+import '../entities/gacha_config.dart';
 import '../entities/game_config.dart';
 import '../entities/item_definition.dart';
 import '../entities/offline_activity.dart';
@@ -12,6 +13,7 @@ import '../entities/periodic_quest_state.dart';
 import '../entities/player_progress.dart';
 import '../entities/player_save_snapshot.dart';
 import 'claimed_rewards_pruner.dart';
+import 'period_service.dart';
 
 /// Jenis kegagalan kodek save cloud yang menyebabkan seluruh blob ditolak.
 enum SaveCodecErrorCode {
@@ -81,6 +83,25 @@ class SaveSnapshotCodec {
   static bool isPermanentClaimId(String id) {
     for (final prefix in permanentClaimPrefixes) {
       if (id.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
+  /// Memeriksa apakah [dungeonId] valid, baik sebagai dungeon statis di
+  /// [GameConfig.dungeons] maupun Boss Event dinamis di [GameConfig.bossEvents]
+  /// (`boss_daily:<id>` atau `boss_weekly:<id>`).
+  static bool isValidDungeonId(String dungeonId, GameConfig config) {
+    if (config.dungeons.containsKey(dungeonId)) return true;
+    final bossEvents = config.bossEvents;
+    if (bossEvents != null) {
+      if (dungeonId.startsWith('boss_daily:')) {
+        final bossId = dungeonId.substring('boss_daily:'.length);
+        return bossEvents.periodForBossId(bossId) == Period.daily;
+      }
+      if (dungeonId.startsWith('boss_weekly:')) {
+        final bossId = dungeonId.substring('boss_weekly:'.length);
+        return bossEvents.periodForBossId(bossId) == Period.weekly;
+      }
     }
     return false;
   }
@@ -181,6 +202,16 @@ class SaveSnapshotCodec {
           }),
       ],
       'playerId': snapshot.playerId,
+      'gachaPityStates': _sortedMap({
+        for (final p in snapshot.gachaPityStates.entries)
+          p.key: _sortedMap({
+            'bannerType': p.value.bannerType,
+            'isGuaranteed': p.value.isGuaranteed,
+            'pullCount': p.value.pullCount,
+          }),
+      }),
+      'unlockedSpecializations': snapshot.unlockedSpecializations.toList()
+        ..sort(),
       'session': _sortedMap({
         'autoSkillEnabled': snapshot.session.autoSkillEnabled,
         'consecutiveDefeats': _sortedIntMap(
@@ -233,11 +264,13 @@ class SaveSnapshotCodec {
       'dungeon',
       'dungeonProgresses',
       'eventShopPurchases',
+      'gachaPityStates',
       'inventory',
       'periodicQuestStates',
       'playerId',
       'session',
       'shopPurchases',
+      'unlockedSpecializations',
     };
     _rejectUnknownKeys(root, allowedRootKeys, 'root');
 
@@ -314,6 +347,21 @@ class SaveSnapshotCodec {
       _requireList(root, 'periodicQuestStates', path: 'periodicQuestStates'),
       config: config,
     );
+    final gachaPityStates = _decodeGachaPityStates(
+      root['gachaPityStates'] == null
+          ? const {}
+          : _requireMap(root, 'gachaPityStates', path: 'gachaPityStates'),
+    );
+    final unlockedSpecializations = _decodeUnlockedSpecializations(
+      root['unlockedSpecializations'] == null
+          ? const ['vanguard', 'arcanist', 'ranger']
+          : _requireList(
+              root,
+              'unlockedSpecializations',
+              path: 'unlockedSpecializations',
+            ),
+      config: config,
+    );
 
     return PlayerSaveSnapshot(
       playerId: playerId,
@@ -331,6 +379,8 @@ class SaveSnapshotCodec {
       currencies: currencies,
       clockState: clockState,
       periodicQuestStates: periodicQuestStates,
+      gachaPityStates: gachaPityStates,
+      unlockedSpecializations: unlockedSpecializations,
     );
   }
 
@@ -338,6 +388,7 @@ class SaveSnapshotCodec {
     'definitionId': item.definitionId,
     'enhancementLevel': item.enhancementLevel,
     'id': item.id,
+    'isFavorite': item.isFavorite,
     'rarity': item.rarity.name,
     'rolledStats': _sortedMap({
       'atk': _normDouble(item.rolledStats.atk),
@@ -350,8 +401,10 @@ class SaveSnapshotCodec {
       'defPct': _normDouble(item.rolledStats.defPct),
       'hp': _normDouble(item.rolledStats.hp),
       'hpPct': _normDouble(item.rolledStats.hpPct),
+      'lifesteal': _normDouble(item.rolledStats.lifesteal),
       'moveSpeed': _normDouble(item.rolledStats.moveSpeed),
       'skillHaste': _normDouble(item.rolledStats.skillHaste),
+      'spellVamp': _normDouble(item.rolledStats.spellVamp),
     }),
     'slot': item.slot.name,
   });
@@ -583,6 +636,7 @@ class SaveSnapshotCodec {
       'definitionId',
       'enhancementLevel',
       'id',
+      'isFavorite',
       'rarity',
       'rolledStats',
       'slot',
@@ -652,8 +706,10 @@ class SaveSnapshotCodec {
       'defPct',
       'hp',
       'hpPct',
+      'lifesteal',
       'moveSpeed',
       'skillHaste',
+      'spellVamp',
     }, '$path.rolledStats');
 
     double stat(String key) => _requireNonNegativeFiniteDouble(
@@ -661,6 +717,23 @@ class SaveSnapshotCodec {
       key,
       path: '$path.rolledStats',
     );
+    double optionalStat(String key) => statsMap.containsKey(key)
+        ? _requireNonNegativeFiniteDouble(
+            statsMap,
+            key,
+            path: '$path.rolledStats',
+          )
+        : 0.0;
+
+    final isFavorite = map.containsKey('isFavorite')
+        ? (map['isFavorite'] is bool
+              ? map['isFavorite'] as bool
+              : throw SaveCodecException(
+                  SaveCodecErrorCode.invalidFieldType,
+                  'Field "isFavorite" harus boolean.',
+                  path: '$path.isFavorite',
+                ))
+        : false;
 
     return EquipmentInstance(
       id: id,
@@ -668,6 +741,7 @@ class SaveSnapshotCodec {
       slot: slot,
       rarity: rarity,
       enhancementLevel: enhancementLevel,
+      isFavorite: isFavorite,
       rolledStats: EquipmentStats(
         hp: stat('hp'),
         atk: stat('atk'),
@@ -681,6 +755,8 @@ class SaveSnapshotCodec {
         moveSpeed: stat('moveSpeed'),
         attackRange: stat('attackRange'),
         skillHaste: stat('skillHaste'),
+        lifesteal: optionalStat('lifesteal'),
+        spellVamp: optionalStat('spellVamp'),
       ),
     );
   }
@@ -705,7 +781,7 @@ class SaveSnapshotCodec {
       'currentDungeonId',
       path: '$path.currentDungeonId',
     );
-    if (!config.dungeons.containsKey(currentDungeonId)) {
+    if (!isValidDungeonId(currentDungeonId, config)) {
       throw SaveCodecException(
         SaveCodecErrorCode.unknownReferenceId,
         'Dungeon "$currentDungeonId" tidak ada dalam konfigurasi.',
@@ -804,7 +880,7 @@ class SaveSnapshotCodec {
     final result = <String, DungeonProgressSnapshot>{};
     for (final entry in map.entries) {
       final dungeonId = entry.key;
-      if (!config.dungeons.containsKey(dungeonId)) {
+      if (!isValidDungeonId(dungeonId, config)) {
         throw SaveCodecException(
           SaveCodecErrorCode.unknownReferenceId,
           'Dungeon "$dungeonId" di dungeonProgresses tidak ada dalam konfigurasi.',
@@ -893,7 +969,7 @@ class SaveSnapshotCodec {
     );
     final consecutiveDefeats = <String, int>{};
     for (final entry in rawDefeats.entries) {
-      if (!config.dungeons.containsKey(entry.key)) {
+      if (!isValidDungeonId(entry.key, config)) {
         throw SaveCodecException(
           SaveCodecErrorCode.unknownReferenceId,
           'Dungeon "${entry.key}" pada consecutiveDefeats tidak ada dalam konfigurasi.',
@@ -913,7 +989,7 @@ class SaveSnapshotCodec {
       path: 'session.lastFailedDungeonId',
     );
     if (lastFailedDungeonId != null &&
-        !config.dungeons.containsKey(lastFailedDungeonId)) {
+        !isValidDungeonId(lastFailedDungeonId, config)) {
       throw SaveCodecException(
         SaveCodecErrorCode.unknownReferenceId,
         'lastFailedDungeonId "$lastFailedDungeonId" tidak ada dalam konfigurasi.',
@@ -1379,6 +1455,63 @@ class SaveSnapshotCodec {
       );
     }
     return d;
+  }
+
+  Map<String, GachaPityState> _decodeGachaPityStates(Map<String, dynamic> raw) {
+    final result = <String, GachaPityState>{};
+    for (final entry in raw.entries) {
+      final pMap = _requireMap(
+        raw,
+        entry.key,
+        path: 'gachaPityStates.${entry.key}',
+      );
+      result[entry.key] = GachaPityState(
+        bannerType: _requireNonEmptyString(
+          pMap,
+          'bannerType',
+          path: 'gachaPityStates.${entry.key}.bannerType',
+        ),
+        pullCount: _requireInt(
+          pMap,
+          'pullCount',
+          path: 'gachaPityStates.${entry.key}.pullCount',
+        ),
+        isGuaranteed: _requireBool(
+          pMap,
+          'isGuaranteed',
+          path: 'gachaPityStates.${entry.key}.isGuaranteed',
+        ),
+      );
+    }
+    return result;
+  }
+
+  Set<String> _decodeUnlockedSpecializations(
+    List<dynamic> list, {
+    required GameConfig config,
+  }) {
+    final result = <String>{};
+    for (var i = 0; i < list.length; i++) {
+      final item = list[i];
+      if (item is! String || item.trim().isEmpty) {
+        throw SaveCodecException(
+          SaveCodecErrorCode.invalidStructure,
+          'unlockedSpecializations[$i] harus berupa string tidak kosong.',
+        );
+      }
+      final clean = item.trim();
+      if (!config.specializations.definitions.containsKey(clean)) {
+        throw SaveCodecException(
+          SaveCodecErrorCode.unknownReferenceId,
+          'unlockedSpecializations[$i] merujuk specialization tidak dikenal "$clean".',
+        );
+      }
+      result.add(clean);
+    }
+    if (result.isEmpty) {
+      result.addAll(['vanguard', 'arcanist', 'ranger']);
+    }
+    return result;
   }
 
   static double _normDouble(double v) => v == 0 ? 0.0 : v;

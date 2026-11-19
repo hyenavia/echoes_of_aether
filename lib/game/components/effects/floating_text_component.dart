@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flutter/painting.dart'
-    show FontWeight, TextDirection, TextPainter, TextSpan, TextStyle;
+    show FontWeight, Shadow, TextDirection, TextPainter, TextSpan, TextStyle;
 
 /// Angka damage / heal melayang yang dipicu dari event simulasi combat.
 /// Murni efek visual dan tidak memengaruhi state gameplay.
@@ -12,16 +12,18 @@ class FloatingTextComponent extends PositionComponent {
     required Vector2 position,
     required this.color,
     bool isBold = false,
+    this.isCrit = false,
     this.fontSize = 7,
     this.duration = 0.65,
     this.riseSpeed = 16,
-  }) : _fontWeight = isBold ? FontWeight.bold : FontWeight.normal,
+  }) : _fontWeight = (isBold || isCrit) ? FontWeight.bold : FontWeight.normal,
        super(position: position, anchor: Anchor.center, priority: 10);
 
   final String text;
   final Color color;
   final double fontSize;
   final FontWeight _fontWeight;
+  final bool isCrit;
   final double duration;
   final double riseSpeed;
 
@@ -55,12 +57,36 @@ class FloatingTextComponent extends PositionComponent {
             color: color.withAlpha(alpha),
             fontSize: fontSize,
             fontWeight: _fontWeight,
+            shadows: isCrit
+                ? [
+                    Shadow(
+                      color: const Color(0xFF10141A).withAlpha(alpha),
+                      offset: const Offset(0.8, 0.8),
+                      blurRadius: 1.0,
+                    ),
+                  ]
+                : null,
           ),
         )
         ..layout();
     }
     final p = _painter!;
-    p.paint(canvas, Offset(-p.width / 2, -p.height / 2));
+    final double scale;
+    if (isCrit && progress < 0.20) {
+      final popT = progress / 0.20;
+      scale = 1.35 - (popT * 0.35);
+    } else {
+      scale = 1.0;
+    }
+
+    if (scale != 1.0) {
+      canvas.save();
+      canvas.scale(scale, scale);
+      p.paint(canvas, Offset(-p.width / 2, -p.height / 2));
+      canvas.restore();
+    } else {
+      p.paint(canvas, Offset(-p.width / 2, -p.height / 2));
+    }
   }
 
   @override

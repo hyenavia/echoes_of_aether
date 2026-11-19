@@ -26,6 +26,7 @@ class EchoesGame extends FlameGame<DungeonWorld> {
     required Inventory inventory,
     required ValueNotifier<bool> autoSkill,
     DungeonManager? dungeonManager,
+    String? dungeonBiome,
     double roomTransitionDelaySeconds = 1.0,
     InventoryViews? views,
     EquipmentService? equipmentService,
@@ -55,6 +56,7 @@ class EchoesGame extends FlameGame<DungeonWorld> {
       character: character,
       autoSkill: autoSkill,
       dungeonManager: dungeonManager,
+      dungeonBiome: dungeonBiome,
       roomTransitionDelaySeconds: roomTransitionDelaySeconds,
       rewardProcessor: rewardProcessor,
       onProgressionChanged: onProgressionChanged,
@@ -86,6 +88,7 @@ class EchoesGame extends FlameGame<DungeonWorld> {
     required this.character,
     required this.autoSkill,
     DungeonManager? dungeonManager,
+    String? dungeonBiome,
     double roomTransitionDelaySeconds = 1.0,
     RewardProcessor? rewardProcessor,
     VoidCallback? onProgressionChanged,
@@ -109,6 +112,7 @@ class EchoesGame extends FlameGame<DungeonWorld> {
            hud: hud,
            autoSkill: autoSkill,
            dungeonManager: dungeonManager,
+           dungeonBiome: dungeonBiome,
            roomTransitionDelaySeconds: roomTransitionDelaySeconds,
            rewardProcessor: rewardProcessor,
            onProgressionChanged: onProgressionChanged,
@@ -151,6 +155,12 @@ class EchoesGame extends FlameGame<DungeonWorld> {
     if (equipmentService.unequip(slot)) {
       views.refresh();
       onBuildChanged?.call();
+    }
+  }
+
+  void toggleFavorite(String instanceId) {
+    if (equipmentService.toggleFavorite(instanceId)) {
+      views.refresh();
     }
   }
 

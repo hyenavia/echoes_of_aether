@@ -9,8 +9,10 @@ import '../../domain/entities/dungeon_definition.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/mystery_box.dart';
 import '../../domain/entities/shop_config.dart';
 import '../../domain/services/event_shop_service.dart';
+import '../../domain/services/mystery_box_service.dart';
 import '../../domain/services/shop_service.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
@@ -37,6 +39,7 @@ class ShopOverlay extends StatefulWidget {
     this.onSellBatch,
     this.eventShopData,
     this.onBuyEventItem,
+    this.onOpenMysteryBox,
     required this.onClose,
   });
 
@@ -58,6 +61,8 @@ class ShopOverlay extends StatefulWidget {
   onSellBatch;
   final EventShopViewData? eventShopData;
   final Future<EventShopBuyResult> Function(String entryId)? onBuyEventItem;
+  final Future<MysteryBoxOpenResult> Function(MysteryBoxTier tier, int count)?
+  onOpenMysteryBox;
   final VoidCallback onClose;
 
   @override
@@ -110,6 +115,172 @@ class _ShopOverlayState extends State<ShopOverlay> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  Future<void> _handleOpenMysteryBox(MysteryBoxTier tier, int count) async {
+    if (_busy || widget.onOpenMysteryBox == null) return;
+    setState(() => _busy = true);
+    try {
+      final result = await widget.onOpenMysteryBox!(tier, count);
+      if (!mounted) return;
+      setState(() {
+        if (result.isSuccess) {
+          _feedbackIsError = false;
+          _feedbackMessage =
+              'Berhasil membuka ${result.itemsObtained.length}x peti! Perlengkapan tersimpan di tas.';
+        } else {
+          _feedbackIsError = true;
+          switch (result.status) {
+            case MysteryBoxOpenStatus.insufficientGold:
+              _feedbackMessage = 'Gold tidak mencukupi untuk membuka peti.';
+            case MysteryBoxOpenStatus.inventoryFull:
+              _feedbackMessage =
+                  'Tas perlengkapan penuh! Kosongkan ruang terlebih dahulu.';
+            case MysteryBoxOpenStatus.underLevel:
+              _feedbackMessage =
+                  'Level karakter belum mencukupi untuk membuka peti ini.';
+            case MysteryBoxOpenStatus.noEligibleItems:
+            case MysteryBoxOpenStatus.unknownTier:
+            default:
+              _feedbackMessage = 'Gagal membuka peti misteri.';
+          }
+        }
+      });
+      if (result.isSuccess && result.itemsObtained.isNotEmpty && mounted) {
+        await _showMysteryBoxRevealDialog(result.itemsObtained);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _showMysteryBoxRevealDialog(
+    List<EquipmentInstance> itemsObtained,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppColors.panelDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: const BorderSide(color: AppColors.antiqueGold, width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: AppColors.antiqueGold, size: 20),
+              SizedBox(width: AppSpacing.sm),
+              Text(
+                'Hasil Peti Misteri',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 380),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (int i = 0; i < itemsObtained.length; i++) ...[
+                      if (i > 0) const SizedBox(height: AppSpacing.sm),
+                      _buildRevealedEquipmentItem(itemsObtained[i]),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.antiqueGold,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Simpan ke Tas'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRevealedEquipmentItem(EquipmentInstance item) {
+    final def = widget.items[item.definitionId];
+    final itemName = def?.name ?? item.definitionId;
+    final rarityColor = AppColors.colorForRarity(item.rarity);
+    final slot = slotLabel(item.slot);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.panelElevated,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: rarityColor.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.xs + 2),
+            decoration: BoxDecoration(
+              color: rarityColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: PixelItemIcon(
+              itemId: item.definitionId,
+              size: 20,
+              fallbackIcon: _slotIcon(item.slot),
+              fallbackColor: rarityColor,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  itemName,
+                  style: TextStyle(
+                    color: rarityColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '$slot • ${_rarityLabel(item.rarity)}',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  describeEquipmentStats(item.effectiveStats),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _slotIcon(EquipmentSlot slot) => switch (slot) {
+    EquipmentSlot.weapon => Icons.colorize,
+    EquipmentSlot.head => Icons.face,
+    EquipmentSlot.body => Icons.shield_outlined,
+    EquipmentSlot.accessory => Icons.all_inclusive,
+  };
 
   Future<void> _handleSellEquipment(
     EquipmentInstance instance,
@@ -495,11 +666,13 @@ class _ShopOverlayState extends State<ShopOverlay> {
     final ext = EchoesTheme.of(context);
     final hasEventTab =
         widget.eventShopData != null && widget.onBuyEventItem != null;
+    final hasMysteryBoxTab = widget.onOpenMysteryBox != null;
+    final tabCount = 2 + (hasMysteryBoxTab ? 1 : 0) + (hasEventTab ? 1 : 0);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460, maxHeight: 560),
+          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 600),
           child: PanelFrame(
             showCornerOrnaments: true,
             padding: const EdgeInsets.fromLTRB(
@@ -509,16 +682,16 @@ class _ShopOverlayState extends State<ShopOverlay> {
               AppSpacing.md,
             ),
             child: DefaultTabController(
-              length: hasEventTab ? 3 : 2,
+              length: tabCount,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.storefront_outlined,
-                        size: 20,
-                        color: AppColors.antiqueGold,
+                      const AetherSymbolMark(
+                        variant: AetherSymbolVariant.mark,
+                        size: 18,
+                        glow: true,
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
@@ -557,6 +730,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                     tabs: [
                       const Tab(text: 'Beli'),
                       const Tab(text: 'Jual'),
+                      if (hasMysteryBoxTab) const Tab(text: 'Peti Misteri'),
                       if (hasEventTab) const Tab(text: 'Event'),
                     ],
                   ),
@@ -599,6 +773,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                       children: [
                         _buildBuyTab(theme, ext),
                         _buildSellTab(theme),
+                        if (hasMysteryBoxTab) _buildMysteryBoxTab(theme, ext),
                         if (hasEventTab)
                           EventShopView(
                             data: widget.eventShopData!,
@@ -628,7 +803,8 @@ class _ShopOverlayState extends State<ShopOverlay> {
       categories: [
         ItemCategoryFilter.all,
         ItemCategoryFilter.weapon,
-        ItemCategoryFilter.armor,
+        ItemCategoryFilter.head,
+        ItemCategoryFilter.body,
         ItemCategoryFilter.accessory,
         if (includeMaterial) ItemCategoryFilter.material,
       ],
@@ -636,6 +812,245 @@ class _ShopOverlayState extends State<ShopOverlay> {
       rarityFilter: rarityFilter,
       onCategoryChanged: onCategoryChanged,
       onRarityChanged: onRarityChanged,
+    );
+  }
+
+  Widget _buildMysteryBoxTab(ThemeData theme, EchoesThemeExtension ext) {
+    const definitions = MysteryBoxDefinition.defaults;
+    final playerLevel = widget.playerContext.playerLevel;
+    final playerGold = widget.playerGold;
+
+    return ListView(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.panelDark.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: AppColors.panelBorder),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome,
+                color: AppColors.antiqueGold,
+                size: 16,
+              ),
+              const SizedBox(width: AppSpacing.xs + 2),
+              Expanded(
+                child: Text(
+                  'Undi perlengkapan acak dengan statistik acak menggunakan Gold!',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        for (final def in definitions.values)
+          _buildMysteryBoxCard(def, playerLevel, playerGold, theme, ext),
+      ],
+    );
+  }
+
+  Widget _buildMysteryBoxCard(
+    MysteryBoxDefinition def,
+    int playerLevel,
+    int playerGold,
+    ThemeData theme,
+    EchoesThemeExtension ext,
+  ) {
+    final isLevelMet = playerLevel >= def.minLevel;
+    final canAfford1 = playerGold >= def.goldCost;
+    final canAfford5 = playerGold >= def.goldCost * 5;
+
+    final Color tierColor = switch (def.tier) {
+      MysteryBoxTier.novice => AppColors.rarityUncommon,
+      MysteryBoxTier.warrior => AppColors.rarityRare,
+      MysteryBoxTier.aether => AppColors.antiqueGold,
+    };
+
+    final IconData tierIcon = switch (def.tier) {
+      MysteryBoxTier.novice => Icons.inventory_2_outlined,
+      MysteryBoxTier.warrior => Icons.military_tech_outlined,
+      MysteryBoxTier.aether => Icons.auto_awesome,
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.panelElevated.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: isLevelMet
+              ? tierColor.withValues(alpha: 0.5)
+              : AppColors.panelBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.xs + 2),
+                decoration: BoxDecoration(
+                  color: tierColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: tierColor.withValues(alpha: 0.4)),
+                ),
+                child: Icon(tierIcon, color: tierColor, size: 18),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      def.name,
+                      style: TextStyle(
+                        color: tierColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      def.description,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: isLevelMet
+                      ? AppColors.panelDark
+                      : AppColors.danger.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: isLevelMet
+                        ? AppColors.panelBorder
+                        : AppColors.danger.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Text(
+                  'Syarat: Lv. ${def.minLevel}+',
+                  style: TextStyle(
+                    color: isLevelMet
+                        ? AppColors.textSecondary
+                        : AppColors.danger,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            def.describeProbabilities(),
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 10,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton(
+                key: Key('mystery_box_open_1_${def.tier.name}'),
+                onPressed: (isLevelMet && canAfford1 && !_busy)
+                    ? () => _handleOpenMysteryBox(def.tier, 1)
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm + 2,
+                    vertical: AppSpacing.xs,
+                  ),
+                  side: BorderSide(
+                    color: (isLevelMet && canAfford1)
+                        ? tierColor.withValues(alpha: 0.8)
+                        : AppColors.panelBorder,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Buka 1x (', style: TextStyle(fontSize: 11)),
+                    const Icon(
+                      Icons.monetization_on,
+                      size: 11,
+                      color: AppColors.antiqueGold,
+                    ),
+                    Text(
+                      '${NumberFormatter.format(def.goldCost)})',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              ElevatedButton(
+                key: Key('mystery_box_open_5_${def.tier.name}'),
+                onPressed: (isLevelMet && canAfford5 && !_busy)
+                    ? () => _handleOpenMysteryBox(def.tier, 5)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: tierColor,
+                  foregroundColor: Colors.black,
+                  disabledBackgroundColor: AppColors.panelDark,
+                  disabledForegroundColor: AppColors.textMuted,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm + 2,
+                    vertical: AppSpacing.xs,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Buka 5x (',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.monetization_on,
+                      size: 11,
+                      color: Colors.black87,
+                    ),
+                    Text(
+                      '${NumberFormatter.format(def.goldCost * 5)})',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -866,10 +1281,22 @@ class _ShopOverlayState extends State<ShopOverlay> {
               selectedMaterials,
             );
 
+            final junkEquipment = [
+              for (final instance in sellableBagEquipment)
+                if (!instance.isFavorite &&
+                    (instance.rarity == ItemRarity.common ||
+                        instance.rarity == ItemRarity.uncommon))
+                  instance,
+            ];
+            final junkGold = _estimateBatchGold(junkEquipment, const []);
+
+            final nonFavoriteFilteredEquipment = filteredEquipment
+                .where((e) => !e.isFavorite)
+                .toList();
             final allVisibleSelected =
-                (filteredEquipment.isNotEmpty ||
+                (nonFavoriteFilteredEquipment.isNotEmpty ||
                     filteredMaterials.isNotEmpty) &&
-                filteredEquipment.every(
+                nonFavoriteFilteredEquipment.every(
                   (e) => _selectedEquipmentIds.contains(e.id),
                 ) &&
                 filteredMaterials.every(
@@ -877,7 +1304,8 @@ class _ShopOverlayState extends State<ShopOverlay> {
                 );
 
             final hasVisibleSellables =
-                filteredEquipment.isNotEmpty || filteredMaterials.isNotEmpty;
+                nonFavoriteFilteredEquipment.isNotEmpty ||
+                filteredMaterials.isNotEmpty;
             final hasAnySellables =
                 sellableBagEquipment.isNotEmpty || sellableStacks.isNotEmpty;
 
@@ -886,7 +1314,8 @@ class _ShopOverlayState extends State<ShopOverlay> {
                 _buildFilterBar(
                   categoryFilter: _sellCategoryFilter,
                   rarityFilter: _sellRarityFilter,
-                  includeMaterial: true,
+                  includeMaterial: widget.catalog.sell.sellableCategories
+                      .contains(ItemCategory.material),
                   onCategoryChanged: (next) =>
                       setState(() => _sellCategoryFilter = next),
                   onRarityChanged: (next) =>
@@ -906,40 +1335,71 @@ class _ShopOverlayState extends State<ShopOverlay> {
                             ),
                           ),
                         )
-                      : ListView(
-                          children: [
+                      : CustomScrollView(
+                          slivers: [
                             if (filteredEquipment.isNotEmpty) ...[
-                              const SectionHeader(
-                                title: 'Equipment di Tas',
-                                useSerif: true,
+                              const SliverToBoxAdapter(
+                                child: SectionHeader(
+                                  title: 'Equipment di Tas',
+                                  useSerif: true,
+                                ),
                               ),
-                              for (final instance in filteredEquipment)
-                                _buildBagEquipmentTile(theme, instance),
+                              SliverList.builder(
+                                itemCount: filteredEquipment.length,
+                                itemBuilder: (context, index) =>
+                                    _buildBagEquipmentTile(
+                                      theme,
+                                      filteredEquipment[index],
+                                    ),
+                              ),
                             ],
                             if (filteredMaterials.isNotEmpty) ...[
-                              const SectionHeader(
-                                title: 'Material',
-                                useSerif: true,
+                              const SliverToBoxAdapter(
+                                child: SectionHeader(
+                                  title: 'Material',
+                                  useSerif: true,
+                                ),
                               ),
-                              for (final entry in filteredMaterials)
-                                _buildMaterialTile(theme, entry),
+                              SliverList.builder(
+                                itemCount: filteredMaterials.length,
+                                itemBuilder: (context, index) =>
+                                    _buildMaterialTile(
+                                      theme,
+                                      filteredMaterials[index],
+                                    ),
+                              ),
                             ],
                             if (filteredNonSellableEquipment.isNotEmpty) ...[
-                              const SectionHeader(
-                                title: 'Tidak Dapat Dijual',
-                                useSerif: true,
+                              const SliverToBoxAdapter(
+                                child: SectionHeader(
+                                  title: 'Tidak Dapat Dijual',
+                                  useSerif: true,
+                                ),
                               ),
-                              for (final instance
-                                  in filteredNonSellableEquipment)
-                                _buildNonSellableBagTile(theme, instance),
+                              SliverList.builder(
+                                itemCount: filteredNonSellableEquipment.length,
+                                itemBuilder: (context, index) =>
+                                    _buildNonSellableBagTile(
+                                      theme,
+                                      filteredNonSellableEquipment[index],
+                                    ),
+                              ),
                             ],
                             if (equippedList.isNotEmpty) ...[
-                              const SectionHeader(
-                                title: 'Sedang Dipakai (Tidak Bisa Dijual)',
-                                useSerif: true,
+                              const SliverToBoxAdapter(
+                                child: SectionHeader(
+                                  title: 'Sedang Dipakai (Tidak Bisa Dijual)',
+                                  useSerif: true,
+                                ),
                               ),
-                              for (final instance in equippedList)
-                                _buildEquippedReadOnlyTile(theme, instance),
+                              SliverList.builder(
+                                itemCount: equippedList.length,
+                                itemBuilder: (context, index) =>
+                                    _buildEquippedReadOnlyTile(
+                                      theme,
+                                      equippedList[index],
+                                    ),
+                              ),
                             ],
                           ],
                         ),
@@ -966,7 +1426,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                   }
                                 } else {
                                   for (final e in filteredEquipment) {
-                                    _selectedEquipmentIds.add(e.id);
+                                    if (!e.isFavorite) {
+                                      _selectedEquipmentIds.add(e.id);
+                                    }
                                   }
                                   for (final m in filteredMaterials) {
                                     _selectedMaterialIds.add(m.definition.id);
@@ -977,6 +1439,24 @@ class _ShopOverlayState extends State<ShopOverlay> {
                         child: Text(
                           allVisibleSelected ? 'Batal Pilih' : 'Pilih Semua',
                         ),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('sell_junk_equipment_button'),
+                        icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+                        label: Text(
+                          junkEquipment.isNotEmpty
+                              ? 'Jual Sampah (${junkEquipment.length} • +${NumberFormatter.format(junkGold)})'
+                              : 'Jual Sampah (0)',
+                        ),
+                        onPressed: !_busy && junkEquipment.isNotEmpty
+                            ? () => _executeBatchSell(
+                                equipments: junkEquipment,
+                                materials: const [],
+                                alwaysConfirm: true,
+                                confirmTitle:
+                                    'Jual Semua Sampah (Common & Uncommon)',
+                              )
+                            : null,
                       ),
                       FilledButton.tonal(
                         onPressed: !_busy && selectedCount > 0
@@ -996,7 +1476,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                       FilledButton(
                         onPressed: !_busy && hasVisibleSellables
                             ? () => _executeBatchSell(
-                                equipments: filteredEquipment,
+                                equipments: nonFavoriteFilteredEquipment,
                                 materials: filteredMaterials,
                                 alwaysConfirm: true,
                                 confirmTitle:
@@ -1059,7 +1539,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           leading: Checkbox(
             value: selected,
-            onChanged: _busy
+            onChanged: _busy || instance.isFavorite
                 ? null
                 : (val) => setState(() {
                     if (val == true) {
@@ -1077,19 +1557,50 @@ class _ShopOverlayState extends State<ShopOverlay> {
               Text(def.name),
               _buildCategoryBadge(theme, def),
               _buildRarityBadge(theme, def.rarity),
+              if (instance.isFavorite)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.star, size: 14, color: ext.gold),
+                    const SizedBox(width: 2),
+                    Text(
+                      'Favorit',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: ext.gold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
-          subtitle: Text(
-            '${describeEquipmentStats(instance.rolledStats)}\n'
-            'Jual: ${NumberFormatter.format(sellPrice)} Gold',
-            style: AppTypography.numeric(theme.textTheme.bodySmall),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final line in equipmentStatLines(instance.rolledStats))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 1),
+                  child: Text(
+                    '• $line',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 2),
+              Text(
+                'Jual: ${NumberFormatter.format(sellPrice)} Gold',
+                style: AppTypography.numeric(theme.textTheme.bodySmall),
+              ),
+            ],
           ),
           isThreeLine: true,
           trailing: OutlinedButton(
-            onPressed: !_busy && sellPrice > 0
+            onPressed: !_busy && sellPrice > 0 && !instance.isFavorite
                 ? () => _handleSellEquipment(instance, def, sellPrice)
                 : null,
-            child: const Text('Jual'),
+            child: Text(instance.isFavorite ? 'Favorit' : 'Jual'),
           ),
         ),
       ),

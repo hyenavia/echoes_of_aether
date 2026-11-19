@@ -5,11 +5,26 @@ import '../../app/theme/app_tokens.dart';
 import '../../app/theme/echoes_theme.dart';
 import '../../core/utils/number_formatter.dart';
 import '../../domain/entities/combat_stats.dart';
+import '../../domain/entities/equipment.dart';
+import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/skill_definition.dart';
 import '../../domain/entities/specialization.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'equipment_text.dart';
 import 'skill_text.dart';
+
+/// Mode tampilan bagian pada [CharacterOverlay].
+enum CharacterSectionMode {
+  /// Tampilkan semua bagian sekaligus (untuk modal di dalam dungeon).
+  all,
+
+  /// Fokus pada profil hero, stat tempur, dan slot perlengkapan terpasang.
+  profileAndGear,
+
+  /// Fokus pada pemilihan spesialisasi kelas dan upgrade skill.
+  classAndSkills,
+}
 
 /// Layar karakter: profil hero berilustrasi, stat tempur, pilihan
 /// specialization, dan daftar/upgrade skill.
@@ -19,18 +34,206 @@ class CharacterOverlay extends StatelessWidget {
     required this.snapshot,
     required this.onChooseSpecialization,
     this.onUpgradeSkill,
+    this.equipmentSnapshot,
+    this.items = const {},
+    this.onUnequip,
+    this.onToggleFavorite,
+    this.onOpenEquipmentBag,
+    this.onOpenBlacksmith,
+    this.sectionMode = CharacterSectionMode.all,
+    this.embedded = false,
     required this.onClose,
   });
 
   final ValueListenable<CharacterSnapshot> snapshot;
   final void Function(String specializationId) onChooseSpecialization;
   final void Function(String skillId)? onUpgradeSkill;
+  final ValueListenable<EquipmentSnapshot>? equipmentSnapshot;
+  final Map<String, ItemDefinition> items;
+  final void Function(EquipmentSlot slot)? onUnequip;
+  final void Function(String instanceId)? onToggleFavorite;
+  final VoidCallback? onOpenEquipmentBag;
+  final void Function(String instanceId)? onOpenBlacksmith;
+  final CharacterSectionMode sectionMode;
+  final bool embedded;
   final VoidCallback onClose;
+
+  static const TextStyle _baseText = TextStyle(fontSize: 12);
+
+  String _equipmentName(EquipmentInstance e) {
+    final base = items[e.definitionId]?.name ?? e.definitionId;
+    return e.enhancementLevel > 0 ? '$base +${e.enhancementLevel}' : base;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ext = EchoesTheme.of(context);
+    final showProfile =
+        sectionMode == CharacterSectionMode.all ||
+        sectionMode == CharacterSectionMode.profileAndGear;
+    final showGear =
+        sectionMode == CharacterSectionMode.profileAndGear &&
+        equipmentSnapshot != null;
+    final showClassAndSkills =
+        sectionMode == CharacterSectionMode.all ||
+        sectionMode == CharacterSectionMode.classAndSkills;
+
+    final panel = PanelFrame(
+      showCornerOrnaments: true,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xs + 2,
+        AppSpacing.md,
+        AppSpacing.xs + 2,
+      ),
+      child: ValueListenableBuilder<CharacterSnapshot>(
+        valueListenable: snapshot,
+        builder: (context, s, _) => Column(
+          mainAxisSize: embedded ? MainAxisSize.max : MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!embedded) ...[
+              Row(
+                children: [
+                  const AetherSymbolMark(
+                    variant: AetherSymbolVariant.mark,
+                    size: 16,
+                    glow: true,
+                  ),
+                  const SizedBox(width: AppSpacing.xs + 2),
+                  Expanded(
+                    child: Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          'Karakter - Lv ${NumberFormatter.format(s.level)}',
+                          style: AppTypography.headingSerif(
+                            theme.textTheme.titleMedium,
+                            color: ext.gold,
+                          ),
+                        ),
+                        ResourceChip.gold(s.gold),
+                      ],
+                    ),
+                  ),
+                  AppIconButton(
+                    icon: Icons.close,
+                    semanticLabel: 'Tutup',
+                    tooltip: 'Tutup',
+                    onPressed: onClose,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showProfile) ...[
+                      _HeroProfileBanner(snapshot: s),
+                      if (s.stats != null) ...[
+                        const SectionHeader(
+                          title: 'Stat Tempur',
+                          useSerif: true,
+                        ),
+                        _CombatStatGrid(stats: s.stats!),
+                      ],
+                    ],
+                    if (showGear)
+                      ValueListenableBuilder<EquipmentSnapshot>(
+                        valueListenable: equipmentSnapshot!,
+                        builder: (context, eqSnap, _) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SectionHeader(
+                              title: 'Perlengkapan Terpasang',
+                              useSerif: true,
+                              trailing: onOpenEquipmentBag != null
+                                  ? TextButton.icon(
+                                      key: const Key('hero_open_equipment_bag'),
+                                      onPressed: onOpenEquipmentBag,
+                                      icon: const Icon(
+                                        Icons.swap_horiz,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Ganti'),
+                                      style: TextButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            for (final slot in EquipmentSlot.values)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: _equippedGearTile(
+                                  context,
+                                  eqSnap.equipped[slot],
+                                  slot,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    if (showClassAndSkills) ...[
+                      const SectionHeader(
+                        title: 'Spesialisasi',
+                        useSerif: true,
+                      ),
+                      if (!s.canChooseSpecialization)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: LockedBadge(
+                            label:
+                                'Terbuka di level ${s.specializationUnlockLevel}.',
+                          ),
+                        ),
+                      for (final spec in s.specializations)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: _specTile(context, s, spec),
+                        ),
+                      const SectionHeader(title: 'Skill', useSerif: true),
+                      for (final e in s.skills)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: _skillTile(context, e),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (embedded) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.xs,
+            AppSpacing.md,
+            AppSpacing.sm,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: panel,
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -39,97 +242,52 @@ class CharacterOverlay extends StatelessWidget {
         ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440, maxHeight: 640),
-          child: PanelFrame(
-            showCornerOrnaments: true,
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.xs + 2,
-              AppSpacing.md,
-              AppSpacing.xs + 2,
-            ),
-            child: ValueListenableBuilder<CharacterSnapshot>(
-              valueListenable: snapshot,
-              builder: (context, s, _) => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.xs,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              'Karakter - Lv ${NumberFormatter.format(s.level)}',
-                              style: AppTypography.headingSerif(
-                                theme.textTheme.titleMedium,
-                                color: ext.gold,
-                              ),
-                            ),
-                            ResourceChip.gold(s.gold),
-                          ],
-                        ),
-                      ),
-                      AppIconButton(
-                        icon: Icons.close,
-                        semanticLabel: 'Tutup',
-                        tooltip: 'Tutup',
-                        onPressed: onClose,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _HeroProfileBanner(snapshot: s),
-                          if (s.stats != null) ...[
-                            const SectionHeader(
-                              title: 'Stat Tempur',
-                              useSerif: true,
-                            ),
-                            _CombatStatGrid(stats: s.stats!),
-                          ],
-                          const SectionHeader(
-                            title: 'Spesialisasi',
-                            useSerif: true,
-                          ),
-                          if (!s.canChooseSpecialization)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: LockedBadge(
-                                label:
-                                    'Terbuka di level ${s.specializationUnlockLevel}.',
-                              ),
-                            ),
-                          for (final spec in s.specializations)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.xs,
-                              ),
-                              child: _specTile(context, s, spec),
-                            ),
-                          const SectionHeader(title: 'Skill', useSerif: true),
-                          for (final e in s.skills)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.xs,
-                              ),
-                              child: _skillTile(context, e),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: panel,
         ),
+      ),
+    );
+  }
+
+  Widget _equippedGearTile(
+    BuildContext context,
+    EquipmentInstance? e,
+    EquipmentSlot slot,
+  ) {
+    if (e == null) {
+      return EquipmentSlotTile(
+        slot: slot,
+        slotLabel: slotLabel(slot),
+        onTap: onOpenEquipmentBag,
+      );
+    }
+    return ItemCard(
+      itemId: e.definitionId,
+      name: _equipmentName(e),
+      rarity: e.rarity,
+      slot: slot,
+      subtitle: slotLabel(slot),
+      statsLines: equipmentStatLines(e.effectiveStats),
+      statsSummary: describeEquipmentStats(e.effectiveStats),
+      isFavorite: e.isFavorite,
+      onToggleFavorite: onToggleFavorite != null
+          ? () => onToggleFavorite!(e.id)
+          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onOpenBlacksmith != null)
+            IconButton(
+              icon: const Icon(Icons.hardware_outlined, size: 18),
+              tooltip: 'Tempa di Pandai Besi',
+              onPressed: () => onOpenBlacksmith!(e.id),
+              visualDensity: VisualDensity.compact,
+            ),
+          if (onUnequip != null)
+            TextButton(
+              onPressed: () => onUnequip!(slot),
+              child: Text('Lepas', style: _baseText),
+            ),
+        ],
       ),
     );
   }
@@ -172,6 +330,47 @@ class CharacterOverlay extends StatelessWidget {
       );
     }
 
+    final skillSprite = ItemSpriteRegistry.spriteForSkill(e.definition.id);
+    final iconWidget = Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: (e.unlocked ? ext.gold : AppColors.surfaceDark).withValues(
+          alpha: 0.12,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: (e.unlocked ? ext.gold : ext.panelInnerBorder).withValues(
+            alpha: 0.45,
+          ),
+        ),
+      ),
+      child: Center(
+        child: skillSprite != null
+            ? Image.asset(
+                skillSprite,
+                width: 24,
+                height: 24,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.none,
+                errorBuilder: (_, _, _) => Icon(
+                  e.definition.type == SkillType.active
+                      ? Icons.bolt_outlined
+                      : Icons.shield_outlined,
+                  size: 18,
+                  color: e.unlocked ? ext.gold : AppColors.textMuted,
+                ),
+              )
+            : Icon(
+                e.definition.type == SkillType.active
+                    ? Icons.bolt_outlined
+                    : Icons.shield_outlined,
+                size: 18,
+                color: e.unlocked ? ext.gold : AppColors.textMuted,
+              ),
+      ),
+    );
+
     return PanelFrame(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm + 2,
@@ -182,6 +381,7 @@ class CharacterOverlay extends StatelessWidget {
           ? ext.panelBorder.withValues(alpha: 0.72)
           : ext.panelInnerBorder,
       child: _AdaptiveOverlayTile(
+        leading: iconWidget,
         title: Text(
           e.unlocked
               ? '${e.definition.name} • Lv ${e.level}/${e.definition.maxLevel}'
@@ -210,7 +410,10 @@ class CharacterOverlay extends StatelessWidget {
     final ext = EchoesTheme.of(context);
     final selected = s.specializationId == spec.id;
     final requiredLevel = spec.unlockLevel ?? s.specializationUnlockLevel;
-    final unlocked = s.level >= requiredLevel;
+    final ownedSpec =
+        spec.rarity != ItemRarity.mythical ||
+        s.unlockedSpecializations.contains(spec.id);
+    final unlocked = s.level >= requiredLevel && ownedSpec;
     final range = spec.attackRange == null
         ? ''
         : ' | Jangkauan ${spec.attackRange!.toStringAsFixed(1)}';
@@ -245,6 +448,8 @@ class CharacterOverlay extends StatelessWidget {
         ),
         trailing: selected
             ? Icon(Icons.check_circle, color: ext.gold)
+            : !ownedSpec
+            ? const LockedBadge(label: 'Gacha / Sanctuary')
             : FilledButton.tonal(
                 onPressed: unlocked
                     ? () => onChooseSpecialization(spec.id)
@@ -258,11 +463,13 @@ class CharacterOverlay extends StatelessWidget {
 
 class _AdaptiveOverlayTile extends StatelessWidget {
   const _AdaptiveOverlayTile({
+    this.leading,
     required this.title,
     required this.subtitle,
     required this.trailing,
   });
 
+  final Widget? leading;
   final Widget title;
   final Widget subtitle;
   final Widget trailing;
@@ -278,7 +485,16 @@ class _AdaptiveOverlayTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              title,
+              if (leading != null) ...[
+                Row(
+                  children: [
+                    leading!,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: title),
+                  ],
+                ),
+              ] else
+                title,
               const SizedBox(height: 2),
               subtitle,
               const SizedBox(height: AppSpacing.xs),
@@ -289,6 +505,10 @@ class _AdaptiveOverlayTile extends StatelessWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: AppSpacing.sm),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,6 +702,17 @@ class _CombatStatGrid extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (ItemSpriteRegistry.spriteForStat(e.label) !=
+                          null) ...[
+                        Image.asset(
+                          ItemSpriteRegistry.spriteForStat(e.label)!,
+                          width: 12,
+                          height: 12,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.none,
+                        ),
+                        const SizedBox(width: 3),
+                      ],
                       Text(
                         '${e.label} ',
                         style: TextStyle(

@@ -1100,9 +1100,10 @@ Tiga opsi mode aktivitas offline (keputusan desain resmi M6 Stage 1):
    - Auto Farming tidak dapat membuka dungeon baru maupun memberikan reward untuk encounter/room yang belum diselesaikan.
    - **Kebijakan Kegagalan (`stopOnDefeat`):** apabila satu attempt Auto Farming berakhir kalah (*defeated* saat revive cooldown aktif), aktivitas Auto Farming berhenti pada titik tersebut; reward dari kill dan room/run sebelumnya yang sah tetap dipertahankan, sedangkan room/dungeon gagal tidak mendapat clear reward.
 
-3. **Default Mode — Pause Progression**
-   - Jika pemain belum memilih aktivitas offline secara eksplisit, default mode adalah **Pause Progression**.
-   - Tidak ada simulasi combat, room, atau farming yang dijalankan saat offline, dan sistem tidak boleh memilih mode aktif secara diam-diam tanpa keputusan pemain.
+3. **Auto-Arming & Fallback (`Pause Progression`)**
+   - Setelah minimal satu dungeon normal pernah diselesaikan pada siklus saat ini (`resolveFarmDungeonId != null`), **Mode B (Auto Farming) aktif otomatis** pada lokasi farming pilihan pemain (default ke dungeon normal terselesaikan terakhir/tertinggi) tanpa perlu mengaktifkan tombol secara terpisah, dan otomatis terpasang ulang setelah klaim ringkasan offline maupun keluar/selesai dari dungeon.
+   - Tombol pada panel Town Hub berfungsi untuk **memilih tempat/lokasi farming** (tidak ada tombol Pause terpisah pada Town Hub).
+   - `Pause Progression` tetap menjadi fallback internal ketika belum ada dungeon normal yang selesai pada siklus saat ini (awal permainan / tepat setelah Ascension ke rank baru) atau saat run Ascension/Boss sedang berjalan manual.
 
 
 

@@ -198,7 +198,8 @@ class OfflineSummaryOverlay extends StatelessWidget {
                               ),
                             ],
                             if (stackEntries.isNotEmpty ||
-                                summary.addedEquipmentCount > 0) ...[
+                                summary.addedEquipmentCount > 0 ||
+                                summary.autoSoldEquipmentCount > 0) ...[
                               const SizedBox(height: AppSpacing.xs),
                               PanelFrame(
                                 backgroundColor: AppColors.surfaceDark,
@@ -235,6 +236,31 @@ class OfflineSummaryOverlay extends StatelessWidget {
                                         const SizedBox(height: AppSpacing.xs),
                                       Text(
                                         'Equipment masuk tas: +${summary.addedEquipmentCount}',
+                                        style: AppTypography.numeric(
+                                          theme.textTheme.bodySmall?.copyWith(
+                                            color: AppColors.aetherBlue,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    if (summary.autoSoldEquipmentCount > 0) ...[
+                                      if (stackEntries.isNotEmpty ||
+                                          summary.addedEquipmentCount > 0)
+                                        const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        'Gear sampah terjual otomatis: +${summary.autoSoldEquipmentCount} item (+${NumberFormatter.format(summary.autoSoldEquipmentGold)} Gold)',
+                                        style: AppTypography.numeric(
+                                          theme.textTheme.bodySmall?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    if (summary.autoSalvagedEquipmentCount >
+                                        0) ...[
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        'Gear AFK dibongkar otomatis: +${summary.autoSalvagedEquipmentCount} item (+${NumberFormatter.format(summary.autoSalvagedScrapCount)} Aether Scrap)',
                                         style: AppTypography.numeric(
                                           theme.textTheme.bodySmall?.copyWith(
                                             color: AppColors.aetherBlue,

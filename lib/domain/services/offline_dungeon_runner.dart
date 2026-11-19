@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../entities/combat_stats.dart';
 import '../entities/combatant.dart';
 import '../entities/dungeon_definition.dart';
 import '../entities/dungeon_session.dart';
@@ -103,6 +104,8 @@ class OfflineDungeonRunOutcome {
     this.overflowStacks = const {},
     this.addedEquipment = const [],
     this.droppedEquipment = const [],
+    this.autoSoldEquipmentCount = 0,
+    this.autoSoldEquipmentGold = 0,
     this.ticksSimulated = 0,
     this.budgetTicks = 0,
     this.processedDurationMs = 0,
@@ -127,6 +130,8 @@ class OfflineDungeonRunOutcome {
   final Map<String, int> overflowStacks;
   final List<EquipmentInstance> addedEquipment;
   final List<EquipmentInstance> droppedEquipment;
+  final int autoSoldEquipmentCount;
+  final int autoSoldEquipmentGold;
   final int ticksSimulated;
   final int budgetTicks;
   final int processedDurationMs;
@@ -259,8 +264,10 @@ class OfflineDungeonRunner {
         !dungeonDef.isNormal &&
         !allowManualAscension) {
       final manualOnlyReason = switch (dungeonDef.kind) {
-        DungeonKind.bossDaily || DungeonKind.bossWeekly =>
-          'Boss Event ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
+        DungeonKind.bossDaily ||
+        DungeonKind.bossWeekly ||
+        DungeonKind.bossSpire =>
+          'Boss Event / Spire ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
         DungeonKind.ascension =>
           'Ascension Dungeon ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
         DungeonKind.normal => '',
@@ -281,8 +288,10 @@ class OfflineDungeonRunner {
         (!dungeonDef.isNormal ||
             request.dungeonProgress.clearedInCycleRank != request.cycleRank)) {
       final autoFarmReason = switch (dungeonDef.kind) {
-        DungeonKind.bossDaily || DungeonKind.bossWeekly =>
-          'Auto Farming menolak Boss Event ("${request.dungeonId}"); hanya dungeon normal yang didukung.',
+        DungeonKind.bossDaily ||
+        DungeonKind.bossWeekly ||
+        DungeonKind.bossSpire =>
+          'Auto Farming menolak Boss Event / Spire ("${request.dungeonId}"); hanya dungeon normal yang didukung.',
         DungeonKind.ascension =>
           'Auto Farming hanya mendukung dungeon normal ("${request.dungeonId}").',
         DungeonKind.normal =>
@@ -453,6 +462,7 @@ class OfflineDungeonRunner {
         skillSelector: skillSelector,
         pathfinder: pathfinder,
         attackPositionFinder: attackPositionFinder,
+        cycleRank: session.cycleRank,
       );
 
       // Jalankan seluruh room secara berurutan pada satu run.
@@ -793,6 +803,8 @@ class OfflineDungeonRunner {
       overflowStacks: Map.unmodifiable(stats.overflowStacks),
       addedEquipment: List.unmodifiable(stats.addedEquipment),
       droppedEquipment: List.unmodifiable(stats.droppedEquipment),
+      autoSoldEquipmentCount: stats.autoSoldEquipmentCount,
+      autoSoldEquipmentGold: stats.autoSoldEquipmentGold,
       ticksSimulated: stats.ticksSimulated,
       budgetTicks: budgetTicks,
       processedDurationMs: processedMs,
@@ -881,6 +893,8 @@ class _RunAccumulators {
   final Map<String, int> overflowStacks = {};
   final List<EquipmentInstance> addedEquipment = [];
   final List<EquipmentInstance> droppedEquipment = [];
+  int autoSoldEquipmentCount = 0;
+  int autoSoldEquipmentGold = 0;
 
   void recordReward(GrantedReward reward) {
     expGained += reward.expGranted;
@@ -895,6 +909,8 @@ class _RunAccumulators {
     }
     addedEquipment.addAll(reward.addedEquipment);
     droppedEquipment.addAll(reward.droppedEquipment);
+    autoSoldEquipmentCount += reward.autoSoldEquipmentCount;
+    autoSoldEquipmentGold += reward.autoSoldEquipmentGold;
   }
 }
 
@@ -912,6 +928,7 @@ class _OfflineCombatRuntime {
     required this.skillSelector,
     required this.pathfinder,
     required this.attackPositionFinder,
+    this.cycleRank = 0,
   }) {
     _syncSkills(initialCooldowns: initialSkillCooldownTicks);
   }
@@ -926,6 +943,7 @@ class _OfflineCombatRuntime {
   final SkillSelector skillSelector;
   final AStarPathfinder pathfinder;
   final AttackPositionFinder attackPositionFinder;
+  final int cycleRank;
 
   int reviveCooldownTicks;
   int _downedTicksLeft = 0;
@@ -934,8 +952,14 @@ class _OfflineCombatRuntime {
   NavigationGrid? _grid;
   CombatSimulation? _spawnShell;
   final List<Combatant> _enemies = [];
+  final List<Combatant> _allies = [];
+  List<Combatant> get enemies => _enemies;
+  List<Combatant> get allies => _allies;
   final Map<String, EnemyDefinition> _definitions = {};
   final Set<String> _processedDeaths = {};
+  int _spawnCounter = 0;
+  int _paladinHolyNovaCooldownTicks = 0;
+  int _chronomancerSkillCasts = 0;
 
   List<SkillDefinition> _skills = const [];
   final Map<String, SkillRuntimeState> _skillStates = {};
@@ -947,6 +971,7 @@ class _OfflineCombatRuntime {
   }) {
     _grid = grid;
     _enemies.clear();
+    _allies.clear();
     _definitions.clear();
     _processedDeaths.clear();
     player.resetNavigation(entryCell);
@@ -963,6 +988,17 @@ class _OfflineCombatRuntime {
     final known = {for (final e in _enemies) e.id};
     for (final enemy in shell.enemies) {
       if (known.add(enemy.id)) {
+        if (enemy.isBoss) {
+          final mechanics = config.difficulty.mechanics;
+          enemy.bossAoECooldownTicks =
+              (mechanics.bossAoeCooldownSeconds *
+                      CombatSimulation.ticksPerSecond)
+                  .round();
+          enemy.lifeSiphonCooldownTicks =
+              (mechanics.weeklyLifeSiphonCooldownSeconds *
+                      CombatSimulation.ticksPerSecond)
+                  .round();
+        }
         _enemies.add(enemy);
         final monsterId = _resolveMonsterIdFromEnemyId(enemy.id, enemy);
         if (monsterId != null && config.monsters.containsKey(monsterId)) {
@@ -973,6 +1009,9 @@ class _OfflineCombatRuntime {
   }
 
   String? _resolveMonsterIdFromEnemyId(String enemyId, Combatant enemy) {
+    if (enemy.definitionId != null && enemy.definitionId!.isNotEmpty) {
+      return enemy.definitionId;
+    }
     // EncounterTracker membentuk id "${room.id}__${config.id}__$i"; lookup
     // definisi monster melalui catalog room spawns atau fallback stats/level.
     for (final d in config.dungeons.values) {
@@ -1035,7 +1074,7 @@ class _OfflineCombatRuntime {
 
     if (playerStatus == PlayerStatus.downed) {
       _tickDowned();
-      for (final enemy in _enemies) {
+      for (final enemy in _enemies.toList()) {
         if (enemy.isAlive && enemy.aiState == MonsterAiState.returning) {
           _returnToSpawn(enemy);
         }
@@ -1045,14 +1084,16 @@ class _OfflineCombatRuntime {
 
     if (reviveCooldownTicks > 0) reviveCooldownTicks--;
     if (player.invulnerableTicks > 0) player.invulnerableTicks--;
+    if (_paladinHolyNovaCooldownTicks > 0) _paladinHolyNovaCooldownTicks--;
     for (final id in _skillStates.keys.toList()) {
       _skillStates[id] = _skillStates[id]!.decrementCooldown();
     }
 
     _updatePlayer(defeated);
-    for (final enemy in _enemies) {
+    _updateAllies(defeated);
+    for (final enemy in _enemies.toList()) {
       if (playerStatus != PlayerStatus.alive) break;
-      if (enemy.isAlive) _updateEnemy(enemy);
+      if (enemy.isAlive) _updateEnemy(enemy, defeated);
     }
     return (defeatedEnemies: defeated);
   }
@@ -1066,6 +1107,12 @@ class _OfflineCombatRuntime {
 
     reviveCooldownTicks = math.max(0, reviveCooldownTicks - gap);
     player.invulnerableTicks = math.max(0, player.invulnerableTicks - gap);
+    if (_paladinHolyNovaCooldownTicks > 0) {
+      _paladinHolyNovaCooldownTicks = math.max(
+        0,
+        _paladinHolyNovaCooldownTicks - gap,
+      );
+    }
     if (player.cooldownTicks > 0) {
       player.cooldownTicks = math.max(0, player.cooldownTicks - gap);
     }
@@ -1075,6 +1122,41 @@ class _OfflineCombatRuntime {
         _skillStates[id] = st.copyWith(
           cooldownTicksRemaining: math.max(0, st.cooldownTicksRemaining - gap),
         );
+      }
+    }
+
+    for (final enemy in _enemies) {
+      if (enemy.shadowMarkTicks > 0) {
+        enemy.shadowMarkTicks = math.max(0, enemy.shadowMarkTicks - gap);
+        enemy.isShadowMarked = enemy.shadowMarkTicks > 0;
+      }
+      if (enemy.shockTicks > 0) {
+        enemy.shockTicks = math.max(0, enemy.shockTicks - gap);
+        enemy.isShocked = enemy.shockTicks > 0;
+      }
+      if (enemy.freezeTicks > 0) {
+        enemy.freezeTicks = math.max(0, enemy.freezeTicks - gap);
+      }
+      if (enemy.eliteSpecialCooldownTicks > 0) {
+        enemy.eliteSpecialCooldownTicks = math.max(
+          0,
+          enemy.eliteSpecialCooldownTicks - gap,
+        );
+      }
+      if (enemy.bossAoECooldownTicks > 0) {
+        enemy.bossAoECooldownTicks = math.max(
+          0,
+          enemy.bossAoECooldownTicks - gap,
+        );
+      }
+      if (enemy.lifeSiphonCooldownTicks > 0) {
+        enemy.lifeSiphonCooldownTicks = math.max(
+          0,
+          enemy.lifeSiphonCooldownTicks - gap,
+        );
+      }
+      if (enemy.elementalWardTicks > 0) {
+        enemy.elementalWardTicks = math.max(0, enemy.elementalWardTicks - gap);
       }
     }
 
@@ -1183,9 +1265,39 @@ class _OfflineCombatRuntime {
       }
     }
 
+    final mechanics = config.difficulty.mechanics;
+    final mechanicsActive = mechanics.isEnabledFor(cycleRank);
     final playerWalking = target != null && !playerInRange;
     for (final enemy in _enemies) {
       if (!enemy.isAlive) continue;
+      if (mechanicsActive) {
+        if (enemy.isElite && enemy.eliteSpecialCooldownTicks == 0) return 0;
+        if (enemy.elementalWardTicks > 0) {
+          gap = math.min(gap, enemy.elementalWardTicks - 1);
+        }
+        if (enemy.isBoss) {
+          if (enemy.isDailyBoss) {
+            if (enemy.bossAoECooldownTicks == 0 &&
+                enemy.distanceTo(player) <= mechanics.dailyBlazingSurgeRadius) {
+              return 0;
+            }
+          } else if (enemy.isWeeklyBoss) {
+            if (enemy.bossAoECooldownTicks == 0 &&
+                enemy.distanceTo(player) <= mechanics.weeklyCataclysmRadius) {
+              return 0;
+            }
+            if (enemy.lifeSiphonCooldownTicks == 0 &&
+                enemy.distanceTo(player) <= enemy.stats.attackRange) {
+              return 0;
+            }
+          } else {
+            if (enemy.bossAoECooldownTicks == 0 &&
+                enemy.distanceTo(player) <= mechanics.bossAoeRadius) {
+              return 0;
+            }
+          }
+        }
+      }
       if (!enemy.aggroed) {
         final distAggro = math.max(
           0.0,
@@ -1295,22 +1407,99 @@ class _OfflineCombatRuntime {
       if (player.cooldownTicks == 0) {
         player.cooldownTicks = _intervalTicks(player.stats.attackSpeed);
         _strike(player, target, defeated: defeated);
+        if (character.activeResonanceClassId == 'gunslinger') {
+          _triggerGunslingerPiercingBeam(player, target, defeated);
+        }
       }
       return;
     }
     _chase(player, target);
   }
 
-  void _updateEnemy(Combatant enemy) {
+  void _updateAllies(List<_DefeatedEnemyRecord> defeated) {
+    _allies.removeWhere((ally) {
+      if (!ally.isAlive) return true;
+      if (ally.lifetimeTicks > 0) {
+        ally.lifetimeTicks--;
+        if (ally.lifetimeTicks <= 0) return true;
+      }
+      return false;
+    });
+
+    for (final ally in List<Combatant>.of(_allies)) {
+      if (!ally.isAlive || playerStatus != PlayerStatus.alive) continue;
+      if (ally.cooldownTicks > 0) ally.cooldownTicks--;
+      final target = targetSelector.select(
+        seeker: ally,
+        candidates: _aliveEnemies,
+      );
+      ally.targetId = target?.id;
+      if (target == null) continue;
+      if (ally.distanceTo(target) <= ally.stats.attackRange) {
+        if (ally.cooldownTicks == 0) {
+          ally.cooldownTicks = _intervalTicks(ally.stats.attackSpeed);
+          _strike(ally, target, defeated: defeated);
+        }
+      } else {
+        _chase(ally, target);
+      }
+    }
+  }
+
+  void _updateEnemy(Combatant enemy, List<_DefeatedEnemyRecord> defeated) {
     if (enemy.cooldownTicks > 0) enemy.cooldownTicks--;
     if (!enemy.isAlive) {
       enemy.aiState = MonsterAiState.dead;
       return;
     }
+
+    // Status efek Weapon Resonance pada musuh
+    if (enemy.shadowMarkTicks > 0) {
+      enemy.shadowMarkTicks--;
+      enemy.isShadowMarked = enemy.shadowMarkTicks > 0;
+    }
+    if (enemy.shockTicks > 0) {
+      enemy.shockTicks--;
+      enemy.isShocked = enemy.shockTicks > 0;
+    }
+    if (enemy.freezeTicks > 0) {
+      enemy.freezeTicks--;
+      return; // Chronomancer Freeze: musuh tidak bergerak/menyerang
+    }
+
     if (enemy.aiState == MonsterAiState.returning) {
       _returnToSpawn(enemy);
       return;
     }
+
+    final mechanics = config.difficulty.mechanics;
+    final mechanicsActive = mechanics.isEnabledFor(cycleRank);
+
+    if (mechanicsActive) {
+      if (enemy.eliteSpecialCooldownTicks > 0) {
+        enemy.eliteSpecialCooldownTicks--;
+      }
+      if (enemy.bossAoECooldownTicks > 0) {
+        enemy.bossAoECooldownTicks--;
+      }
+      if (enemy.lifeSiphonCooldownTicks > 0) {
+        enemy.lifeSiphonCooldownTicks--;
+      }
+      if (enemy.elementalWardTicks > 0) {
+        enemy.elementalWardTicks--;
+      }
+
+      // Berserk / Enrage check (Elite / Boss).
+      if ((enemy.isElite || enemy.isBoss) && !enemy.isEnraged) {
+        final threshold = enemy.isDailyBoss
+            ? mechanics.dailyEnragedRushHpThreshold
+            : mechanics.berserkHpThreshold;
+        if (enemy.hp <= (enemy.stats.maxHp * threshold)) {
+          enemy.isEnraged = true;
+        }
+      }
+    }
+
     if (!enemy.aggroed) {
       if (!player.isAlive || playerStatus != PlayerStatus.alive) return;
       if (enemy.distanceTo(player) > enemy.detectionRange) return;
@@ -1328,11 +1517,104 @@ class _OfflineCombatRuntime {
     }
 
     enemy.targetId = player.id;
+
+    if (mechanicsActive && enemy.isBoss) {
+      if (enemy.isDailyBoss) {
+        // Daily Boss: Elemental Ward
+        if (!enemy.hasTriggeredWard &&
+            enemy.hp <=
+                (enemy.stats.maxHp * mechanics.dailyElementalWardHpThreshold)) {
+          _triggerDailyElementalWard(enemy);
+        }
+        // Daily Boss: Blazing Surge AoE
+        if (player.isAlive &&
+            playerStatus == PlayerStatus.alive &&
+            enemy.bossAoECooldownTicks == 0 &&
+            enemy.distanceTo(player) <= mechanics.dailyBlazingSurgeRadius) {
+          _triggerDailyBlazingSurge(enemy, defeated);
+          return;
+        }
+      } else if (enemy.isWeeklyBoss) {
+        // Weekly Boss: Summon Elite Guards
+        if (!enemy.hasSummonedMinions &&
+            enemy.hp <=
+                (enemy.stats.maxHp * mechanics.weeklySummonHpThreshold)) {
+          _triggerWeeklySummonMinions(enemy);
+        }
+        // Weekly Boss: Final Stand
+        if (!enemy.isFinalStand &&
+            enemy.hp <=
+                (enemy.stats.maxHp * mechanics.weeklyFinalStandHpThreshold)) {
+          _triggerWeeklyFinalStand(enemy);
+        }
+        // Weekly Boss: Cataclysm AoE
+        if (player.isAlive &&
+            playerStatus == PlayerStatus.alive &&
+            enemy.bossAoECooldownTicks == 0 &&
+            enemy.distanceTo(player) <= mechanics.weeklyCataclysmRadius) {
+          _triggerWeeklyCataclysm(enemy, defeated);
+          return;
+        }
+        // Weekly Boss: Life Siphon
+        if (player.isAlive &&
+            playerStatus == PlayerStatus.alive &&
+            enemy.lifeSiphonCooldownTicks == 0 &&
+            enemy.distanceTo(player) <= enemy.stats.attackRange) {
+          _triggerWeeklyLifeSiphon(enemy, defeated);
+          return;
+        }
+      } else {
+        // Standard Dungeon Boss: Summon Minions
+        if (!enemy.hasSummonedMinions &&
+            enemy.hp <= (enemy.stats.maxHp * mechanics.bossSummonHpThreshold)) {
+          _triggerBossSummonMinions(enemy);
+        }
+
+        // Standard Dungeon Boss: Ground Slam / Shockwave AoE
+        if (player.isAlive &&
+            playerStatus == PlayerStatus.alive &&
+            enemy.bossAoECooldownTicks == 0 &&
+            enemy.distanceTo(player) <= mechanics.bossAoeRadius) {
+          _triggerBossGroundSlam(enemy, defeated);
+          return;
+        }
+      }
+    }
+
     if (enemy.distanceTo(player) <= enemy.stats.attackRange) {
       enemy.aiState = MonsterAiState.attack;
       if (enemy.cooldownTicks == 0) {
-        enemy.cooldownTicks = _intervalTicks(enemy.stats.attackSpeed);
-        _strike(enemy, player);
+        var speedMultiplier = 1.0;
+        var multiplier = 1.0;
+        if (enemy.isEnraged && mechanicsActive) {
+          if (enemy.isDailyBoss) {
+            speedMultiplier = mechanics.dailyEnragedRushSpeedMultiplier;
+            multiplier *= mechanics.dailyEnragedRushAtkMultiplier;
+          } else if (enemy.isWeeklyBoss && enemy.isFinalStand) {
+            speedMultiplier = mechanics.weeklyFinalStandSpeedMultiplier;
+            multiplier *= mechanics.weeklyFinalStandAtkMultiplier;
+          } else {
+            speedMultiplier = mechanics.berserkSpeedMultiplier;
+            multiplier *= mechanics.berserkAtkMultiplier;
+          }
+        }
+        final baseTicks = _intervalTicks(enemy.stats.attackSpeed);
+        enemy.cooldownTicks = math.max(
+          1,
+          (baseTicks / speedMultiplier).round(),
+        );
+
+        if (enemy.isElite &&
+            mechanicsActive &&
+            enemy.eliteSpecialCooldownTicks == 0) {
+          enemy.eliteSpecialCooldownTicks =
+              (mechanics.eliteHeavyStrikeCooldownSeconds *
+                      CombatSimulation.ticksPerSecond)
+                  .round();
+          multiplier *= mechanics.eliteHeavyStrikeMultiplier;
+        }
+
+        _strike(enemy, player, multiplier: multiplier, defeated: defeated);
       }
       return;
     }
@@ -1341,6 +1623,281 @@ class _OfflineCombatRuntime {
     if (!_chase(enemy, player)) {
       _startReturning(enemy);
     }
+  }
+
+  void _triggerDailyElementalWard(Combatant boss) {
+    boss.hasTriggeredWard = true;
+    final mechanics = config.difficulty.mechanics;
+    boss.elementalWardTicks =
+        (mechanics.dailyElementalWardDurationSeconds *
+                CombatSimulation.ticksPerSecond)
+            .round();
+    final shieldAmount = (boss.stats.maxHp * 0.10).round();
+    boss.addShield(shieldAmount, max: shieldAmount);
+  }
+
+  void _triggerDailyBlazingSurge(
+    Combatant boss,
+    List<_DefeatedEnemyRecord> defeated,
+  ) {
+    final mechanics = config.difficulty.mechanics;
+    boss.bossAoECooldownTicks =
+        (mechanics.dailyBlazingSurgeCooldownSeconds *
+                CombatSimulation.ticksPerSecond)
+            .round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.dailyBlazingSurgeMultiplier *
+        (boss.isEnraged ? mechanics.dailyEnragedRushAtkMultiplier : 1.0);
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'blazing_surge',
+      defeated: defeated,
+    );
+  }
+
+  void _triggerWeeklySummonMinions(Combatant boss) {
+    boss.hasSummonedMinions = true;
+    final mechanics = config.difficulty.mechanics;
+    final bossDef = _definitions[boss.id];
+    final count = mechanics.weeklySummonCount;
+    final minionDef = _resolveMinionDef(boss, bossDef, isElite: true);
+    final cells = _findMinionCells(boss, count);
+
+    for (final cell in cells) {
+      final minionId = '${boss.id}__guard_${_spawnCounter++}';
+      final minion = Combatant(
+        id: minionId,
+        team: Team.enemy,
+        stats: minionDef.stats,
+        cell: cell,
+        definitionId: minionDef.id,
+        detectionRange: minionDef.detectionRange,
+        leashRange: minionDef.leashRange,
+        isElite: true,
+        isBoss: false,
+      );
+      minion.aggroed = true;
+      minion.targetId = player.id;
+      minion.aiState = MonsterAiState.chase;
+      _enemies.add(minion);
+      _definitions[minionId] = minionDef;
+    }
+  }
+
+  void _triggerWeeklyFinalStand(Combatant boss) {
+    boss.isFinalStand = true;
+    boss.isEnraged = true;
+    final shieldAmount = (boss.stats.maxHp * 0.05).round();
+    boss.addShield(shieldAmount, max: shieldAmount);
+  }
+
+  void _triggerWeeklyCataclysm(
+    Combatant boss,
+    List<_DefeatedEnemyRecord> defeated,
+  ) {
+    final mechanics = config.difficulty.mechanics;
+    boss.bossAoECooldownTicks =
+        (mechanics.weeklyCataclysmCooldownSeconds *
+                CombatSimulation.ticksPerSecond)
+            .round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.weeklyCataclysmMultiplier *
+        (boss.isFinalStand
+            ? mechanics.weeklyFinalStandAtkMultiplier
+            : (boss.isEnraged ? mechanics.berserkAtkMultiplier : 1.0));
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'cataclysm',
+      defeated: defeated,
+    );
+  }
+
+  void _triggerWeeklyLifeSiphon(
+    Combatant boss,
+    List<_DefeatedEnemyRecord> defeated,
+  ) {
+    final mechanics = config.difficulty.mechanics;
+    boss.lifeSiphonCooldownTicks =
+        (mechanics.weeklyLifeSiphonCooldownSeconds *
+                CombatSimulation.ticksPerSecond)
+            .round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.weeklyLifeSiphonMultiplier *
+        (boss.isFinalStand
+            ? mechanics.weeklyFinalStandAtkMultiplier
+            : (boss.isEnraged ? mechanics.berserkAtkMultiplier : 1.0));
+    final prevPlayerHp = player.hp;
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'life_siphon',
+      defeated: defeated,
+    );
+    final dealt = math.max(0, prevPlayerHp - player.hp);
+    if (dealt > 0 && boss.isAlive) {
+      final healAmount = (dealt * mechanics.weeklyLifeSiphonHealRatio).round();
+      boss.heal(healAmount);
+    }
+  }
+
+  void _triggerBossGroundSlam(
+    Combatant boss,
+    List<_DefeatedEnemyRecord> defeated,
+  ) {
+    final mechanics = config.difficulty.mechanics;
+    boss.bossAoECooldownTicks =
+        (mechanics.bossAoeCooldownSeconds * CombatSimulation.ticksPerSecond)
+            .round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.bossAoeMultiplier *
+        (boss.isEnraged ? mechanics.berserkAtkMultiplier : 1.0);
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'ground_slam',
+      defeated: defeated,
+    );
+  }
+
+  void _triggerBossSummonMinions(Combatant boss) {
+    boss.hasSummonedMinions = true;
+    final shieldAmount = (boss.stats.maxHp * 0.08).round();
+    boss.addShield(shieldAmount, max: shieldAmount);
+    final mechanics = config.difficulty.mechanics;
+    final bossDef = _definitions[boss.id];
+    final count = mechanics.bossSummonCount;
+    final minionDef = _resolveMinionDef(boss, bossDef, isElite: false);
+    final cells = _findMinionCells(boss, count);
+
+    for (final cell in cells) {
+      final minionId = '${boss.id}__guard_${_spawnCounter++}';
+      final minion = Combatant(
+        id: minionId,
+        team: Team.enemy,
+        stats: minionDef.stats,
+        cell: cell,
+        definitionId: minionDef.id,
+        detectionRange: minionDef.detectionRange,
+        leashRange: minionDef.leashRange,
+        isElite: false,
+        isBoss: false,
+      );
+      minion.aggroed = true;
+      minion.targetId = player.id;
+      minion.aiState = MonsterAiState.chase;
+      _enemies.add(minion);
+      _definitions[minionId] = minionDef;
+    }
+  }
+
+  List<GridPoint> _findMinionCells(Combatant boss, int count) {
+    const offsets = [
+      (-1, 0),
+      (1, 0),
+      (0, -1),
+      (0, 1),
+      (-1, -1),
+      (1, -1),
+      (-1, 1),
+      (1, 1),
+      (-2, 0),
+      (2, 0),
+      (0, -2),
+      (0, 2),
+    ];
+    final bx = boss.follower.currentCell.x;
+    final by = boss.follower.currentCell.y;
+    final valid = <GridPoint>[];
+    final g = _grid;
+    for (final (dx, dy) in offsets) {
+      final nx = bx + dx;
+      final ny = by + dy;
+      if (g != null && g.inBounds(nx, ny) && g.isWalkable(nx, ny)) {
+        valid.add(GridPoint(nx, ny));
+        if (valid.length >= count) break;
+      }
+    }
+    if (valid.isEmpty) {
+      valid.add(boss.follower.currentCell);
+    }
+    return valid;
+  }
+
+  EnemyDefinition _resolveMinionDef(
+    Combatant boss,
+    EnemyDefinition? bossDef, {
+    bool isElite = false,
+  }) {
+    final hpRatio = isElite ? 0.06 : 0.04;
+    final atkRatio = isElite ? 0.10 : 0.06;
+    final defRatio = isElite ? 0.05 : 0.0;
+
+    if (bossDef != null) {
+      return EnemyDefinition(
+        id: '${bossDef.id}_guard',
+        name: isElite ? '${bossDef.name} Elite Guard' : '${bossDef.name} Guard',
+        level: bossDef.level,
+        stats: CombatStats(
+          maxHp: math.max(10, (bossDef.stats.maxHp * hpRatio).round()),
+          atk: math.max(1, (bossDef.stats.atk * atkRatio).round()),
+          def: (bossDef.stats.def * defRatio).round(),
+          attackSpeed: bossDef.stats.attackSpeed,
+          moveSpeed: bossDef.stats.moveSpeed,
+          attackRange: bossDef.stats.attackRange,
+        ),
+        detectionRange: bossDef.detectionRange,
+        leashRange: bossDef.leashRange,
+        isElite: isElite,
+        isBoss: false,
+        expReward: 0,
+        goldReward: 0,
+        spriteRef: bossDef.spriteRef,
+        spriteTint: bossDef.spriteTint,
+      );
+    }
+
+    return EnemyDefinition(
+      id: '${boss.id}_guard',
+      name: isElite ? 'Boss Elite Guard' : 'Boss Guard',
+      level: 1,
+      stats: CombatStats(
+        maxHp: math.max(
+          10,
+          (boss.stats.maxHp * (isElite ? 0.25 : 0.15)).round(),
+        ),
+        atk: math.max(1, (boss.stats.atk * (isElite ? 0.25 : 0.20)).round()),
+        def: (boss.stats.def * (isElite ? 0.25 : 0.20)).round(),
+        attackSpeed: boss.stats.attackSpeed,
+        moveSpeed: boss.stats.moveSpeed,
+        attackRange: boss.stats.attackRange,
+      ),
+      detectionRange: boss.detectionRange,
+      leashRange: boss.leashRange,
+      isElite: isElite,
+      isBoss: false,
+    );
   }
 
   bool _tryCastSkill(Combatant? target, List<_DefeatedEnemyRecord> defeated) {
@@ -1375,6 +1932,7 @@ class _OfflineCombatRuntime {
       _skillStates[skill.id] = state.triggerCooldown(
         _skillCooldownTicks(skill),
       );
+      _onSkillCastResonanceCheck();
       final effectiveHealPercent =
           (skill.healPercentAt(state.level) * (1.0 + affinityBonus)).clamp(
             0.0,
@@ -1392,6 +1950,7 @@ class _OfflineCombatRuntime {
     if (player.distanceTo(target) > range) return;
 
     _skillStates[skill.id] = state.triggerCooldown(_skillCooldownTicks(skill));
+    _onSkillCastResonanceCheck();
 
     final victims = skill.targetType == SkillTarget.area
         ? _aliveEnemies
@@ -1409,6 +1968,7 @@ class _OfflineCombatRuntime {
         victim,
         multiplier: multiplier,
         damageType: damageType,
+        skillId: skill.id,
         defeated: defeated,
       );
     }
@@ -1419,6 +1979,7 @@ class _OfflineCombatRuntime {
     Combatant target, {
     double multiplier = 1.0,
     SkillDamageType damageType = SkillDamageType.physical,
+    String? skillId,
     List<_DefeatedEnemyRecord>? defeated,
   }) {
     if (playerStatus != PlayerStatus.alive ||
@@ -1428,14 +1989,133 @@ class _OfflineCombatRuntime {
     }
     if (target.invulnerableTicks > 0) return;
 
+    var defenderDef = target.stats.def;
+    var effectiveDamageType = damageType;
+
+    // Voidblade: True damage jika target memiliki Shadow Mark (mengabaikan 100% Armor)
+    final isVoidbladeTrueDamage =
+        attacker.team == Team.player &&
+        character.activeResonanceClassId == 'voidblade' &&
+        (target.isShadowMarked || target.shadowMarkTicks > 0);
+    if (isVoidbladeTrueDamage) {
+      defenderDef = 0;
+      effectiveDamageType = SkillDamageType.trueDamage;
+    }
+
     final result = damageCalculator.roll(
       attacker: attacker.stats,
-      defenderDef: target.stats.def,
+      defenderDef: defenderDef,
       random: random,
       multiplier: multiplier,
-      damageType: damageType,
+      damageType: effectiveDamageType,
     );
-    target.hp = math.max(0, target.hp - result.amount);
+    var finalDamage = result.amount;
+
+    // Stormcaller: Target dengan status Shock menerima +15% damage
+    if (target.isShocked || target.shockTicks > 0) {
+      finalDamage = (finalDamage * 1.15).round();
+    }
+
+    // Voidblade: Serangan kritikal memberi tanda Shadow Mark
+    if (attacker.team == Team.player &&
+        character.activeResonanceClassId == 'voidblade' &&
+        result.isCrit) {
+      target.shadowMarkTicks = (6.0 * CombatSimulation.ticksPerSecond).round();
+      target.isShadowMarked = true;
+    }
+
+    final mechanics = config.difficulty.mechanics;
+    final mechanicsActive = mechanics.isEnabledFor(cycleRank);
+    if (mechanicsActive) {
+      if (target.isElite && !target.isDailyBoss && !target.isWeeklyBoss) {
+        if (target.hp > (target.stats.maxHp * mechanics.stoneskinHpThreshold)) {
+          final reduced =
+              (finalDamage * (1.0 - mechanics.stoneskinDamageReduction))
+                  .round();
+          finalDamage = math.max(1, reduced);
+        }
+      } else if (target.isDailyBoss && target.elementalWardTicks > 0) {
+        final reduced =
+            (finalDamage * (1.0 - mechanics.dailyElementalWardReduction))
+                .round();
+        finalDamage = math.max(1, reduced);
+      } else if (target.isWeeklyBoss && target.isFinalStand) {
+        final reduced =
+            (finalDamage * (1.0 - mechanics.weeklyFinalStandDamageReduction))
+                .round();
+        finalDamage = math.max(1, reduced);
+      }
+    }
+    final unabsorbedDamage = target.absorbDamage(finalDamage);
+    target.hp = math.max(0, target.hp - unabsorbedDamage);
+
+    // Lifesteal (Basic Attack) & Spell Vamp (Skill Damage)
+    if (finalDamage > 0 && attacker.isAlive) {
+      if (skillId == null && attacker.stats.lifesteal > 0) {
+        final healAmount = (finalDamage * attacker.stats.lifesteal).round();
+        if (healAmount > 0) {
+          attacker.heal(healAmount);
+        }
+      } else if (skillId != null && attacker.stats.spellVamp > 0) {
+        final healAmount = (finalDamage * attacker.stats.spellVamp).round();
+        if (healAmount > 0) {
+          attacker.heal(healAmount);
+        }
+      }
+    }
+
+    // Stormcaller: Chain lightning & Shock
+    if (attacker.team == Team.player &&
+        character.activeResonanceClassId == 'stormcaller' &&
+        skillId != 'chain_lightning') {
+      target.shockTicks = (4.0 * CombatSimulation.ticksPerSecond).round();
+      target.isShocked = true;
+      final chainCandidates =
+          _aliveEnemies
+              .where(
+                (e) => !identical(e, target) && target.distanceTo(e) <= 3.0,
+              )
+              .toList()
+            ..sort(
+              (a, b) => target.distanceTo(a).compareTo(target.distanceTo(b)),
+            );
+      for (final extra in chainCandidates.take(2)) {
+        extra.shockTicks = (4.0 * CombatSimulation.ticksPerSecond).round();
+        extra.isShocked = true;
+        _strike(
+          attacker,
+          extra,
+          multiplier: 0.8,
+          damageType: SkillDamageType.magic,
+          skillId: 'chain_lightning',
+          defeated: defeated,
+        );
+      }
+    }
+
+    // Paladin: Holy Nova retaliation saat menerima damage
+    if (identical(target, player) &&
+        character.activeResonanceClassId == 'paladin' &&
+        _paladinHolyNovaCooldownTicks == 0 &&
+        finalDamage > 0) {
+      _paladinHolyNovaCooldownTicks = (3.0 * CombatSimulation.ticksPerSecond)
+          .round();
+      final healAmount = math.max(1, (player.stats.maxHp * 0.05).round());
+      player.heal(healAmount);
+      final inRange = _aliveEnemies
+          .where((e) => player.distanceTo(e) <= 2.0)
+          .toList();
+      for (final enemy in inRange) {
+        _strike(
+          player,
+          enemy,
+          multiplier: 1.0,
+          damageType: SkillDamageType.magic,
+          skillId: 'holy_nova_retaliation',
+          defeated: defeated,
+        );
+      }
+    }
 
     if (!target.isAlive) {
       if (identical(target, player)) {
@@ -1448,6 +2128,11 @@ class _OfflineCombatRuntime {
         final def = _definitions[target.id];
         if (def != null && _processedDeaths.add(target.id)) {
           defeated?.add(_DefeatedEnemyRecord(target.id, def));
+        }
+
+        // Necromancer: Memanggil Shadow Minion saat musuh gugur
+        if (character.activeResonanceClassId == 'necromancer') {
+          _spawnNecromancerMinion(target.follower.currentCell);
         }
       }
     }
@@ -1581,4 +2266,77 @@ class _OfflineCombatRuntime {
 
   int _intervalTicks(double attackSpeed) =>
       math.max(1, (CombatSimulation.ticksPerSecond / attackSpeed).round());
+
+  void _triggerGunslingerPiercingBeam(
+    Combatant attacker,
+    Combatant primaryTarget,
+    List<_DefeatedEnemyRecord> defeated,
+  ) {
+    final px = attacker.x;
+    final py = attacker.y;
+    final tx = primaryTarget.x;
+    final ty = primaryTarget.y;
+    final vx = tx - px;
+    final vy = ty - py;
+    final distTarget = math.sqrt(vx * vx + vy * vy);
+    if (distTarget < 1e-4) return;
+    final ux = vx / distTarget;
+    final uy = vy / distTarget;
+    final maxDist = attacker.stats.attackRange + 1.0;
+
+    for (final enemy in _aliveEnemies) {
+      if (identical(enemy, primaryTarget)) continue;
+      final ex = enemy.x;
+      final ey = enemy.y;
+      final wx = ex - px;
+      final wy = ey - py;
+      final proj = wx * ux + wy * uy;
+      if (proj > 0 && proj <= maxDist) {
+        final perp2 = (wx * wx + wy * wy) - (proj * proj);
+        if (perp2 <= 0.6 * 0.6) {
+          _strike(
+            attacker,
+            enemy,
+            multiplier: 1.0,
+            skillId: 'piercing_beam',
+            damageType: SkillDamageType.physical,
+            defeated: defeated,
+          );
+        }
+      }
+    }
+  }
+
+  void _spawnNecromancerMinion(GridPoint cell) {
+    if (_allies.length >= 2) return;
+    final minionId = 'shadow_minion_${_spawnCounter++}';
+    final minionStats = CombatStats(
+      maxHp: math.max(1, (player.stats.maxHp * 0.5).round()),
+      atk: math.max(1, (player.stats.atk * 0.5).round()),
+      def: (player.stats.def * 0.5).round(),
+      attackSpeed: player.stats.attackSpeed,
+      moveSpeed: player.stats.moveSpeed,
+      attackRange: player.stats.attackRange,
+    );
+    final minion = Combatant(
+      id: minionId,
+      team: Team.player,
+      stats: minionStats,
+      cell: cell,
+    )..lifetimeTicks = (6.0 * CombatSimulation.ticksPerSecond).round();
+    _allies.add(minion);
+  }
+
+  void _onSkillCastResonanceCheck() {
+    if (character.activeResonanceClassId == 'chronomancer') {
+      _chronomancerSkillCasts++;
+      if (_chronomancerSkillCasts % 4 == 0) {
+        for (final enemy in _aliveEnemies) {
+          if (!enemy.isBoss) {
+            enemy.freezeTicks = (2.0 * CombatSimulation.ticksPerSecond).round();
+          }
+        }
+      }
+    }
+  }
 }

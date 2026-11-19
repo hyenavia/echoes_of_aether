@@ -43,6 +43,28 @@ abstract final class GameAssetPaths {
   }
 }
 
+/// Lokasi berkas aset branding resmi Echoes of Aether.
+abstract final class BrandingAssetPaths {
+  static const String appIconFull =
+      'assets/branding/app_icon/app_icon_full.png';
+  static const String logoPrimary =
+      'assets/branding/logo/logo_primary_horizontal.png';
+  static const String logoCompact = 'assets/branding/logo/logo_compact.png';
+  static const String logoWinged = 'assets/branding/logo/logo_winged.png';
+  static const String symbolMark = 'assets/branding/symbol/symbol_mark.png';
+  static const String symbolBadge = 'assets/branding/symbol/symbol_badge.png';
+  static const String logoMonoWhite =
+      'assets/branding/monochrome/logo_mono_white.png';
+  static const String logoMonoDark =
+      'assets/branding/monochrome/logo_mono_dark.png';
+  static const String symbolMonoWhite =
+      'assets/branding/monochrome/symbol_mono_white.png';
+  static const String symbolMonoDark =
+      'assets/branding/monochrome/symbol_mono_dark.png';
+  static const String splashBranding =
+      'assets/branding/splash/splash_branding.png';
+}
+
 /// Spesifikasi visual kelas karakter untuk ilustrasi menu & placeholder vektor.
 @immutable
 class CharacterVisualSpec {

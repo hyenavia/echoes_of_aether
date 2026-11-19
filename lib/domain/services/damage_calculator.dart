@@ -51,7 +51,10 @@ class DamageCalculator {
   }) => switch (damageType) {
     SkillDamageType.physical => physicalDamage(atk, def),
     SkillDamageType.magic => magicDamage(atk, def),
+    SkillDamageType.trueDamage => trueDamage(atk),
   };
+
+  int trueDamage(int atk) => math.max(1, math.min(kMaxDamage, atk));
 
   int physicalDamage(int atk, int def) => switch (formula) {
     DamageFormula.ratio => _calculateRatioDamage(atk, def),

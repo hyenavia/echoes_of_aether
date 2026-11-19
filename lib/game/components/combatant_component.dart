@@ -64,6 +64,7 @@ abstract class CombatantComponent extends PositionComponent {
   final Paint _barBorder = Paint()..color = const Color(0xFF10141A);
   final Paint _barBackground = Paint()..color = const Color(0xFF222933);
   final Paint _barFill = Paint();
+  final Paint _gleamPaint = Paint()..isAntiAlias = false;
 
   double _hitFlashTimer = 0;
   double _attackAnimTimer = 0;
@@ -206,6 +207,22 @@ abstract class CombatantComponent extends PositionComponent {
       );
     }
 
+    // Indikator telegraf serang elite & boss saat menyerang (gleam merah-putih)
+    if (combatant.isAlive && (isBoss || isElite) && _attackAnimTimer > 0) {
+      final gleamY = top - 3.0;
+      final gleamX = size.x / 2;
+      _gleamPaint.color = const Color(0xFFFF5252);
+      canvas.drawRect(
+        Rect.fromLTWH(gleamX - 1.5, gleamY - 1.5, 3, 3),
+        _gleamPaint,
+      );
+      _gleamPaint.color = const Color(0xFFFFFFFF);
+      canvas.drawRect(
+        Rect.fromLTWH(gleamX - 0.5, gleamY - 0.5, 1, 1),
+        _gleamPaint,
+      );
+    }
+
     final sprite = _atlas.combatantSprite(
       isPlayer: combatant.team == Team.player,
       specializationId: spriteSpecializationId,
@@ -264,5 +281,16 @@ abstract class CombatantComponent extends PositionComponent {
       Rect.fromLTWH(barLeft, barTop, barWidth * ratio, barHeight),
       _barFill,
     );
+    if (combatant.shield > 0) {
+      final shieldRatio = (combatant.shield / combatant.stats.maxHp).clamp(
+        0.0,
+        1.0,
+      );
+      final shieldPaint = Paint()..color = const Color(0xFF4DD0E1);
+      canvas.drawRect(
+        Rect.fromLTWH(barLeft, barTop, barWidth * shieldRatio, barHeight),
+        shieldPaint,
+      );
+    }
   }
 }

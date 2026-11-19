@@ -102,6 +102,9 @@ class CurrencyService {
   /// Salinan read-only seluruh saldo mata uang untuk snapshot/persistensi.
   Map<String, int> toSnapshot() => Map<String, int>.unmodifiable(_balances);
 
+  /// Salinan read-only saldo mata uang saat ini.
+  Map<String, int> get balances => toSnapshot();
+
   /// Salinan read-only seluruh ID klaim yang telah diproses.
   Set<String> get claimedIds => Set<String>.unmodifiable(_claimedIds);
 

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../entities/combat_event.dart';
 import '../entities/combat_stats.dart';
 import '../entities/combatant.dart';
+import '../entities/difficulty_config.dart';
 import '../entities/enemy_definition.dart';
 import '../entities/equipment.dart';
 import '../entities/grid_point.dart';
@@ -35,6 +36,9 @@ class CombatSimulation {
     this.targetSelector = const TargetSelector(),
     this.skillSelector = const SkillSelector(),
     this.attackPositionFinder = const AttackPositionFinder(),
+    this.mechanics = const EliteBossMechanicsConfig(),
+    this.cycleRank = 0,
+    this.minionProvider,
   }) : _grid = grid, // ignore: prefer_initializing_formals
        _random = math.Random(seed);
 
@@ -50,16 +54,25 @@ class CombatSimulation {
   final TargetSelector targetSelector;
   final SkillSelector skillSelector;
   final AttackPositionFinder attackPositionFinder;
+  final EliteBossMechanicsConfig mechanics;
+  final int cycleRank;
+  final EnemyDefinition Function(Combatant boss)? minionProvider;
 
   /// Pengaturan auto skill (GDD 2.4): jika false, skill tidak dipakai.
   bool autoSkillEnabled = true;
 
   final math.Random _random;
   final List<Combatant> _enemies = [];
+  final List<Combatant> _allies = [];
   final List<CombatEvent> _events = [];
   final Map<String, EnemyDefinition> _definitions = {};
   int _tick = 0;
   int _spawnCounter = 0;
+
+  /// Id class yang sedang aktif Signature Weapon Resonance-nya (jika ada).
+  String? activeResonanceClassId;
+  int _paladinHolyNovaCooldownTicks = 0;
+  int _chronomancerSkillCasts = 0;
 
   List<SkillDefinition> _skills = const [];
   final Map<String, SkillRuntimeState> _skillStates = {};
@@ -80,6 +93,8 @@ class CombatSimulation {
 
   List<Combatant> get enemies => List.unmodifiable(_enemies);
   Iterable<Combatant> get aliveEnemies => _enemies.where((e) => e.isAlive);
+  List<Combatant> get allies => List.unmodifiable(_allies);
+  Iterable<Combatant> get aliveAllies => _allies.where((a) => a.isAlive);
 
   /// Skill aktif player saat ini.
   List<SkillDefinition> get playerSkills => List.unmodifiable(_skills);
@@ -189,6 +204,7 @@ class CombatSimulation {
     }
     _grid = nextGrid;
     _enemies.clear();
+    _allies.clear();
     _definitions.clear();
     _events.clear();
     _spawnCounter = 0;
@@ -227,6 +243,12 @@ class CombatSimulation {
       isElite: isElite,
       isBoss: isBoss,
     );
+    if (isBoss) {
+      enemy.bossAoECooldownTicks =
+          (mechanics.bossAoeCooldownSeconds * ticksPerSecond).round();
+      enemy.lifeSiphonCooldownTicks =
+          (mechanics.weeklyLifeSiphonCooldownSeconds * ticksPerSecond).round();
+    }
     _enemies.add(enemy);
     _definitions[enemy.id] = definition;
     return enemy;
@@ -256,10 +278,12 @@ class CombatSimulation {
 
     if (_reviveCooldownTicks > 0) _reviveCooldownTicks--;
     if (player.invulnerableTicks > 0) player.invulnerableTicks--;
+    if (_paladinHolyNovaCooldownTicks > 0) _paladinHolyNovaCooldownTicks--;
     _tickSkillCooldowns();
 
     _updatePlayer();
-    for (final enemy in _enemies) {
+    _updateAllies();
+    for (final enemy in List<Combatant>.of(_enemies)) {
       if (_status != PlayerStatus.alive) break;
       if (enemy.isAlive) _updateEnemy(enemy);
     }
@@ -289,16 +313,90 @@ class CombatSimulation {
     _engage(player, target);
   }
 
+  void _updateAllies() {
+    _allies.removeWhere((ally) {
+      if (!ally.isAlive) return true;
+      if (ally.lifetimeTicks > 0) {
+        ally.lifetimeTicks--;
+        if (ally.lifetimeTicks <= 0) return true;
+      }
+      return false;
+    });
+
+    for (final ally in List<Combatant>.of(_allies)) {
+      if (!ally.isAlive || _status != PlayerStatus.alive) continue;
+      _tickCooldown(ally);
+      final target = targetSelector.select(
+        seeker: ally,
+        candidates: aliveEnemies,
+      );
+      ally.targetId = target?.id;
+      if (target == null) continue;
+      _engage(ally, target);
+    }
+  }
+
   void _updateEnemy(Combatant enemy) {
     _tickCooldown(enemy);
     if (!enemy.isAlive) {
       enemy.aiState = MonsterAiState.dead;
       return;
     }
+
+    // Status efek Weapon Resonance pada musuh
+    if (enemy.shadowMarkTicks > 0) {
+      enemy.shadowMarkTicks--;
+      enemy.isShadowMarked = enemy.shadowMarkTicks > 0;
+    }
+    if (enemy.shockTicks > 0) {
+      enemy.shockTicks--;
+      enemy.isShocked = enemy.shockTicks > 0;
+    }
+    if (enemy.freezeTicks > 0) {
+      enemy.freezeTicks--;
+      return; // Chronomancer Timestop Freeze: musuh diam dan tidak bisa bergerak/menyerang
+    }
+
     if (enemy.aiState == MonsterAiState.returning) {
       _returnToSpawn(enemy);
       return;
     }
+
+    final mechanicsActive = mechanics.isEnabledFor(cycleRank);
+    if (mechanicsActive) {
+      if (enemy.eliteSpecialCooldownTicks > 0) {
+        enemy.eliteSpecialCooldownTicks--;
+      }
+      if (enemy.bossAoECooldownTicks > 0) {
+        enemy.bossAoECooldownTicks--;
+      }
+      if (enemy.lifeSiphonCooldownTicks > 0) {
+        enemy.lifeSiphonCooldownTicks--;
+      }
+      if (enemy.elementalWardTicks > 0) {
+        enemy.elementalWardTicks--;
+      }
+
+      // Berserk / Enrage check (Elite / Boss).
+      if ((enemy.isElite || enemy.isBoss) && !enemy.isEnraged) {
+        final threshold = enemy.isDailyBoss
+            ? mechanics.dailyEnragedRushHpThreshold
+            : mechanics.berserkHpThreshold;
+        if (enemy.hp <= (enemy.stats.maxHp * threshold)) {
+          enemy.isEnraged = true;
+          final msg = enemy.isDailyBoss ? 'ENRAGED RUSH!' : 'BERSERK!';
+          _events.add(
+            EnemySpecialEvent(
+              _tick,
+              enemyId: enemy.id,
+              specialType: EnemySpecialType.berserk,
+              message: msg,
+            ),
+          );
+        }
+      }
+    }
+
     if (!enemy.aggroed) {
       if (!player.isAlive || _status != PlayerStatus.alive) return;
       if (enemy.distanceTo(player) > enemy.detectionRange) return;
@@ -316,6 +414,70 @@ class CombatSimulation {
     }
 
     enemy.targetId = player.id;
+
+    if (mechanicsActive && enemy.isBoss) {
+      if (enemy.isDailyBoss) {
+        // Daily Boss: Elemental Ward
+        if (!enemy.hasTriggeredWard &&
+            enemy.hp <=
+                (enemy.stats.maxHp * mechanics.dailyElementalWardHpThreshold)) {
+          _triggerDailyElementalWard(enemy);
+        }
+        // Daily Boss: Blazing Surge AoE
+        if (player.isAlive &&
+            _status == PlayerStatus.alive &&
+            enemy.bossAoECooldownTicks == 0 &&
+            enemy.distanceTo(player) <= mechanics.dailyBlazingSurgeRadius) {
+          _triggerDailyBlazingSurge(enemy);
+          return;
+        }
+      } else if (enemy.isWeeklyBoss) {
+        // Weekly Boss: Summon Elite Reinforcements
+        if (!enemy.hasSummonedMinions &&
+            enemy.hp <=
+                (enemy.stats.maxHp * mechanics.weeklySummonHpThreshold)) {
+          _triggerWeeklySummonMinions(enemy);
+        }
+        // Weekly Boss: Final Stand
+        if (!enemy.isFinalStand &&
+            enemy.hp <=
+                (enemy.stats.maxHp * mechanics.weeklyFinalStandHpThreshold)) {
+          _triggerWeeklyFinalStand(enemy);
+        }
+        // Weekly Boss: Cataclysm AoE
+        if (player.isAlive &&
+            _status == PlayerStatus.alive &&
+            enemy.bossAoECooldownTicks == 0 &&
+            enemy.distanceTo(player) <= mechanics.weeklyCataclysmRadius) {
+          _triggerWeeklyCataclysm(enemy);
+          return;
+        }
+        // Weekly Boss: Life Siphon
+        if (player.isAlive &&
+            _status == PlayerStatus.alive &&
+            enemy.lifeSiphonCooldownTicks == 0 &&
+            enemy.distanceTo(player) <= enemy.stats.attackRange) {
+          _triggerWeeklyLifeSiphon(enemy);
+          return;
+        }
+      } else {
+        // Standard Dungeon Boss Summon Minions check.
+        if (!enemy.hasSummonedMinions &&
+            enemy.hp <= (enemy.stats.maxHp * mechanics.bossSummonHpThreshold)) {
+          _triggerBossSummonMinions(enemy);
+        }
+
+        // Standard Dungeon Boss Ground Slam / Shockwave AoE check.
+        if (player.isAlive &&
+            _status == PlayerStatus.alive &&
+            enemy.bossAoECooldownTicks == 0 &&
+            enemy.distanceTo(player) <= mechanics.bossAoeRadius) {
+          _triggerBossGroundSlam(enemy);
+          return;
+        }
+      }
+    }
+
     if (enemy.distanceTo(player) <= enemy.stats.attackRange) {
       enemy.aiState = MonsterAiState.attack;
       if (enemy.cooldownTicks == 0) _attack(enemy, player);
@@ -326,6 +488,341 @@ class CombatSimulation {
     if (!_chase(enemy, player)) {
       _startReturning(enemy);
     }
+  }
+
+  void _triggerDailyElementalWard(Combatant boss) {
+    boss.hasTriggeredWard = true;
+    boss.elementalWardTicks =
+        (mechanics.dailyElementalWardDurationSeconds * ticksPerSecond).round();
+    final shieldAmount = (boss.stats.maxHp * 0.10).round();
+    boss.addShield(shieldAmount, max: shieldAmount);
+    _events.add(
+      ShieldEvent(
+        _tick,
+        targetId: boss.id,
+        shieldRemaining: boss.shield,
+        absorbedDamage: 0,
+      ),
+    );
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.elementalWard,
+        message: 'ELEMENTAL WARD!',
+      ),
+    );
+  }
+
+  void _triggerDailyBlazingSurge(Combatant boss) {
+    boss.bossAoECooldownTicks =
+        (mechanics.dailyBlazingSurgeCooldownSeconds * ticksPerSecond).round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.dailyBlazingSurgeMultiplier *
+        (boss.isEnraged ? mechanics.dailyEnragedRushAtkMultiplier : 1.0);
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'blazing_surge',
+      damageType: SkillDamageType.physical,
+    );
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.blazingSurge,
+        message: 'BLAZING SURGE!',
+      ),
+    );
+  }
+
+  void _triggerWeeklySummonMinions(Combatant boss) {
+    boss.hasSummonedMinions = true;
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.summonMinions,
+        message: 'SUMMON ELITE GUARDS!',
+      ),
+    );
+
+    final bossDef = _definitions[boss.id];
+    final minionDef = _resolveMinionDefinition(boss, bossDef, isElite: true);
+    final count = mechanics.weeklySummonCount;
+    final cells = _findMinionSpawnCells(boss, count);
+
+    for (final cell in cells) {
+      final minionId = '${boss.id}__guard_${_spawnCounter++}';
+      final minion = spawnEnemy(
+        minionDef,
+        cell,
+        id: minionId,
+        isEliteOverride: true,
+        isBossOverride: false,
+      );
+      minion.aggroed = true;
+      minion.targetId = player.id;
+      minion.aiState = MonsterAiState.chase;
+    }
+  }
+
+  void _triggerWeeklyFinalStand(Combatant boss) {
+    boss.isFinalStand = true;
+    boss.isEnraged = true;
+    final shieldAmount = (boss.stats.maxHp * 0.05).round();
+    boss.addShield(shieldAmount, max: shieldAmount);
+    _events.add(
+      ShieldEvent(
+        _tick,
+        targetId: boss.id,
+        shieldRemaining: boss.shield,
+        absorbedDamage: 0,
+      ),
+    );
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.finalStand,
+        message: 'FINAL STAND!',
+      ),
+    );
+  }
+
+  void _triggerWeeklyCataclysm(Combatant boss) {
+    boss.bossAoECooldownTicks =
+        (mechanics.weeklyCataclysmCooldownSeconds * ticksPerSecond).round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.weeklyCataclysmMultiplier *
+        (boss.isFinalStand
+            ? mechanics.weeklyFinalStandAtkMultiplier
+            : (boss.isEnraged ? mechanics.berserkAtkMultiplier : 1.0));
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'cataclysm',
+      damageType: SkillDamageType.physical,
+    );
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.cataclysm,
+        message: 'CATACLYSM!',
+      ),
+    );
+  }
+
+  void _triggerWeeklyLifeSiphon(Combatant boss) {
+    boss.lifeSiphonCooldownTicks =
+        (mechanics.weeklyLifeSiphonCooldownSeconds * ticksPerSecond).round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.weeklyLifeSiphonMultiplier *
+        (boss.isFinalStand
+            ? mechanics.weeklyFinalStandAtkMultiplier
+            : (boss.isEnraged ? mechanics.berserkAtkMultiplier : 1.0));
+    final prevPlayerHp = player.hp;
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'life_siphon',
+      damageType: SkillDamageType.physical,
+    );
+    final dealt = math.max(0, prevPlayerHp - player.hp);
+    if (dealt > 0 && boss.isAlive) {
+      final healAmount = (dealt * mechanics.weeklyLifeSiphonHealRatio).round();
+      boss.heal(healAmount);
+      _events.add(
+        HealEvent(
+          _tick,
+          targetId: boss.id,
+          amount: healAmount,
+          skillId: 'life_siphon',
+        ),
+      );
+    }
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.lifeSiphon,
+        message: 'LIFE SIPHON!',
+      ),
+    );
+  }
+
+  void _triggerBossGroundSlam(Combatant boss) {
+    boss.bossAoECooldownTicks =
+        (mechanics.bossAoeCooldownSeconds * ticksPerSecond).round();
+    boss.cooldownTicks = math.max(
+      boss.cooldownTicks,
+      _intervalTicks(boss.stats.attackSpeed),
+    );
+    final multiplier =
+        mechanics.bossAoeMultiplier *
+        (boss.isEnraged ? mechanics.berserkAtkMultiplier : 1.0);
+    _strike(
+      boss,
+      player,
+      multiplier: multiplier,
+      skillId: 'ground_slam',
+      damageType: SkillDamageType.physical,
+    );
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.groundSlam,
+        message: 'SHOCKWAVE!',
+      ),
+    );
+  }
+
+  void _triggerBossSummonMinions(Combatant boss) {
+    boss.hasSummonedMinions = true;
+    final shieldAmount = (boss.stats.maxHp * 0.08).round();
+    boss.addShield(shieldAmount, max: shieldAmount);
+    _events.add(
+      ShieldEvent(
+        _tick,
+        targetId: boss.id,
+        shieldRemaining: boss.shield,
+        absorbedDamage: 0,
+      ),
+    );
+    _events.add(
+      EnemySpecialEvent(
+        _tick,
+        enemyId: boss.id,
+        specialType: EnemySpecialType.summonMinions,
+        message: 'SUMMON GUARDS!',
+      ),
+    );
+
+    final bossDef = _definitions[boss.id];
+    final minionDef = _resolveMinionDefinition(boss, bossDef);
+    final count = mechanics.bossSummonCount;
+    final cells = _findMinionSpawnCells(boss, count);
+
+    for (final cell in cells) {
+      final minionId = '${boss.id}__guard_${_spawnCounter++}';
+      final minion = spawnEnemy(
+        minionDef,
+        cell,
+        id: minionId,
+        isEliteOverride: false,
+        isBossOverride: false,
+      );
+      minion.aggroed = true;
+      minion.targetId = player.id;
+      minion.aiState = MonsterAiState.chase;
+    }
+  }
+
+  EnemyDefinition _resolveMinionDefinition(
+    Combatant boss,
+    EnemyDefinition? bossDef, {
+    bool isElite = false,
+  }) {
+    final provided = minionProvider?.call(boss);
+    if (provided != null) return provided;
+
+    final hpRatio = isElite ? 0.06 : 0.04;
+    final atkRatio = isElite ? 0.10 : 0.06;
+    final defRatio = isElite ? 0.05 : 0.0;
+
+    if (bossDef != null) {
+      return EnemyDefinition(
+        id: '${bossDef.id}_guard',
+        name: isElite ? '${bossDef.name} Elite Guard' : '${bossDef.name} Guard',
+        level: bossDef.level,
+        stats: CombatStats(
+          maxHp: math.max(10, (bossDef.stats.maxHp * hpRatio).round()),
+          atk: math.max(1, (bossDef.stats.atk * atkRatio).round()),
+          def: (bossDef.stats.def * defRatio).round(),
+          attackSpeed: bossDef.stats.attackSpeed,
+          moveSpeed: bossDef.stats.moveSpeed,
+          attackRange: bossDef.stats.attackRange,
+        ),
+        detectionRange: bossDef.detectionRange,
+        leashRange: bossDef.leashRange,
+        isElite: isElite,
+        isBoss: false,
+        expReward: 0,
+        goldReward: 0,
+        spriteRef: bossDef.spriteRef,
+        spriteTint: bossDef.spriteTint,
+      );
+    }
+
+    return EnemyDefinition(
+      id: '${boss.id}_guard',
+      name: isElite ? 'Boss Elite Guard' : 'Boss Guard',
+      level: 1,
+      stats: CombatStats(
+        maxHp: math.max(
+          10,
+          (boss.stats.maxHp * (isElite ? 0.25 : 0.15)).round(),
+        ),
+        atk: math.max(1, (boss.stats.atk * (isElite ? 0.25 : 0.20)).round()),
+        def: (boss.stats.def * (isElite ? 0.25 : 0.20)).round(),
+        attackSpeed: boss.stats.attackSpeed,
+        moveSpeed: boss.stats.moveSpeed,
+        attackRange: boss.stats.attackRange,
+      ),
+      detectionRange: boss.detectionRange,
+      leashRange: boss.leashRange,
+      isElite: isElite,
+      isBoss: false,
+    );
+  }
+
+  List<GridPoint> _findMinionSpawnCells(Combatant boss, int count) {
+    const offsets = [
+      (-1, 0),
+      (1, 0),
+      (0, -1),
+      (0, 1),
+      (-1, -1),
+      (1, -1),
+      (-1, 1),
+      (1, 1),
+      (-2, 0),
+      (2, 0),
+      (0, -2),
+      (0, 2),
+    ];
+    final bx = boss.follower.currentCell.x;
+    final by = boss.follower.currentCell.y;
+    final valid = <GridPoint>[];
+    for (final (dx, dy) in offsets) {
+      final nx = bx + dx;
+      final ny = by + dy;
+      if (grid.inBounds(nx, ny) && grid.isWalkable(nx, ny)) {
+        valid.add(GridPoint(nx, ny));
+        if (valid.length >= count) break;
+      }
+    }
+    if (valid.isEmpty) {
+      valid.add(boss.follower.currentCell);
+    }
+    return valid;
   }
 
   void _startReturning(Combatant enemy) {
@@ -388,7 +885,11 @@ class CombatSimulation {
         mover.follower.setPath(path);
       }
     }
-    mover.follower.advance(mover.stats.moveSpeed * tickSeconds);
+    final speedMultiplier =
+        (mover.isEnraged && mechanics.isEnabledFor(cycleRank)) ? 1.25 : 1.0;
+    mover.follower.advance(
+      mover.stats.moveSpeed * speedMultiplier * tickSeconds,
+    );
     return true;
   }
 
@@ -411,8 +912,51 @@ class CombatSimulation {
   // ---- Serangan dasar ----
 
   void _attack(Combatant attacker, Combatant target) {
-    attacker.cooldownTicks = _intervalTicks(attacker.stats.attackSpeed);
-    _strike(attacker, target);
+    final mechanicsActive = mechanics.isEnabledFor(cycleRank);
+    var speedMultiplier = 1.0;
+    var multiplier = 1.0;
+    if (attacker.team == Team.enemy && attacker.isEnraged && mechanicsActive) {
+      if (attacker.isDailyBoss) {
+        speedMultiplier = mechanics.dailyEnragedRushSpeedMultiplier;
+        multiplier *= mechanics.dailyEnragedRushAtkMultiplier;
+      } else if (attacker.isWeeklyBoss && attacker.isFinalStand) {
+        speedMultiplier = mechanics.weeklyFinalStandSpeedMultiplier;
+        multiplier *= mechanics.weeklyFinalStandAtkMultiplier;
+      } else {
+        speedMultiplier = mechanics.berserkSpeedMultiplier;
+        multiplier *= mechanics.berserkAtkMultiplier;
+      }
+    }
+    final baseTicks = _intervalTicks(attacker.stats.attackSpeed);
+    attacker.cooldownTicks = math.max(1, (baseTicks / speedMultiplier).round());
+
+    String? skillId;
+    if (attacker.team == Team.enemy &&
+        attacker.isElite &&
+        mechanicsActive &&
+        attacker.eliteSpecialCooldownTicks == 0) {
+      attacker.eliteSpecialCooldownTicks =
+          (mechanics.eliteHeavyStrikeCooldownSeconds * ticksPerSecond).round();
+      multiplier *= mechanics.eliteHeavyStrikeMultiplier;
+      skillId = 'heavy_strike';
+      _events.add(
+        EnemySpecialEvent(
+          _tick,
+          enemyId: attacker.id,
+          specialType: EnemySpecialType.heavyStrike,
+          message: 'HEAVY STRIKE!',
+        ),
+      );
+    }
+
+    _strike(attacker, target, multiplier: multiplier, skillId: skillId);
+
+    // Gunslinger: Serangan dasar menembus seluruh monster dalam garis lurus
+    if (attacker.team == Team.player &&
+        activeResonanceClassId == 'gunslinger' &&
+        skillId == null) {
+      _triggerGunslingerPiercingBeam(attacker, target, multiplier);
+    }
   }
 
   /// Satu pukulan (serangan dasar atau bagian dari skill).
@@ -443,27 +987,227 @@ class CombatSimulation {
       return;
     }
 
+    var defenderDef = target.stats.def;
+    var effectiveDamageType = damageType;
+
+    // Voidblade: True damage jika target memiliki Shadow Mark (mengabaikan 100% Armor)
+    final isVoidbladeTrueDamage =
+        attacker.team == Team.player &&
+        activeResonanceClassId == 'voidblade' &&
+        (target.isShadowMarked || target.shadowMarkTicks > 0);
+    if (isVoidbladeTrueDamage) {
+      defenderDef = 0;
+      effectiveDamageType = SkillDamageType.trueDamage;
+    }
+
     final result = damageCalculator.roll(
       attacker: attacker.stats,
-      defenderDef: target.stats.def,
+      defenderDef: defenderDef,
       random: _random,
       multiplier: multiplier,
-      damageType: damageType,
+      damageType: effectiveDamageType,
     );
-    target.hp = math.max(0, target.hp - result.amount);
+
+    var finalDamage = result.amount;
+
+    // Stormcaller: Target dengan status Shock menerima +15% damage
+    if (target.isShocked || target.shockTicks > 0) {
+      finalDamage = (finalDamage * 1.15).round();
+    }
+
+    // Voidblade: Serangan kritikal memberi tanda Shadow Mark
+    if (attacker.team == Team.player &&
+        activeResonanceClassId == 'voidblade' &&
+        result.isCrit) {
+      target.shadowMarkTicks = (6.0 * ticksPerSecond).round(); // 120 ticks = 6s
+      target.isShadowMarked = true;
+      _events.add(
+        WeaponResonanceEvent(
+          _tick,
+          resonanceClassId: 'voidblade',
+          trigger: WeaponResonanceTrigger.voidbladeShadowMark,
+          targetId: target.id,
+          message: 'SHADOW MARK!',
+        ),
+      );
+    }
+    if (isVoidbladeTrueDamage) {
+      _events.add(
+        WeaponResonanceEvent(
+          _tick,
+          resonanceClassId: 'voidblade',
+          trigger: WeaponResonanceTrigger.voidbladeTrueDamage,
+          targetId: target.id,
+          value: finalDamage,
+          message: 'TRUE DAMAGE!',
+        ),
+      );
+    }
+    final mechanicsActive = mechanics.isEnabledFor(cycleRank);
+    if (mechanicsActive) {
+      if (target.isElite && !target.isDailyBoss && !target.isWeeklyBoss) {
+        if (target.hp > (target.stats.maxHp * mechanics.stoneskinHpThreshold)) {
+          final reduced =
+              (finalDamage * (1.0 - mechanics.stoneskinDamageReduction))
+                  .round();
+          finalDamage = math.max(1, reduced);
+        }
+      } else if (target.isDailyBoss && target.elementalWardTicks > 0) {
+        final reduced =
+            (finalDamage * (1.0 - mechanics.dailyElementalWardReduction))
+                .round();
+        finalDamage = math.max(1, reduced);
+      } else if (target.isWeeklyBoss && target.isFinalStand) {
+        final reduced =
+            (finalDamage * (1.0 - mechanics.weeklyFinalStandDamageReduction))
+                .round();
+        finalDamage = math.max(1, reduced);
+      }
+    }
+
+    final unabsorbedDamage = target.absorbDamage(finalDamage);
+    final absorbedByShield = finalDamage - unabsorbedDamage;
+    if (absorbedByShield > 0) {
+      _events.add(
+        ShieldEvent(
+          _tick,
+          targetId: target.id,
+          shieldRemaining: target.shield,
+          absorbedDamage: absorbedByShield,
+        ),
+      );
+    }
+    target.hp = math.max(0, target.hp - unabsorbedDamage);
+
+    // Lifesteal (Basic Attack) & Spell Vamp (Skill Damage)
+    if (finalDamage > 0 && attacker.isAlive) {
+      if (skillId == null && attacker.stats.lifesteal > 0) {
+        final healAmount = (finalDamage * attacker.stats.lifesteal).round();
+        if (healAmount > 0) {
+          final hpBefore = attacker.hp;
+          attacker.heal(healAmount);
+          final actualHealed = attacker.hp - hpBefore;
+          if (actualHealed > 0) {
+            _events.add(
+              HealEvent(
+                _tick,
+                targetId: attacker.id,
+                amount: actualHealed,
+                skillId: 'lifesteal',
+              ),
+            );
+          }
+        }
+      } else if (skillId != null && attacker.stats.spellVamp > 0) {
+        final healAmount = (finalDamage * attacker.stats.spellVamp).round();
+        if (healAmount > 0) {
+          final hpBefore = attacker.hp;
+          attacker.heal(healAmount);
+          final actualHealed = attacker.hp - hpBefore;
+          if (actualHealed > 0) {
+            _events.add(
+              HealEvent(
+                _tick,
+                targetId: attacker.id,
+                amount: actualHealed,
+                skillId: 'spell_vamp',
+              ),
+            );
+          }
+        }
+      }
+    }
 
     _events.add(
       AttackEvent(
         _tick,
         attackerId: attacker.id,
         targetId: target.id,
-        damage: result.amount,
+        damage: finalDamage,
         isCrit: result.isCrit,
         targetHpAfter: target.hp,
         skillId: skillId,
         damageType: result.damageType,
       ),
     );
+
+    // Stormcaller: Serangan petir menyambar ke +2 musuh tambahan & menyebabkan Shock
+    if (attacker.team == Team.player &&
+        activeResonanceClassId == 'stormcaller' &&
+        skillId != 'chain_lightning') {
+      target.shockTicks = (4.0 * ticksPerSecond).round();
+      target.isShocked = true;
+      final chainCandidates =
+          aliveEnemies
+              .where(
+                (e) => !identical(e, target) && target.distanceTo(e) <= 3.0,
+              )
+              .toList()
+            ..sort(
+              (a, b) => target.distanceTo(a).compareTo(target.distanceTo(b)),
+            );
+      for (final extra in chainCandidates.take(2)) {
+        extra.shockTicks = (4.0 * ticksPerSecond).round();
+        extra.isShocked = true;
+        _strike(
+          attacker,
+          extra,
+          multiplier: 0.8,
+          damageType: SkillDamageType.magic,
+          skillId: 'chain_lightning',
+        );
+      }
+      _events.add(
+        WeaponResonanceEvent(
+          _tick,
+          resonanceClassId: 'stormcaller',
+          trigger: WeaponResonanceTrigger.stormcallerChainLightning,
+          targetId: target.id,
+          message: 'CHAIN LIGHTNING!',
+        ),
+      );
+    }
+
+    // Paladin: Holy Nova retaliation saat menerima damage
+    if (identical(target, player) &&
+        activeResonanceClassId == 'paladin' &&
+        _paladinHolyNovaCooldownTicks == 0 &&
+        finalDamage > 0) {
+      _paladinHolyNovaCooldownTicks = (3.0 * ticksPerSecond).round();
+      final healAmount = math.max(1, (player.stats.maxHp * 0.05).round());
+      player.heal(healAmount);
+      _events.add(
+        HealEvent(
+          _tick,
+          targetId: player.id,
+          amount: healAmount,
+          skillId: 'holy_nova',
+        ),
+      );
+      final novaDamage = math.max(1, (player.stats.def * 0.35).round());
+      final inRange = aliveEnemies
+          .where((e) => player.distanceTo(e) <= 2.0)
+          .toList();
+      for (final enemy in inRange) {
+        _strike(
+          player,
+          enemy,
+          multiplier: 1.0,
+          damageType: SkillDamageType.magic,
+          skillId: 'holy_nova_retaliation',
+        );
+      }
+      _events.add(
+        WeaponResonanceEvent(
+          _tick,
+          resonanceClassId: 'paladin',
+          trigger: WeaponResonanceTrigger.paladinHolyNova,
+          value: novaDamage,
+          message: 'HOLY NOVA!',
+        ),
+      );
+    }
+
     if (!target.isAlive) {
       _events.add(DeathEvent(_tick, target.id));
       if (identical(target, player)) {
@@ -476,6 +1220,11 @@ class CombatSimulation {
         final definition = _definitions[target.id];
         if (definition != null) {
           _events.add(EnemyDefeatedEvent(_tick, target.id, definition));
+        }
+
+        // Necromancer: Memanggil Shadow Minion saat musuh gugur
+        if (activeResonanceClassId == 'necromancer') {
+          _spawnNecromancerMinion(target.follower.currentCell);
         }
       }
     }
@@ -518,6 +1267,7 @@ class CombatSimulation {
       _events.add(
         SkillCastEvent(_tick, casterId: player.id, skillId: skill.id),
       );
+      _onSkillCastResonanceCheck();
       final before = player.hp;
       final effectiveHealPercent =
           (skill.healPercentAt(state.level) * (1.0 + affinityBonus)).clamp(
@@ -545,6 +1295,7 @@ class CombatSimulation {
 
     _skillStates[skill.id] = state.triggerCooldown(_skillCooldownTicks(skill));
     _events.add(SkillCastEvent(_tick, casterId: player.id, skillId: skill.id));
+    _onSkillCastResonanceCheck();
 
     final victims = skill.targetType == SkillTarget.area
         ? aliveEnemies
@@ -643,5 +1394,105 @@ class CombatSimulation {
 
   void _tickCooldown(Combatant c) {
     if (c.cooldownTicks > 0) c.cooldownTicks--;
+  }
+
+  void _triggerGunslingerPiercingBeam(
+    Combatant attacker,
+    Combatant primaryTarget,
+    double multiplier,
+  ) {
+    final px = attacker.x;
+    final py = attacker.y;
+    final tx = primaryTarget.x;
+    final ty = primaryTarget.y;
+    final vx = tx - px;
+    final vy = ty - py;
+    final distTarget = math.sqrt(vx * vx + vy * vy);
+    if (distTarget < 1e-4) return;
+    final ux = vx / distTarget;
+    final uy = vy / distTarget;
+    final maxDist = attacker.stats.attackRange + 1.0;
+
+    for (final enemy in aliveEnemies) {
+      if (identical(enemy, primaryTarget)) continue;
+      final ex = enemy.x;
+      final ey = enemy.y;
+      final wx = ex - px;
+      final wy = ey - py;
+      final proj = wx * ux + wy * uy;
+      if (proj > 0 && proj <= maxDist) {
+        final perp2 = (wx * wx + wy * wy) - (proj * proj);
+        if (perp2 <= 0.6 * 0.6) {
+          _strike(
+            attacker,
+            enemy,
+            multiplier: multiplier,
+            skillId: 'piercing_beam',
+            damageType: SkillDamageType.physical,
+          );
+          _events.add(
+            WeaponResonanceEvent(
+              _tick,
+              resonanceClassId: 'gunslinger',
+              trigger: WeaponResonanceTrigger.gunslingerPiercing,
+              targetId: enemy.id,
+              message: 'PIERCING BEAM!',
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _spawnNecromancerMinion(GridPoint cell) {
+    if (_allies.length >= 2) return;
+    final minionId = 'shadow_minion_${_spawnCounter++}';
+    final minionStats = CombatStats(
+      maxHp: math.max(1, (player.stats.maxHp * 0.5).round()),
+      atk: math.max(1, (player.stats.atk * 0.5).round()),
+      def: (player.stats.def * 0.5).round(),
+      attackSpeed: player.stats.attackSpeed,
+      moveSpeed: player.stats.moveSpeed,
+      attackRange: player.stats.attackRange,
+    );
+    final minion = Combatant(
+      id: minionId,
+      team: Team.player,
+      stats: minionStats,
+      cell: cell,
+    )..lifetimeTicks = (6.0 * ticksPerSecond).round(); // 120 ticks = 6s
+    _allies.add(minion);
+    _events.add(
+      WeaponResonanceEvent(
+        _tick,
+        resonanceClassId: 'necromancer',
+        trigger: WeaponResonanceTrigger.necromancerShadowMinion,
+        targetId: minionId,
+        message: 'SHADOW MINION RISES!',
+      ),
+    );
+  }
+
+  void _onSkillCastResonanceCheck() {
+    if (activeResonanceClassId == 'chronomancer') {
+      _chronomancerSkillCasts++;
+      if (_chronomancerSkillCasts % 4 == 0) {
+        for (final enemy in aliveEnemies) {
+          if (!enemy.isBoss) {
+            enemy.freezeTicks = (2.0 * ticksPerSecond)
+                .round(); // 40 ticks = 2.0s
+          }
+        }
+        _events.add(
+          WeaponResonanceEvent(
+            _tick,
+            resonanceClassId: 'chronomancer',
+            trigger: WeaponResonanceTrigger.chronomancerFreeze,
+            value: (2.0 * ticksPerSecond).round(),
+            message: 'TIMESTOP FREEZE!',
+          ),
+        );
+      }
+    }
   }
 }

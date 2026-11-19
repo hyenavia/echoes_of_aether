@@ -30,6 +30,7 @@ class CharacterIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spec = CharacterVisualSpec.resolve(specializationId);
+    final spriteAsset = 'assets/char/frames/hero_${spec.classId}_idle0.png';
 
     return Semantics(
       image: true,
@@ -40,18 +41,76 @@ class CharacterIllustration extends StatelessWidget {
         height: height,
         child: GameAssetRegistry.hasRasterAsset(spec.assetPath)
             ? Image.asset(spec.assetPath, fit: BoxFit.contain)
-            : RepaintBoundary(
-                child: CustomPaint(
-                  painter: _CharacterIllustrationPainter(
-                    spec: spec,
-                    showPedestal: showPedestal,
-                    showAura: showAura,
+            : Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (showAura || showPedestal)
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _CharacterBackdropPainter(
+                            spec: spec,
+                            showPedestal: showPedestal,
+                            showAura: showAura,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    bottom: showPedestal ? height * 0.10 : height * 0.05,
+                    top: showPedestal ? height * 0.08 : height * 0.05,
+                    child: Image.asset(
+                      spriteAsset,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.none,
+                      errorBuilder: (context, error, stackTrace) {
+                        return RepaintBoundary(
+                          child: CustomPaint(
+                            size: Size(width, height),
+                            painter: _CharacterIllustrationPainter(
+                              spec: spec,
+                              showPedestal: showPedestal,
+                              showAura: showAura,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
               ),
       ),
     );
   }
+}
+
+class _CharacterBackdropPainter extends CustomPainter {
+  const _CharacterBackdropPainter({
+    required this.spec,
+    required this.showPedestal,
+    required this.showAura,
+  });
+
+  final CharacterVisualSpec spec;
+  final bool showPedestal;
+  final bool showAura;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width * 0.5;
+    if (showAura) {
+      _CharacterIllustrationPainter.paintAura(canvas, size, cx, spec);
+    }
+    if (showPedestal) {
+      _CharacterIllustrationPainter.paintPedestal(canvas, size, cx, spec);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CharacterBackdropPainter oldDelegate) =>
+      oldDelegate.spec.classId != spec.classId ||
+      oldDelegate.showPedestal != showPedestal ||
+      oldDelegate.showAura != showAura;
 }
 
 class _CharacterIllustrationPainter extends CustomPainter {
@@ -72,10 +131,10 @@ class _CharacterIllustrationPainter extends CustomPainter {
     final cx = w * 0.5;
 
     if (showAura) {
-      _paintAura(canvas, size, cx);
+      paintAura(canvas, size, cx, spec);
     }
     if (showPedestal) {
-      _paintPedestal(canvas, size, cx);
+      paintPedestal(canvas, size, cx, spec);
     }
 
     switch (spec.classId) {
@@ -90,7 +149,12 @@ class _CharacterIllustrationPainter extends CustomPainter {
     }
   }
 
-  void _paintAura(Canvas canvas, Size size, double cx) {
+  static void paintAura(
+    Canvas canvas,
+    Size size,
+    double cx,
+    CharacterVisualSpec spec,
+  ) {
     final auraCenter = Offset(cx, size.height * 0.46);
     final auraRadius = math.min(size.width, size.height) * 0.48;
     final paint = Paint()
@@ -123,7 +187,12 @@ class _CharacterIllustrationPainter extends CustomPainter {
     );
   }
 
-  void _paintPedestal(Canvas canvas, Size size, double cx) {
+  static void paintPedestal(
+    Canvas canvas,
+    Size size,
+    double cx,
+    CharacterVisualSpec spec,
+  ) {
     final groundRect = Rect.fromCenter(
       center: Offset(cx, size.height * 0.90),
       width: size.width * 0.68,

@@ -6,6 +6,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier, VoidCallback;
 
 import '../../core/constants/test_room.dart';
+import '../../core/perf/perf_tracer.dart';
 import '../../domain/entities/combat_event.dart';
 import '../../domain/entities/combatant.dart';
 import '../../domain/entities/dungeon_definition.dart';
@@ -21,6 +22,7 @@ import '../../domain/services/dungeon_reward_settlement_service.dart';
 import '../../domain/services/equipment_factory.dart';
 import '../../domain/services/loot_service.dart';
 import '../../domain/services/reward_processor.dart';
+import '../../features/shared/assets/item_sprite_registry.dart';
 import '../audio/audio_service.dart';
 import '../components/combatant_component.dart';
 import '../components/effects/floating_text_component.dart';
@@ -137,6 +139,7 @@ class CombatSystem extends Component {
 
   @override
   Future<void> onLoad() async {
+    simulation.activeResonanceClassId = character.activeResonanceClassId;
     final manager = dungeonManager;
     if (manager != null) {
       _dungeonListener = _onDungeonEvent;
@@ -200,6 +203,7 @@ class CombatSystem extends Component {
       }
     }
     _transientEffects.clear();
+    rewardProcessor.clearTransientEnemyClaims();
     _respawnTimer = null;
     _accumulator = 0;
   }
@@ -228,60 +232,62 @@ class CombatSystem extends Component {
 
   @override
   void update(double dt) {
-    super.update(dt);
-    _updateMessages(dt);
+    PerfTracer.traceSync('Flame.CombatSystem.update', () {
+      super.update(dt);
+      _updateMessages(dt);
 
-    final manager = dungeonManager;
-    if (manager != null) {
-      final session = manager.session;
-      if (session == null || session.isTerminal) {
-        _publishHudThrottled(dt);
-        return;
-      }
-      if (session.roomLifecycle == RoomLifecycleState.completed) {
-        final timer = _pendingTransitionTimer;
-        if (timer != null && !(isTransitionBusy?.call() ?? false)) {
-          final remaining = timer - dt;
-          if (remaining <= 0) {
-            _pendingTransitionTimer = null;
-            manager.transitionToNextRoom();
-          } else {
-            _pendingTransitionTimer = remaining;
-          }
+      final manager = dungeonManager;
+      if (manager != null) {
+        final session = manager.session;
+        if (session == null || session.isTerminal) {
+          _publishHudThrottled(dt);
+          return;
         }
-        _publishHudThrottled(dt);
-        return;
+        if (session.roomLifecycle == RoomLifecycleState.completed) {
+          final timer = _pendingTransitionTimer;
+          if (timer != null && !(isTransitionBusy?.call() ?? false)) {
+            final remaining = timer - dt;
+            if (remaining <= 0) {
+              _pendingTransitionTimer = null;
+              manager.transitionToNextRoom();
+            } else {
+              _pendingTransitionTimer = remaining;
+            }
+          }
+          _publishHudThrottled(dt);
+          return;
+        }
+        if (session.roomLifecycle != RoomLifecycleState.active) {
+          _publishHudThrottled(dt);
+          return;
+        }
       }
-      if (session.roomLifecycle != RoomLifecycleState.active) {
-        _publishHudThrottled(dt);
-        return;
+
+      simulation.autoSkillEnabled = autoSkill.value;
+
+      _accumulator += dt;
+      var steps = 0;
+      while (_accumulator >= CombatSimulation.tickSeconds &&
+          steps < _maxTicksPerFrame) {
+        simulation.tick();
+        _accumulator -= CombatSimulation.tickSeconds;
+        steps++;
       }
-    }
+      // Jika frame tertinggal terlalu jauh, buang sisa waktu agar tidak menumpuk.
+      if (steps == _maxTicksPerFrame) _accumulator = 0;
 
-    simulation.autoSkillEnabled = autoSkill.value;
-
-    _accumulator += dt;
-    var steps = 0;
-    while (_accumulator >= CombatSimulation.tickSeconds &&
-        steps < _maxTicksPerFrame) {
-      simulation.tick();
-      _accumulator -= CombatSimulation.tickSeconds;
-      steps++;
-    }
-    // Jika frame tertinggal terlalu jauh, buang sisa waktu agar tidak menumpuk.
-    if (steps == _maxTicksPerFrame) _accumulator = 0;
-
-    final hasEvents = _handleEvents();
-    _evaluateRoomProgress();
-    _syncPlayerBuild();
-    if (enableDebugWaveRespawn && manager == null) {
-      _updateWaves(dt);
-    }
-    if (hasEvents) {
-      publishHudNow();
-    } else {
-      _publishHudThrottled(dt);
-    }
+      final hasEvents = _handleEvents();
+      _evaluateRoomProgress();
+      _syncPlayerBuild();
+      if (enableDebugWaveRespawn && manager == null) {
+        _updateWaves(dt);
+      }
+      if (hasEvents) {
+        publishHudNow();
+      } else {
+        _publishHudThrottled(dt);
+      }
+    });
   }
 
   void _evaluateRoomProgress() {
@@ -439,8 +445,20 @@ class CombatSystem extends Component {
         _onAttackVisual(event);
       } else if (event is HealEvent) {
         _onHealVisual(event);
+      } else if (event is ShieldEvent) {
+        _onShieldVisual(event);
       } else if (event is DeathEvent &&
           event.combatantId != simulation.player.id) {
+        final enemy = _combatantFor(event.combatantId);
+        if (enemy != null) {
+          _addTransientEffect(
+            SkillVfxComponent.defeatBurst(
+              position: Vector2(enemy.x * tileSize, enemy.y * tileSize),
+              isBoss: enemy.isBoss,
+              isElite: enemy.isElite,
+            ),
+          );
+        }
         _views.remove(event.combatantId)?.removeFromParent();
       } else if (event is EnemyDefeatedEvent) {
         _grantRewards(event);
@@ -452,6 +470,67 @@ class CombatSystem extends Component {
             grid: simulation.grid,
           );
           syncEnemyViews();
+        }
+      } else if (event is EnemySpecialEvent) {
+        final target = _combatantFor(event.enemyId);
+        if (target != null) {
+          final color = switch (event.specialType) {
+            EnemySpecialType.berserk => const Color(0xFFFF5722),
+            EnemySpecialType.heavyStrike => const Color(0xFFFF9800),
+            EnemySpecialType.groundSlam => const Color(0xFFE91E63),
+            EnemySpecialType.summonMinions => const Color(0xFFAB47BC),
+            EnemySpecialType.elementalWard => const Color(0xFF29B6F6),
+            EnemySpecialType.blazingSurge => const Color(0xFFFF7043),
+            EnemySpecialType.lifeSiphon => const Color(0xFF8E24AA),
+            EnemySpecialType.cataclysm => const Color(0xFFD32F2F),
+            EnemySpecialType.finalStand => const Color(0xFFFFD700),
+          };
+          _addTransientEffect(
+            FloatingTextComponent(
+              text: event.message ?? event.specialType.name.toUpperCase(),
+              position: Vector2(
+                target.x * tileSize,
+                (target.y - 0.7) * tileSize,
+              ),
+              color: color,
+              isBold: true,
+              isCrit: true,
+              fontSize: 8,
+            ),
+          );
+        }
+        if (event.specialType == EnemySpecialType.summonMinions) {
+          syncEnemyViews();
+        }
+      } else if (event is WeaponResonanceEvent) {
+        if (event.message != null) {
+          final target = event.targetId != null
+              ? _combatantFor(event.targetId!)
+              : simulation.player;
+          if (target != null) {
+            final color = switch (event.resonanceClassId) {
+              'paladin' => const Color(0xFFFFD700),
+              'voidblade' => const Color(0xFF9932CC),
+              'chronomancer' => const Color(0xFF00CED1),
+              'gunslinger' => const Color(0xFFFF4500),
+              'necromancer' => const Color(0xFF2E8B57),
+              'stormcaller' => const Color(0xFF1E90FF),
+              _ => const Color(0xFFFFFFFF),
+            };
+            _addTransientEffect(
+              FloatingTextComponent(
+                text: event.message!,
+                position: Vector2(
+                  target.x * tileSize,
+                  (target.y - 0.7) * tileSize,
+                ),
+                color: color,
+                isBold: true,
+                isCrit: true,
+                fontSize: 8,
+              ),
+            );
+          }
         }
       } else if (event is SkillCastEvent &&
           event.casterId == simulation.player.id) {
@@ -472,14 +551,12 @@ class CombatSystem extends Component {
         _roomStatusOverride = '';
         _transitionMessage = 'Revive berhasil (+${event.hp} HP)';
         _transitionMessageTimer = _transitionMessageSeconds;
-        _addTransientEffect(
-          SkillVfxComponent.healPulse(
-            position: Vector2(
-              simulation.player.x * tileSize,
-              simulation.player.y * tileSize,
-            ),
-          ),
+        final pPos = Vector2(
+          simulation.player.x * tileSize,
+          simulation.player.y * tileSize,
         );
+        _addTransientEffect(SkillVfxComponent.healPulse(position: pPos));
+        _addTransientEffect(SkillVfxComponent.arcaneBurst(position: pPos));
         onCriticalSaveRequired?.call();
       } else if (event is RunEndedEvent) {
         simulation.setExitNavigation(null);
@@ -507,6 +584,9 @@ class CombatSystem extends Component {
     for (final e in simulation.enemies) {
       if (e.id == id) return e;
     }
+    for (final a in simulation.allies) {
+      if (a.id == id) return a;
+    }
     return null;
   }
 
@@ -522,7 +602,29 @@ class CombatSystem extends Component {
 
     final targetPos = Vector2(target.x * tileSize, target.y * tileSize);
     if (event.damage > 0) {
-      if (event.damageType == SkillDamageType.magic) {
+      if (event.skillId == 'ground_slam') {
+        _addTransientEffect(SkillVfxComponent.groundSlam(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.hit));
+      } else if (event.skillId == 'meteor_fall' ||
+          event.skillId == 'cataclysm' ||
+          event.skillId == 'blazing_surge') {
+        _addTransientEffect(SkillVfxComponent.meteorFall(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'life_siphon') {
+        _addTransientEffect(SkillVfxComponent.lifeSiphon(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'quick_shot' || event.skillId == 'volley') {
+        _addTransientEffect(SkillVfxComponent.arrowShot(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.slash));
+      } else if (event.skillId == 'crushing_blow' ||
+          event.skillId == 'power_strike' ||
+          event.skillId == 'heavy_strike') {
+        _addTransientEffect(SkillVfxComponent.heavySlash(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.slash));
+      } else if (event.skillId == 'aether_burst') {
+        _addTransientEffect(SkillVfxComponent.arcaneBurst(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.damageType == SkillDamageType.magic) {
         _addTransientEffect(SkillVfxComponent.arcaneBurst(position: targetPos));
         unawaited(audioService?.playSfx(AudioCue.magic));
       } else {
@@ -562,7 +664,8 @@ class CombatSystem extends Component {
         position: Vector2(target.x * tileSize, (target.y - 0.5) * tileSize),
         color: color,
         isBold: event.isCrit,
-        fontSize: event.isCrit ? 8 : 7,
+        isCrit: event.isCrit,
+        fontSize: event.isCrit ? 9 : 7,
       ),
     );
   }
@@ -584,6 +687,20 @@ class CombatSystem extends Component {
     );
   }
 
+  void _onShieldVisual(ShieldEvent event) {
+    if (event.absorbedDamage <= 0) return;
+    final target = _combatantFor(event.targetId);
+    if (target == null) return;
+    _addTransientEffect(
+      FloatingTextComponent(
+        text: 'SHIELD -${event.absorbedDamage}',
+        position: Vector2(target.x * tileSize, (target.y - 0.7) * tileSize),
+        color: const Color(0xFF4DD0E1),
+        isBold: true,
+      ),
+    );
+  }
+
   /// Menerapkan stat dan skill baru ke simulasi bila level, equipment, atau
   /// specialization berubah. Jika max HP naik, HP ikut naik sebesar selisih
   /// (lihat Combatant.applyStats).
@@ -597,6 +714,7 @@ class CombatSystem extends Component {
     _appliedLevel = character.level;
     _appliedLoadoutRevision = revision;
     _appliedBuildRevision = character.buildRevision;
+    simulation.activeResonanceClassId = character.activeResonanceClassId;
     simulation.player.applyStats(character.stats);
     simulation.setPlayerSkills(
       character.activeSkills,
@@ -700,6 +818,28 @@ class CombatSystem extends Component {
       }
     }
 
+    final activeSkills = simulation.playerSkills;
+    final skillInfos = <HudSkillInfo>[];
+    for (final skill in activeSkills) {
+      final cdTicks = simulation.skillCooldownTicks(skill.id);
+      final remainingSeconds = cdTicks * CombatSimulation.tickSeconds;
+      final maxCd = skill.cooldownSeconds > 0 ? skill.cooldownSeconds : 1.0;
+      final progress = maxCd > 0
+          ? (remainingSeconds / maxCd).clamp(0.0, 1.0)
+          : 0.0;
+      skillInfos.add(
+        HudSkillInfo(
+          id: skill.id,
+          name: skill.name,
+          spritePath: ItemSpriteRegistry.spriteForSkill(skill.id),
+          cooldownSeconds: maxCd,
+          remainingSeconds: remainingSeconds,
+          progress: progress,
+          isReady: cdTicks <= 0,
+        ),
+      );
+    }
+
     hud.value = HudState.fromCharacter(
       character,
       hp: player.hp,
@@ -717,6 +857,7 @@ class CombatSystem extends Component {
       bossName: bossName,
       bossHp: bossHp,
       bossMaxHp: bossMaxHp,
+      skills: skillInfos,
     );
   }
 

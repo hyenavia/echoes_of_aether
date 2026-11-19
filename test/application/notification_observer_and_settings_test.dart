@@ -362,102 +362,127 @@ void main() {
       },
     );
 
-    test(
-      'AppLifecycleNotificationObserver mengevaluasi kelayakan Event Shop minggu berjalan sebelum menjadwalkan eventShopEnding',
-      () async {
-        final config = _loadTestConfig();
-        final scheduler = FakeNotificationScheduler();
-        final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
-        final eventService = EventShopService(
-          catalog: config.eventShop!,
-          items: config.items,
-          equipmentFactory: EquipmentFactory(config.equipment),
-        );
-        final periodKey = eventService.periodKeyAt(
-          nowMs,
-          offset: Duration.zero,
-        );
-        final active = eventService.activeEntriesAt(
-          nowMs,
-          offset: Duration.zero,
-        );
+    test('AppLifecycleNotificationObserver mengevaluasi kelayakan Event Shop minggu berjalan sebelum menjadwalkan eventShopEnding', () async {
+      final config = _loadTestConfig();
+      final scheduler = FakeNotificationScheduler();
+      final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
+      final eventService = EventShopService(
+        catalog: config.eventShop!,
+        items: config.items,
+        equipmentFactory: EquipmentFactory(config.equipment),
+      );
+      final periodKey = eventService.periodKeyAt(nowMs, offset: Duration.zero);
+      final active = eventService.activeEntriesAt(nowMs, offset: Duration.zero);
 
-        // 1. Syarat terpenuhi & belum dibeli -> eventShopEnding dijadwalkan.
-        final eligibleObserver = AppLifecycleNotificationObserver(
-          scheduler: scheduler,
-          clock: _FixedClock(nowMs),
-          timeZoneOffset: Duration.zero,
-          loadSnapshot: () async => NotificationRuntimeSnapshot(
-            config: config,
-            settings: const GameSettingsData(notifyEventShopEnding: true),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            shopContext: const ShopPlayerContext(
-              playerLevel: 30,
-              dungeonProgresses: {
-                'ancient_crypt': DungeonProgressSnapshot(
-                  currentDungeonId: 'ancient_crypt',
-                  clearsCount: 1,
-                ),
-              },
-            ),
-          ),
-        );
-        await eligibleObserver.handleLifecycleState(AppLifecycleState.paused);
-        expect(scheduler.scheduled.map((e) => e.category).toList(), [
-          NotificationCategory.eventShopEnding,
-        ]);
-
-        // 2. Semua item layak beli minggu ini sudah dibeli -> eventShopEnding tidak dijadwalkan.
-        final boughtObserver = AppLifecycleNotificationObserver(
-          scheduler: scheduler,
-          clock: _FixedClock(nowMs),
-          timeZoneOffset: Duration.zero,
-          loadSnapshot: () async => NotificationRuntimeSnapshot(
-            config: config,
-            settings: const GameSettingsData(notifyEventShopEnding: true),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            shopContext: ShopPlayerContext(
-              playerLevel: 30,
-              cycleProgress: const CycleProgress(
-                ascensionRank: 1,
-                highestAscensionRank: 1,
+      // 1. Syarat terpenuhi & belum dibeli -> eventShopEnding dijadwalkan.
+      final eligibleObserver = AppLifecycleNotificationObserver(
+        scheduler: scheduler,
+        clock: _FixedClock(nowMs),
+        timeZoneOffset: Duration.zero,
+        loadSnapshot: () async => NotificationRuntimeSnapshot(
+          config: config,
+          settings: const GameSettingsData(notifyEventShopEnding: true),
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
+          shopContext: const ShopPlayerContext(
+            playerLevel: 30,
+            dungeonProgresses: {
+              'ancient_crypt': DungeonProgressSnapshot(
+                currentDungeonId: 'ancient_crypt',
+                clearsCount: 1,
               ),
-              dungeonProgresses: const {
-                'ancient_crypt': DungeonProgressSnapshot(
-                  currentDungeonId: 'ancient_crypt',
-                  clearsCount: 1,
-                ),
-              },
-              eventShopPurchases: {
-                for (final entry in active)
-                  (entry.id, periodKey): EventShopPurchaseRecord(
-                    entryId: entry.id,
-                    periodKey: periodKey,
-                  ).purchasedCount,
-              },
+            },
+          ),
+        ),
+      );
+      await eligibleObserver.handleLifecycleState(AppLifecycleState.paused);
+      expect(scheduler.scheduled.map((e) => e.category).toList(), [
+        NotificationCategory.eventShopEnding,
+      ]);
+
+      // 2. Semua item layak beli minggu ini sudah dibeli -> eventShopEnding tidak dijadwalkan.
+      final boughtObserver = AppLifecycleNotificationObserver(
+        scheduler: scheduler,
+        clock: _FixedClock(nowMs),
+        timeZoneOffset: Duration.zero,
+        loadSnapshot: () async => NotificationRuntimeSnapshot(
+          config: config,
+          settings: const GameSettingsData(notifyEventShopEnding: true),
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
+          shopContext: ShopPlayerContext(
+            playerLevel: 30,
+            cycleProgress: const CycleProgress(
+              ascensionRank: 1,
+              highestAscensionRank: 1,
+            ),
+            dungeonProgresses: const {
+              'ancient_crypt': DungeonProgressSnapshot(
+                currentDungeonId: 'ancient_crypt',
+                clearsCount: 1,
+              ),
+            },
+            eventShopPurchases: {
+              for (final entry in active)
+                (entry.id, periodKey): EventShopPurchaseRecord(
+                  entryId: entry.id,
+                  periodKey: periodKey,
+                ).purchasedCount,
+            },
+          ),
+        ),
+      );
+      await boughtObserver.handleLifecycleState(AppLifecycleState.paused);
+      expect(scheduler.scheduled, isEmpty);
+
+      // 3. Syarat belum terpenuhi sama sekali -> tidak dijadwalkan.
+      final lockedObserver = AppLifecycleNotificationObserver(
+        scheduler: scheduler,
+        clock: _FixedClock(nowMs),
+        timeZoneOffset: Duration.zero,
+        loadSnapshot: () async => NotificationRuntimeSnapshot(
+          config: config,
+          settings: const GameSettingsData(notifyEventShopEnding: true),
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
+          shopContext: const ShopPlayerContext(playerLevel: 5),
+        ),
+      );
+      await lockedObserver.handleLifecycleState(AppLifecycleState.paused);
+      expect(scheduler.scheduled, isEmpty);
+    });
+
+    testWidgets(
+      'tombol Tes Notifikasi di SettingsOverlay memanggil onTestNotification',
+      (tester) async {
+        final scheduler = FakeNotificationScheduler();
+        var testNotificationCalled = false;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: EchoesTheme.dark(),
+            home: Scaffold(
+              body: SettingsOverlay(
+                settings: ValueNotifier(const GameSettingsData()),
+                onChanged: (_) {},
+                onClose: () {},
+                onTestNotification: () async {
+                  testNotificationCalled = true;
+                  await scheduler.sendTestNotification();
+                },
+              ),
             ),
           ),
         );
-        await boughtObserver.handleLifecycleState(AppLifecycleState.paused);
-        expect(scheduler.scheduled, isEmpty);
 
-        // 3. Syarat belum terpenuhi sama sekali -> tidak dijadwalkan.
-        final lockedObserver = AppLifecycleNotificationObserver(
-          scheduler: scheduler,
-          clock: _FixedClock(nowMs),
-          timeZoneOffset: Duration.zero,
-          loadSnapshot: () async => NotificationRuntimeSnapshot(
-            config: config,
-            settings: const GameSettingsData(notifyEventShopEnding: true),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            shopContext: const ShopPlayerContext(playerLevel: 5),
-          ),
-        );
-        await lockedObserver.handleLifecycleState(AppLifecycleState.paused);
-        expect(scheduler.scheduled, isEmpty);
+        final btn = find.byKey(const Key('settings_test_notification_btn'));
+        expect(btn, findsOneWidget);
+        await tester.ensureVisible(btn);
+        await tester.tap(btn);
+        await tester.pumpAndSettle();
+
+        expect(testNotificationCalled, isTrue);
+        expect(scheduler.sendTestNotificationCalls, 1);
       },
     );
   });

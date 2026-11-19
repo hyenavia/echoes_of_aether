@@ -4,6 +4,7 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../app/theme/echoes_theme.dart';
 import '../../../domain/entities/equipment.dart';
 import '../../../domain/entities/item_definition.dart';
+import 'pixel_item_icon.dart';
 import 'rarity_border.dart';
 
 IconData _resolveSharedItemIcon({EquipmentSlot? slot, ItemCategory? category}) {
@@ -28,6 +29,8 @@ class ItemSlot extends StatelessWidget {
   const ItemSlot({
     super.key,
     required this.rarity,
+    this.itemId,
+    this.spritePath,
     this.slot,
     this.category,
     this.quantity,
@@ -39,6 +42,8 @@ class ItemSlot extends StatelessWidget {
   });
 
   final ItemRarity rarity;
+  final String? itemId;
+  final String? spritePath;
   final EquipmentSlot? slot;
   final ItemCategory? category;
   final int? quantity;
@@ -54,29 +59,68 @@ class ItemSlot extends StatelessWidget {
     final ext = EchoesTheme.of(context);
     final rarityColor = ext.colorForRarity(rarity);
 
+    final bgTint = isLocked
+        ? ext.locked.withValues(alpha: 0.08)
+        : switch (rarity) {
+            ItemRarity.mythical => rarityColor.withValues(alpha: 0.22),
+            ItemRarity.legendary => ext.gold.withValues(alpha: 0.18),
+            ItemRarity.epic => rarityColor.withValues(alpha: 0.14),
+            ItemRarity.rare => rarityColor.withValues(alpha: 0.10),
+            ItemRarity.uncommon => rarityColor.withValues(alpha: 0.08),
+            ItemRarity.common => rarityColor.withValues(alpha: 0.05),
+          };
+
     final slotBox = RarityBorder(
       rarity: rarity,
       isSelected: isSelected,
       isLocked: isLocked,
       useGlow: isSelected,
       radius: AppRadius.sm,
-      backgroundColor: rarityColor.withValues(alpha: 0.10),
+      backgroundColor: bgTint,
       child: SizedBox(
         width: size,
         height: size,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(
-              _resolveSharedItemIcon(slot: slot, category: category),
-              size: size * 0.44,
-              color: isLocked ? ext.locked : rarityColor,
+            PixelItemIcon(
+              itemId: itemId,
+              spritePath: spritePath,
+              slot: slot,
+              category: category,
+              size: size * 0.70,
+              fallbackIcon: _resolveSharedItemIcon(
+                slot: slot,
+                category: category,
+              ),
+              fallbackColor: isLocked ? ext.locked : rarityColor,
             ),
             if (isLocked)
               Positioned(
                 top: 3,
                 left: 3,
                 child: Icon(Icons.lock_outline, size: 12, color: ext.locked),
+              ),
+            if ((rarity == ItemRarity.legendary ||
+                    rarity == ItemRarity.mythical) &&
+                !isLocked)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Container(
+                  width: 3,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: ext.gold,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: ext.gold.withValues(alpha: 0.8),
+                        blurRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             if (quantity != null && quantity! > 1)
               Positioned(
@@ -88,8 +132,12 @@ class ItemSlot extends StatelessWidget {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.midnightForest.withValues(alpha: 0.9),
+                    color: AppColors.midnightForest.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(
+                      color: AppColors.panelBorder.withValues(alpha: 0.65),
+                      width: 1.0,
+                    ),
                   ),
                   child: Text(
                     'x$quantity',
@@ -183,14 +231,31 @@ class EquipmentSlotTile extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: tint.withValues(alpha: isEquipped ? 0.14 : 0.08),
+              color: tint.withValues(alpha: isEquipped ? 0.16 : 0.08),
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: tint.withValues(alpha: 0.45)),
+              border: Border.all(
+                color: tint.withValues(alpha: isEquipped ? 0.58 : 0.35),
+                width: isEquipped ? 1.2 : 1.0,
+              ),
+              boxShadow:
+                  isEquipped &&
+                      (effectiveRarity == ItemRarity.legendary ||
+                          effectiveRarity == ItemRarity.mythical)
+                  ? [
+                      BoxShadow(
+                        color: ext.gold.withValues(alpha: 0.20),
+                        blurRadius: 4,
+                      ),
+                    ]
+                  : null,
             ),
-            child: Icon(
-              _resolveSharedItemIcon(slot: slot),
-              size: 18,
-              color: tint,
+            child: Center(
+              child: PixelItemIcon(
+                slot: slot,
+                size: 26,
+                fallbackIcon: _resolveSharedItemIcon(slot: slot),
+                fallbackColor: tint,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),

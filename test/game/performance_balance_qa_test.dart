@@ -241,7 +241,7 @@ void main() {
         config: config.progression,
         skillCatalog: config.skills,
         specializationConfig: config.specializations,
-      )..receiveReward(exp: 800, gold: 200); // ~Lv 5
+      )..receiveReward(exp: 1500, gold: 200); // ~Lv 5 (Lv 5 butuh 1428 EXP)
       character.chooseSpecialization('arcanist');
       final inventory = Inventory(definitions: config.items);
       const startTime = 1700000000000;

@@ -4,12 +4,14 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
+import '../../core/perf/perf_tracer.dart';
 import '../../domain/entities/clock_state.dart';
 import '../../domain/entities/combat_stats.dart';
 import '../../domain/entities/cycle_progress.dart';
 import '../../domain/entities/dungeon_session.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/event_shop_purchase.dart';
+import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/item_definition.dart';
@@ -23,6 +25,7 @@ import '../../domain/repositories/game_settings_repository.dart';
 import '../../domain/repositories/player_progress_repository.dart';
 import '../../domain/services/claimed_rewards_pruner.dart';
 import '../../domain/services/game_clock.dart';
+import '../../domain/services/save_snapshot_codec.dart';
 import '../database/app_database.dart' hide ClockState, PeriodicQuestState;
 
 typedef RecoveryWarningLogger = void Function(String message);
@@ -56,6 +59,26 @@ class DriftPlayerSaveRepository
   final GameClock clock;
   final RecoveryWarningLogger _warn;
 
+  PlayerSaveSnapshot? _lastSavedSnapshot;
+  List<EquipmentInstance>? _lastSavedAllEquipment;
+  String? _lastSavedPid;
+
+  void _invalidateSaveDiffCache() {
+    _lastSavedSnapshot = null;
+    _lastSavedAllEquipment = null;
+    _lastSavedPid = null;
+  }
+
+  void _recordSavedBaseline(
+    PlayerSaveSnapshot snapshot,
+    List<EquipmentInstance> allEquipment,
+    String pid,
+  ) {
+    _lastSavedSnapshot = snapshot;
+    _lastSavedAllEquipment = allEquipment;
+    _lastSavedPid = pid;
+  }
+
   static void _defaultWarn(String message) =>
       debugPrint('[SaveRecovery] $message');
 
@@ -70,6 +93,7 @@ class DriftPlayerSaveRepository
   static const String _keyNotifyEventShop = 'notifications.event_shop_ending';
   static const String _keyNotifyQuietHours =
       'notifications.quiet_hours_enabled';
+  static const String _keyOfflineAutoSalvage = 'offline.auto_salvage_equipment';
 
   @override
   Future<GameSettingsData> loadSettings() async {
@@ -117,6 +141,10 @@ class DriftPlayerSaveRepository
         _keyNotifyQuietHours,
         defaults.notifyQuietHoursEnabled,
       ),
+      autoSalvageOfflineEquipment: parseBool(
+        _keyOfflineAutoSalvage,
+        defaults.autoSalvageOfflineEquipment,
+      ),
     );
   }
 
@@ -162,6 +190,10 @@ class DriftPlayerSaveRepository
             key: _keyNotifyQuietHours,
             value: normalized.notifyQuietHoursEnabled ? 'true' : 'false',
           ),
+          GameSettingsCompanion.insert(
+            key: _keyOfflineAutoSalvage,
+            value: normalized.autoSalvageOfflineEquipment ? 'true' : 'false',
+          ),
         ], mode: InsertMode.insertOrReplace);
       });
     });
@@ -192,6 +224,7 @@ class DriftPlayerSaveRepository
 
   @override
   Future<void> save(PlayerProgress progress) async {
+    _invalidateSaveDiffCache();
     _validateProgress(progress);
     final nowMs = clock.nowMs;
     final baseStats = config.progression.statsAt(progress.level);
@@ -214,29 +247,36 @@ class DriftPlayerSaveRepository
   // ---- PlayerSaveRepository (penuh & atomik) ----
 
   @override
-  Future<void> saveSnapshot(PlayerSaveSnapshot snapshot) async {
-    final prepared = _validateAndPrepareSnapshot(snapshot);
-    final savedAtMs = snapshot.session.lastSavedAtMs > 0
-        ? snapshot.session.lastSavedAtMs
-        : clock.nowMs;
-    final activeAtMs = snapshot.session.lastActiveAtMs > 0
-        ? snapshot.session.lastActiveAtMs
-        : savedAtMs;
+  Future<void> saveSnapshot(PlayerSaveSnapshot snapshot) =>
+      PerfTracer.traceAsync('Drift.saveSnapshot', () async {
+        final prepared = PerfTracer.traceSync(
+          'Drift.validateAndPrepare',
+          () => _validateAndPrepareSnapshot(snapshot),
+        );
+        final savedAtMs = snapshot.session.lastSavedAtMs > 0
+            ? snapshot.session.lastSavedAtMs
+            : clock.nowMs;
+        final activeAtMs = snapshot.session.lastActiveAtMs > 0
+            ? snapshot.session.lastActiveAtMs
+            : savedAtMs;
 
-    await db.transaction(() async {
-      await _writePreparedSnapshot(
-        prepared,
-        savedAtMs: savedAtMs,
-        activeAtMs: activeAtMs,
-        lastOfflineClaimAtMs: math.max(
-          0,
-          snapshot.session.lastOfflineClaimAtMs,
-        ),
-        clockState: snapshot.clockState,
-        deleteAllPlayerRowsFirst: false,
-      );
-    });
-  }
+        await PerfTracer.traceAsync('Drift.saveTransaction', () {
+          return db.transaction(() async {
+            await _writePreparedSnapshot(
+              prepared,
+              savedAtMs: savedAtMs,
+              activeAtMs: activeAtMs,
+              lastOfflineClaimAtMs: math.max(
+                0,
+                snapshot.session.lastOfflineClaimAtMs,
+              ),
+              clockState: snapshot.clockState,
+              deleteAllPlayerRowsFirst: false,
+            );
+          });
+        });
+        _recordSavedBaseline(snapshot, prepared.allEquipment, prepared.pid);
+      });
 
   /// Mengganti seluruh data pemain dalam satu transaksi atomik tanpa menyentuh
   /// `GameSettings`. Mengosongkan sesi dungeon aktif, menyetel jangkar offline
@@ -248,6 +288,7 @@ class DriftPlayerSaveRepository
     required int restoredAtMs,
     @visibleForTesting void Function()? beforeCommitHook,
   }) async {
+    _invalidateSaveDiffCache();
     final safeRestoredAt = math.max(0, restoredAtMs);
     final sanitizedSnapshot = PlayerSaveSnapshot(
       playerId: snapshot.playerId,
@@ -269,6 +310,8 @@ class DriftPlayerSaveRepository
       currencies: snapshot.currencies,
       clockState: snapshot.clockState,
       periodicQuestStates: snapshot.periodicQuestStates,
+      gachaPityStates: snapshot.gachaPityStates,
+      unlockedSpecializations: snapshot.unlockedSpecializations,
     );
     final prepared = _validateAndPrepareSnapshot(sanitizedSnapshot);
 
@@ -433,6 +476,40 @@ class DriftPlayerSaveRepository
     final specId = prepared.specId;
     final baseStats = config.progression.statsAt(progress.level);
 
+    final prev = (!deleteAllPlayerRowsFirst && _lastSavedPid == pid)
+        ? _lastSavedSnapshot
+        : null;
+    final prevEquipment = prev != null ? _lastSavedAllEquipment : null;
+
+    final skillsChanged =
+        prev == null ||
+        prev.character.progress.level != progress.level ||
+        prev.character.specializationId != specId ||
+        !_intMapEquals(
+          prev.character.skillLevels,
+          snapshot.character.skillLevels,
+        ) ||
+        !_intMapEquals(
+          prev.character.skillCooldownTicks,
+          snapshot.character.skillCooldownTicks,
+        );
+    final stacksChanged =
+        prev == null ||
+        !_intMapEquals(prev.inventory.stacks, snapshot.inventory.stacks);
+    final equipmentChanged =
+        prev == null ||
+        prevEquipment == null ||
+        !_equipmentListEquals(prevEquipment, prepared.allEquipment);
+    final equippedChanged =
+        prev == null ||
+        !_equippedMapEquals(
+          prev.character.equipped,
+          snapshot.character.equipped,
+        );
+    // Foreign key equippedItems -> equipmentInstances: jika equipmentInstances
+    // ditulis ulang, equippedItems juga harus dihapus lebih dulu & ditulis ulang.
+    final rewriteEquipped = equippedChanged || equipmentChanged;
+
     if (deleteAllPlayerRowsFirst) {
       // Hapus seluruh baris milik pemain (kecuali GameSettings, CloudSyncStates,
       // LocalSaveBackups) sebelum menulis ulang data terpulihkan.
@@ -475,19 +552,29 @@ class DriftPlayerSaveRepository
       await (db.delete(
         db.eventShopPurchases,
       )..where((t) => t.playerId.equals(pid))).go();
+      await db.delete(db.gachaPityStates).go();
+      await db.delete(db.unlockedSpecializations).go();
     } else {
-      await (db.delete(
-        db.equippedItems,
-      )..where((t) => t.playerId.equals(pid))).go();
-      await (db.delete(
-        db.equipmentInstances,
-      )..where((t) => t.playerId.equals(pid))).go();
-      await (db.delete(
-        db.inventoryEntries,
-      )..where((t) => t.playerId.equals(pid))).go();
-      await (db.delete(
-        db.skillProgresses,
-      )..where((t) => t.playerId.equals(pid))).go();
+      if (rewriteEquipped) {
+        await (db.delete(
+          db.equippedItems,
+        )..where((t) => t.playerId.equals(pid))).go();
+      }
+      if (equipmentChanged) {
+        await (db.delete(
+          db.equipmentInstances,
+        )..where((t) => t.playerId.equals(pid))).go();
+      }
+      if (stacksChanged) {
+        await (db.delete(
+          db.inventoryEntries,
+        )..where((t) => t.playerId.equals(pid))).go();
+      }
+      if (skillsChanged) {
+        await (db.delete(
+          db.skillProgresses,
+        )..where((t) => t.playerId.equals(pid))).go();
+      }
     }
 
     await db
@@ -506,7 +593,7 @@ class DriftPlayerSaveRepository
           ),
         );
 
-    if (config.skills.isNotEmpty) {
+    if (skillsChanged && config.skills.isNotEmpty) {
       final skillRows = <SkillProgressesCompanion>[];
       for (final skill in config.skills.values) {
         final level = math.min(
@@ -534,20 +621,22 @@ class DriftPlayerSaveRepository
       await db.batch((b) => b.insertAll(db.skillProgresses, skillRows));
     }
 
-    final stackRows = [
-      for (final entry in snapshot.inventory.stacks.entries)
-        if (entry.value > 0)
-          InventoryEntriesCompanion.insert(
-            playerId: pid,
-            itemId: entry.key,
-            quantity: entry.value,
-          ),
-    ];
-    if (stackRows.isNotEmpty) {
-      await db.batch((b) => b.insertAll(db.inventoryEntries, stackRows));
+    if (stacksChanged) {
+      final stackRows = [
+        for (final entry in snapshot.inventory.stacks.entries)
+          if (entry.value > 0)
+            InventoryEntriesCompanion.insert(
+              playerId: pid,
+              itemId: entry.key,
+              quantity: entry.value,
+            ),
+      ];
+      if (stackRows.isNotEmpty) {
+        await db.batch((b) => b.insertAll(db.inventoryEntries, stackRows));
+      }
     }
 
-    if (prepared.allEquipment.isNotEmpty) {
+    if (equipmentChanged && prepared.allEquipment.isNotEmpty) {
       final instanceRows = [
         for (final item in prepared.allEquipment)
           EquipmentInstancesCompanion.insert(
@@ -560,12 +649,13 @@ class DriftPlayerSaveRepository
               _encodeEquipmentStats(item.rolledStats),
             ),
             enhancementLevel: Value(item.enhancementLevel),
+            isFavorite: Value(item.isFavorite),
           ),
       ];
       await db.batch((b) => b.insertAll(db.equipmentInstances, instanceRows));
     }
 
-    if (snapshot.character.equipped.isNotEmpty) {
+    if (rewriteEquipped && snapshot.character.equipped.isNotEmpty) {
       final equippedRows = [
         for (final entry in snapshot.character.equipped.entries)
           EquippedItemsCompanion.insert(
@@ -581,10 +671,25 @@ class DriftPlayerSaveRepository
       ...snapshot.dungeonProgresses,
       snapshot.dungeon.currentDungeonId: snapshot.dungeon,
     };
-    for (final dungeon in allDungeonProgresses.values) {
-      await db
-          .into(db.dungeonProgresses)
-          .insertOnConflictUpdate(
+    final prevDungeons = prev == null
+        ? null
+        : <String, DungeonProgressSnapshot>{
+            ...prev.dungeonProgresses,
+            prev.dungeon.currentDungeonId: prev.dungeon,
+          };
+    final changedDungeons = [
+      for (final dungeon in allDungeonProgresses.values)
+        if (prevDungeons == null ||
+            !_dungeonProgressEquals(
+              prevDungeons[dungeon.currentDungeonId],
+              dungeon,
+            ))
+          dungeon,
+    ];
+    if (changedDungeons.isNotEmpty) {
+      await db.batch((b) {
+        b.insertAllOnConflictUpdate(db.dungeonProgresses, [
+          for (final dungeon in changedDungeons)
             DungeonProgressesCompanion.insert(
               playerId: pid,
               dungeonId: dungeon.currentDungeonId,
@@ -602,36 +707,87 @@ class DriftPlayerSaveRepository
                 jsonEncode(_encodeRewardState(dungeon.rewardState)),
               ),
             ),
-          );
+        ]);
+      });
     }
 
-    await db
-        .into(db.cycleProgresses)
-        .insertOnConflictUpdate(
-          CycleProgressesCompanion.insert(
-            playerId: pid,
-            ascensionRank: Value(prepared.safeAscensionRank),
-            highestAscensionRank: Value(prepared.safeHighestAscensionRank),
-            lastNormalDungeonId: Value(prepared.safeLastNormalId),
-            updatedAtMs: savedAtMs,
-          ),
-        );
-
-    for (final purchase in snapshot.shopPurchases.entries) {
-      final entryId = purchase.key.trim();
-      if (entryId.isEmpty || purchase.value < 0) continue;
+    if (prev == null ||
+        prev.cycleProgress.ascensionRank != prepared.safeAscensionRank ||
+        prev.cycleProgress.highestAscensionRank !=
+            prepared.safeHighestAscensionRank ||
+        prev.cycleProgress.lastNormalDungeonId != prepared.safeLastNormalId) {
       await db
-          .into(db.shopPurchases)
+          .into(db.cycleProgresses)
           .insertOnConflictUpdate(
-            ShopPurchasesCompanion.insert(
+            CycleProgressesCompanion.insert(
               playerId: pid,
-              entryId: entryId,
-              purchasedCount: Value(purchase.value),
+              ascensionRank: Value(prepared.safeAscensionRank),
+              highestAscensionRank: Value(prepared.safeHighestAscensionRank),
+              lastNormalDungeonId: Value(prepared.safeLastNormalId),
+              updatedAtMs: savedAtMs,
             ),
           );
     }
 
-    await _replaceCurrencies(pid: pid, currencies: snapshot.currencies);
+    if (prev == null ||
+        !_intMapEquals(prev.shopPurchases, snapshot.shopPurchases)) {
+      final shopPurchaseRows = [
+        for (final purchase in snapshot.shopPurchases.entries)
+          if (purchase.key.trim().isNotEmpty && purchase.value >= 0)
+            ShopPurchasesCompanion.insert(
+              playerId: pid,
+              entryId: purchase.key.trim(),
+              purchasedCount: Value(purchase.value),
+            ),
+      ];
+      if (shopPurchaseRows.isNotEmpty) {
+        await db.batch(
+          (b) =>
+              b.insertAllOnConflictUpdate(db.shopPurchases, shopPurchaseRows),
+        );
+      }
+    }
+
+    if (prev == null || !_intMapEquals(prev.currencies, snapshot.currencies)) {
+      await _replaceCurrencies(pid: pid, currencies: snapshot.currencies);
+    }
+
+    if (prev == null ||
+        !_gachaPityMapEquals(prev.gachaPityStates, snapshot.gachaPityStates)) {
+      final pityRows = [
+        for (final pity in snapshot.gachaPityStates.values)
+          GachaPityStatesCompanion.insert(
+            bannerType: pity.bannerType,
+            pullCount: Value(pity.pullCount),
+            isGuaranteed: Value(pity.isGuaranteed),
+          ),
+      ];
+      if (pityRows.isNotEmpty) {
+        await db.batch(
+          (b) => b.insertAllOnConflictUpdate(db.gachaPityStates, pityRows),
+        );
+      }
+    }
+
+    if (prev == null ||
+        !_stringSetEquals(
+          prev.unlockedSpecializations,
+          snapshot.unlockedSpecializations,
+        )) {
+      final specRows = [
+        for (final specId in snapshot.unlockedSpecializations)
+          UnlockedSpecializationsCompanion.insert(
+            specializationId: specId,
+            unlockedAtMs: savedAtMs,
+          ),
+      ];
+      if (specRows.isNotEmpty) {
+        await db.batch(
+          (b) =>
+              b.insertAllOnConflictUpdate(db.unlockedSpecializations, specRows),
+        );
+      }
+    }
 
     await db
         .into(db.gameSessions)
@@ -656,10 +812,13 @@ class DriftPlayerSaveRepository
           ),
         );
 
-    if (snapshot.claimedEventIds.isNotEmpty) {
+    final newClaimedIds = prev == null
+        ? snapshot.claimedEventIds
+        : snapshot.claimedEventIds.difference(prev.claimedEventIds);
+    if (newClaimedIds.isNotEmpty) {
       await db.batch((b) {
         b.insertAll(db.claimedRewards, [
-          for (final eventId in snapshot.claimedEventIds)
+          for (final eventId in newClaimedIds)
             ClaimedRewardsCompanion.insert(
               playerId: pid,
               eventId: eventId,
@@ -684,43 +843,62 @@ class DriftPlayerSaveRepository
           );
     }
 
-    for (final q in snapshot.periodicQuestStates) {
-      final qid = q.questId.trim();
-      final pkey = q.periodKey.trim();
-      if (qid.isEmpty || pkey.isEmpty) continue;
-      await db
-          .into(db.periodicQuestStates)
-          .insertOnConflictUpdate(
+    if (prev == null ||
+        !_periodicQuestListEquals(
+          prev.periodicQuestStates,
+          snapshot.periodicQuestStates,
+        )) {
+      final periodicQuestRows = [
+        for (final q in snapshot.periodicQuestStates)
+          if (q.questId.trim().isNotEmpty && q.periodKey.trim().isNotEmpty)
             PeriodicQuestStatesCompanion.insert(
               playerId: pid,
-              questId: qid,
-              periodKey: pkey,
+              questId: q.questId.trim(),
+              periodKey: q.periodKey.trim(),
               completedAtMs: math.max(0, q.completedAtMs),
             ),
-          );
+      ];
+      if (periodicQuestRows.isNotEmpty) {
+        await db.batch(
+          (b) => b.insertAllOnConflictUpdate(
+            db.periodicQuestStates,
+            periodicQuestRows,
+          ),
+        );
+      }
     }
 
-    for (final p in snapshot.eventShopPurchases) {
-      final entryId = p.entryId.trim();
-      final periodKey = p.periodKey.trim();
-      if (entryId.isEmpty || periodKey.isEmpty || p.purchasedCount < 0) {
-        continue;
-      }
-      await db
-          .into(db.eventShopPurchases)
-          .insertOnConflictUpdate(
+    if (prev == null ||
+        !_eventShopListEquals(
+          prev.eventShopPurchases,
+          snapshot.eventShopPurchases,
+        )) {
+      final eventShopPurchaseRows = [
+        for (final p in snapshot.eventShopPurchases)
+          if (p.entryId.trim().isNotEmpty &&
+              p.periodKey.trim().isNotEmpty &&
+              p.purchasedCount >= 0)
             EventShopPurchasesCompanion.insert(
               playerId: pid,
-              entryId: entryId,
-              periodKey: periodKey,
+              entryId: p.entryId.trim(),
+              periodKey: p.periodKey.trim(),
               purchasedCount: Value(p.purchasedCount),
             ),
-          );
+      ];
+      if (eventShopPurchaseRows.isNotEmpty) {
+        await db.batch(
+          (b) => b.insertAllOnConflictUpdate(
+            db.eventShopPurchases,
+            eventShopPurchaseRows,
+          ),
+        );
+      }
     }
   }
 
   @override
-  Future<PlayerSaveSnapshot?> loadSnapshot() async {
+  Future<PlayerSaveSnapshot?>
+  loadSnapshot() => PerfTracer.traceAsync('Drift.loadSnapshot', () async {
     return db.transaction(() async {
       final playerRow = await (db.select(
         db.players,
@@ -827,6 +1005,7 @@ class DriftPlayerSaveRepository
           rarity: rarity,
           rolledStats: stats,
           enhancementLevel: math.max(0, row.enhancementLevel),
+          isFavorite: row.isFavorite,
         );
       }
 
@@ -1070,7 +1249,28 @@ class DriftPlayerSaveRepository
             ),
       ];
 
-      return PlayerSaveSnapshot(
+      final pityRows = await db.select(db.gachaPityStates).get();
+      final gachaPityStates = <String, GachaPityState>{
+        for (final r in pityRows)
+          r.bannerType: GachaPityState(
+            bannerType: r.bannerType,
+            pullCount: math.max(0, r.pullCount),
+            isGuaranteed: r.isGuaranteed,
+          ),
+      };
+
+      final unlockedSpecRows = await db
+          .select(db.unlockedSpecializations)
+          .get();
+      final unlockedSpecializations = <String>{
+        for (final r in unlockedSpecRows)
+          if (r.specializationId.trim().isNotEmpty) r.specializationId.trim(),
+      };
+      if (unlockedSpecializations.isEmpty) {
+        unlockedSpecializations.addAll(['vanguard', 'arcanist', 'ranger']);
+      }
+
+      final loaded = PlayerSaveSnapshot(
         playerId: playerId,
         character: PlayerCharacterSnapshot(
           progress: PlayerProgress(
@@ -1105,9 +1305,16 @@ class DriftPlayerSaveRepository
         periodicQuestStates: List<PeriodicQuestState>.unmodifiable(
           periodicQuestStates,
         ),
+        gachaPityStates: Map.unmodifiable(gachaPityStates),
+        unlockedSpecializations: Set.unmodifiable(unlockedSpecializations),
       );
+      _recordSavedBaseline(loaded, [
+        ...loaded.character.equipped.values,
+        ...loaded.inventory.equipment,
+      ], playerId);
+      return loaded;
     });
-  }
+  });
 
   // ---- CycleProgressRepository (siklus Ascension & transisi atomik) ----
 
@@ -1126,6 +1333,7 @@ class DriftPlayerSaveRepository
 
   @override
   Future<void> saveCycleProgress(CycleProgress cycleProgress) async {
+    _invalidateSaveDiffCache();
     final sanitized = _sanitizeCycleProgress(
       cycleProgress.ascensionRank,
       cycleProgress.lastNormalDungeonId,
@@ -1155,6 +1363,7 @@ class DriftPlayerSaveRepository
     String? claimEventId,
     int? updatedAtMs,
   }) async {
+    _invalidateSaveDiffCache();
     final sanitized = _sanitizeCycleProgress(
       cycleProgress.ascensionRank,
       cycleProgress.lastNormalDungeonId,
@@ -1239,6 +1448,7 @@ class DriftPlayerSaveRepository
     String? actionId,
     int? updatedAtMs,
   }) async {
+    _invalidateSaveDiffCache();
     _validateProgress(progress);
     final allEquipment = _collectAndValidateEquipment(
       bagEquipment: inventory.equipment,
@@ -1339,6 +1549,7 @@ class DriftPlayerSaveRepository
     String? actionId,
     int? updatedAtMs,
   }) async {
+    _invalidateSaveDiffCache();
     _validateProgress(progress);
     final entryId = purchase.entryId.trim();
     final periodKey = purchase.periodKey.trim();
@@ -1392,6 +1603,7 @@ class DriftPlayerSaveRepository
 
       await (db.update(db.players)..where((t) => t.id.equals(playerId))).write(
         PlayersCompanion(
+          gold: Value(progress.gold),
           equipmentCounter: Value(math.max(0, inventory.equipmentCounter)),
           lastSavedAtMs: Value(safeUpdatedAtMs),
         ),
@@ -1461,6 +1673,7 @@ class DriftPlayerSaveRepository
 
   @override
   Future<void> saveClockState(ClockState state) async {
+    _invalidateSaveDiffCache();
     final safeLastSeen = math.max(0, state.lastSeenAtMs);
     await db.transaction(() async {
       await _ensurePlayerRowExists(safeLastSeen);
@@ -1483,6 +1696,7 @@ class DriftPlayerSaveRepository
     String? activeRunId,
     Set<String> activePeriodKeys = const {},
   }) async {
+    _invalidateSaveDiffCache();
     const pruner = ClaimedRewardsPruner();
     final candidates =
         await (db.select(db.claimedRewards)..where(
@@ -1605,6 +1819,7 @@ class DriftPlayerSaveRepository
               _encodeEquipmentStats(item.rolledStats),
             ),
             enhancementLevel: Value(item.enhancementLevel),
+            isFavorite: Value(item.isFavorite),
           ),
       ];
       await db.batch((b) => b.insertAll(db.equipmentInstances, instanceRows));
@@ -1718,6 +1933,8 @@ class DriftPlayerSaveRepository
     'moveSpeed': s.moveSpeed,
     'attackRange': s.attackRange,
     'skillHaste': s.skillHaste,
+    'lifesteal': s.lifesteal,
+    'spellVamp': s.spellVamp,
   };
 
   Map<String, dynamic> _encodeEquipmentStats(EquipmentStats s) => {
@@ -1733,6 +1950,8 @@ class DriftPlayerSaveRepository
     'moveSpeed': s.moveSpeed,
     'attackRange': s.attackRange,
     'skillHaste': s.skillHaste,
+    'lifesteal': s.lifesteal,
+    'spellVamp': s.spellVamp,
   };
 
   EquipmentStats _decodeEquipmentStats(
@@ -1764,6 +1983,8 @@ class DriftPlayerSaveRepository
         moveSpeed: numOr('moveSpeed', 0),
         attackRange: numOr('attackRange', 0),
         skillHaste: numOr('skillHaste', 0),
+        lifesteal: numOr('lifesteal', 0),
+        spellVamp: numOr('spellVamp', 0),
       );
     } on FormatException {
       _warn('Stats JSON rusak pada "$instanceId"; memakai stat dasar.');
@@ -1912,6 +2133,10 @@ class DriftPlayerSaveRepository
     'overflowStacks': s.overflowStacks,
     'addedEquipmentCount': math.max(0, s.addedEquipmentCount),
     'droppedEquipmentCount': math.max(0, s.droppedEquipmentCount),
+    'autoSoldEquipmentCount': math.max(0, s.autoSoldEquipmentCount),
+    'autoSoldEquipmentGold': math.max(0, s.autoSoldEquipmentGold),
+    'autoSalvagedEquipmentCount': math.max(0, s.autoSalvagedEquipmentCount),
+    'autoSalvagedScrapCount': math.max(0, s.autoSalvagedScrapCount),
     'acknowledged': s.acknowledged,
     'generatedAtMs': math.max(0, s.generatedAtMs),
     'cycleRank': math.max(0, s.cycleRank),
@@ -1960,7 +2185,10 @@ class DriftPlayerSaveRepository
       if (lastFailedDungeonId != null &&
           (lastFailedDungeonId.isEmpty ||
               (config.dungeons.isNotEmpty &&
-                  !config.dungeons.containsKey(lastFailedDungeonId)))) {
+                  !SaveSnapshotCodec.isValidDungeonId(
+                    lastFailedDungeonId,
+                    config,
+                  )))) {
         lastFailedDungeonId = null;
       }
       return (
@@ -1991,7 +2219,8 @@ class DriftPlayerSaveRepository
       final id = entry.key.trim();
       final val = entry.value;
       if (id.isEmpty || val is! int || val <= 0) continue;
-      if (config.dungeons.isNotEmpty && !config.dungeons.containsKey(id)) {
+      if (config.dungeons.isNotEmpty &&
+          !SaveSnapshotCodec.isValidDungeonId(id, config)) {
         continue;
       }
       result[id] = val;
@@ -2257,6 +2486,10 @@ class DriftPlayerSaveRepository
       overflowStacks: decodeStacks(inner['overflowStacks']),
       addedEquipmentCount: nonNegInt('addedEquipmentCount'),
       droppedEquipmentCount: nonNegInt('droppedEquipmentCount'),
+      autoSoldEquipmentCount: nonNegInt('autoSoldEquipmentCount'),
+      autoSoldEquipmentGold: nonNegInt('autoSoldEquipmentGold'),
+      autoSalvagedEquipmentCount: nonNegInt('autoSalvagedEquipmentCount'),
+      autoSalvagedScrapCount: nonNegInt('autoSalvagedScrapCount'),
       acknowledged: inner['acknowledged'] is bool
           ? inner['acknowledged'] as bool
           : false,
@@ -2266,6 +2499,143 @@ class DriftPlayerSaveRepository
           ? inner['failureReason'] as String
           : null,
     );
+  }
+
+  static bool _intMapEquals(Map<String, int> a, Map<String, int> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  static bool _stringSetEquals(Set<String> a, Set<String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    return a.containsAll(b);
+  }
+
+  static bool _equipmentStatsEquals(EquipmentStats a, EquipmentStats b) =>
+      identical(a, b) ||
+      (a.hp == b.hp &&
+          a.atk == b.atk &&
+          a.def == b.def &&
+          a.hpPct == b.hpPct &&
+          a.atkPct == b.atkPct &&
+          a.defPct == b.defPct &&
+          a.critRate == b.critRate &&
+          a.critDamage == b.critDamage &&
+          a.attackSpeed == b.attackSpeed &&
+          a.moveSpeed == b.moveSpeed &&
+          a.attackRange == b.attackRange &&
+          a.skillHaste == b.skillHaste &&
+          a.lifesteal == b.lifesteal &&
+          a.spellVamp == b.spellVamp);
+
+  static bool _equipmentEquals(EquipmentInstance a, EquipmentInstance b) =>
+      identical(a, b) ||
+      (a.id == b.id &&
+          a.definitionId == b.definitionId &&
+          a.slot == b.slot &&
+          a.rarity == b.rarity &&
+          a.enhancementLevel == b.enhancementLevel &&
+          a.isFavorite == b.isFavorite &&
+          _equipmentStatsEquals(a.rolledStats, b.rolledStats));
+
+  static bool _equipmentListEquals(
+    List<EquipmentInstance> a,
+    List<EquipmentInstance> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!_equipmentEquals(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  static bool _equippedMapEquals(
+    Map<EquipmentSlot, EquipmentInstance> a,
+    Map<EquipmentSlot, EquipmentInstance> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || other.id != entry.value.id) return false;
+    }
+    return true;
+  }
+
+  static bool _dungeonProgressEquals(
+    DungeonProgressSnapshot? a,
+    DungeonProgressSnapshot b,
+  ) {
+    if (a == null) return false;
+    if (identical(a, b)) return true;
+    return a.currentDungeonId == b.currentDungeonId &&
+        a.currentRoomId == b.currentRoomId &&
+        a.currentRoomIndex == b.currentRoomIndex &&
+        a.highestClearedRoomIndex == b.highestClearedRoomIndex &&
+        a.clearsCount == b.clearsCount &&
+        a.clearedInCycleRank == b.clearedInCycleRank &&
+        a.rewardState.lastRunId == b.rewardState.lastRunId &&
+        a.rewardState.completionRewardClaimed ==
+            b.rewardState.completionRewardClaimed &&
+        _stringSetEquals(
+          a.rewardState.claimedRoomRewardIds,
+          b.rewardState.claimedRoomRewardIds,
+        );
+  }
+
+  static bool _gachaPityMapEquals(
+    Map<String, GachaPityState> a,
+    Map<String, GachaPityState> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null ||
+          other.pullCount != entry.value.pullCount ||
+          other.isGuaranteed != entry.value.isGuaranteed) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static bool _periodicQuestListEquals(
+    List<PeriodicQuestState> a,
+    List<PeriodicQuestState> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].questId != b[i].questId ||
+          a[i].periodKey != b[i].periodKey ||
+          a[i].completedAtMs != b[i].completedAtMs) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static bool _eventShopListEquals(
+    List<EventShopPurchaseRecord> a,
+    List<EventShopPurchaseRecord> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].entryId != b[i].entryId ||
+          a[i].periodKey != b[i].periodKey ||
+          a[i].purchasedCount != b[i].purchasedCount) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

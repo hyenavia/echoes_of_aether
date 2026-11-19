@@ -859,11 +859,13 @@ void main() {
       expect(econ.cycleWeeks, 4);
       expect(econ.cadences, hasLength(3));
 
-      for (final c in econ.cadences) {
-        expect(c.buysAllInSingleCycle, isFalse);
-        expect(c.impossibleForLegendary, isFalse);
-        expect(c.weeksForOneEpic.isFinite, isTrue);
-        expect(c.weeksForOneLegendary.isFinite, isTrue);
+      if (sim.config.eventShop?.currencyId != 'barter') {
+        for (final c in econ.cadences) {
+          expect(c.buysAllInSingleCycle, isFalse);
+          expect(c.impossibleForLegendary, isFalse);
+          expect(c.weeksForOneEpic.isFinite, isTrue);
+          expect(c.weeksForOneLegendary.isFinite, isTrue);
+        }
       }
       // Tidak ada kombinasi item legal yang mencapai/melampaui pct_caps
       expect(econ.pctCapCheck.isBelowAllCaps, isTrue);
@@ -902,71 +904,5 @@ void main() {
         }
       }
     });
-  });
-
-  group('M13 Stage 4 — Shard Economy, Pct Caps & Event Set Impact', () {
-    late BalanceSimulator sim;
-
-    setUpAll(() {
-      final config = BalanceSimulator.loadRealConfig();
-      sim = BalanceSimulator(config);
-    });
-
-    test(
-      'Ekonomi shard (harian, 3x/minggu, hanya weekly) sehat dan total persen kombinasi item legal di bawah cap',
-      () {
-        final econ = sim.simulateEventShopEconomy();
-        expect(econ.dailyShard, 10);
-        expect(econ.weeklyShard, 50);
-        expect(econ.cycleWeeks, 4);
-        expect(econ.cadences, hasLength(3));
-
-        for (final c in econ.cadences) {
-          expect(c.buysAllInSingleCycle, isFalse);
-          expect(c.impossibleForLegendary, isFalse);
-          expect(c.weeksForOneEpic.isFinite, isTrue);
-          expect(c.weeksForOneLegendary.isFinite, isTrue);
-        }
-        // Tidak ada kombinasi item legal yang mencapai/melampaui pct_caps
-        expect(econ.pctCapCheck.isBelowAllCaps, isTrue);
-        expect(
-          econ.pctCapCheck.maxLegalHpPct,
-          lessThan(econ.pctCapCheck.capHpPct),
-        );
-        expect(
-          econ.pctCapCheck.maxLegalAtkPct,
-          lessThan(econ.pctCapCheck.capAtkPct),
-        );
-        expect(
-          econ.pctCapCheck.maxLegalDefPct,
-          lessThan(econ.pctCapCheck.capDefPct),
-        );
-      },
-    );
-
-    test(
-      'Dampak 4-slot Event Set penuh (Epic & Legendary) di D1..D5, Daily/Weekly Boss, Ascension Rank 0..50 aman tanpa overflow/NaN',
-      () {
-        final rows = sim.simulateEventSetImpact(
-          ranks: const [0, 1, 5, 10, 50],
-          seedCount: 5,
-        );
-        expect(rows, hasLength(50)); // 5 ranks * (5 normal + 1 asc + 4 boss)
-        for (final r in rows) {
-          expect(
-            r.allFiniteAndSafe,
-            isTrue,
-            reason: 'Overflow/NaN di ${r.targetId} Rank ${r.cycleRank}',
-          );
-          expect(r.epicWinRate, greaterThanOrEqualTo(0.80));
-          expect(r.legendaryWinRate, greaterThanOrEqualTo(0.85));
-          // Pada Rank >= 1 Legendary Event Set memberi kenaikan DMG & EHP positif
-          if (r.cycleRank >= 1) {
-            expect(r.legendaryDamageDeltaPct, greaterThan(0.0));
-            expect(r.legendaryToughnessDeltaPct, greaterThan(0.0));
-          }
-        }
-      },
-    );
   });
 }

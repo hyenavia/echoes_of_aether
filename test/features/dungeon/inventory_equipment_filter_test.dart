@@ -79,6 +79,12 @@ void main() {
       category: ItemCategory.equipment,
       rarity: ItemRarity.epic,
     );
+    final helmDef = const ItemDefinition(
+      id: 'iron_helm',
+      name: 'Iron Helm',
+      category: ItemCategory.equipment,
+      rarity: ItemRarity.uncommon,
+    );
     final snapshot = ValueNotifier<EquipmentSnapshot>(
       EquipmentSnapshot(
         stats: const CombatStats(maxHp: 100, atk: 10, def: 5),
@@ -98,6 +104,13 @@ void main() {
             rarity: ItemRarity.epic,
             rolledStats: EquipmentStats(def: 12),
           ),
+          EquipmentInstance(
+            id: 'eq_3',
+            definitionId: 'iron_helm',
+            slot: EquipmentSlot.head,
+            rarity: ItemRarity.uncommon,
+            rolledStats: EquipmentStats(hp: 40),
+          ),
         ],
       ),
     );
@@ -107,7 +120,11 @@ void main() {
         home: Scaffold(
           body: EquipmentOverlay(
             snapshot: snapshot,
-            items: {'rusty_sword': swordDef, 'aether_mail': armorDef},
+            items: {
+              'rusty_sword': swordDef,
+              'aether_mail': armorDef,
+              'iron_helm': helmDef,
+            },
             onEquip: (_) {},
             onUnequip: (_) {},
             onClose: () {},
@@ -118,12 +135,29 @@ void main() {
 
     expect(find.text('Rusty Sword'), findsOneWidget);
     expect(find.text('Aether Mail'), findsOneWidget);
+    expect(find.text('Iron Helm'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Armor'));
+    // Filter Badan
+    final badanChip = find.widgetWithText(ChoiceChip, 'Badan');
+    await tester.ensureVisible(badanChip);
+    await tester.pumpAndSettle();
+    await tester.tap(badanChip);
     await tester.pumpAndSettle();
 
     expect(find.text('Rusty Sword'), findsNothing);
+    expect(find.text('Iron Helm'), findsNothing);
     expect(find.text('Aether Mail'), findsOneWidget);
+
+    // Filter Kepala
+    final kepalaChip = find.widgetWithText(ChoiceChip, 'Kepala');
+    await tester.ensureVisible(kepalaChip);
+    await tester.pumpAndSettle();
+    await tester.tap(kepalaChip);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rusty Sword'), findsNothing);
+    expect(find.text('Aether Mail'), findsNothing);
+    expect(find.text('Iron Helm'), findsOneWidget);
 
     final semuaChip = find.widgetWithText(ChoiceChip, 'Semua');
     await tester.ensureVisible(semuaChip);
@@ -137,5 +171,6 @@ void main() {
 
     expect(find.text('Rusty Sword'), findsOneWidget);
     expect(find.text('Aether Mail'), findsNothing);
+    expect(find.text('Iron Helm'), findsNothing);
   });
 }

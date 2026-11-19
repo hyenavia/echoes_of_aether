@@ -110,10 +110,6 @@ void main() {
                   onEquip: (_) {},
                   onUnequip: (_) {},
                   onChooseSpecialization: (_) {},
-                  onSelectPauseOffline: () {
-                    selectedMode = OfflineActivityMode.pauseProgression;
-                    selectedAutoFarmId = null;
-                  },
                   onSelectAutoFarming: (id) {
                     selectedMode = OfflineActivityMode.autoFarming;
                     selectedAutoFarmId = id;
@@ -124,56 +120,49 @@ void main() {
           );
         }
 
-        // Sebelum clear pertama, Auto Farming terkunci.
+        // Sebelum clear pertama, Auto Farming belum aktif dan tombol lokasi terkunci.
         await pumpTown(clearsCount: 0);
-        expect(find.text('Aktivitas Offline'), findsOneWidget);
+        expect(find.text('Auto Farming Offline'), findsOneWidget);
+        expect(find.text('Pause Progression (Default)'), findsNothing);
         expect(
-          find.text('Mode aktif: Pause Progression (Default)'),
+          find.text(
+            'Auto Farming belum aktif — selesaikan dungeon normal di siklus ini terlebih dahulu.',
+          ),
           findsOneWidget,
         );
         expect(
           find.text(
-            'Terkunci — selesaikan Forgotten Forest pada siklus ini untuk membuka Auto Farming.',
+            'Terkunci — selesaikan Forgotten Forest pada siklus ini untuk membuka lokasi farming.',
           ),
           findsOneWidget,
         );
-        await tester.ensureVisible(find.text('Auto Farming: Forgotten Forest'));
-        await tester.tap(find.text('Auto Farming: Forgotten Forest'));
+        await tester.ensureVisible(
+          find.text('Lokasi Farming: Forgotten Forest'),
+        );
+        await tester.tap(find.text('Lokasi Farming: Forgotten Forest'));
         await tester.pump();
         expect(selectedMode, OfflineActivityMode.pauseProgression);
         expect(selectedAutoFarmId, isNull);
 
-        // Setelah clear >= 1, Auto Farming terbuka dan dapat dipilih.
+        // Setelah clear >= 1, Auto Farming otomatis aktif dan tombol cukup memilih lokasi.
         await pumpTown(clearsCount: 1);
         expect(
           find.text(
-            'Terkunci — selesaikan Forgotten Forest pada siklus ini untuk membuka Auto Farming.',
+            'Terkunci — selesaikan Forgotten Forest pada siklus ini untuk membuka lokasi farming.',
           ),
           findsNothing,
         );
-        await tester.ensureVisible(find.text('Auto Farming: Forgotten Forest'));
-        await tester.tap(find.text('Auto Farming: Forgotten Forest'));
+        expect(
+          find.text('Auto Farming aktif — Lokasi: Forgotten Forest'),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(
+          find.text('Lokasi Farming: Forgotten Forest'),
+        );
+        await tester.tap(find.text('Lokasi Farming: Forgotten Forest'));
         await tester.pump();
         expect(selectedMode, OfflineActivityMode.autoFarming);
         expect(selectedAutoFarmId, 'forgotten_forest');
-
-        // Saat mode aktif Auto Farming, memilih Pause mengembalikan default mode.
-        await pumpTown(
-          clearsCount: 1,
-          activity: const OfflineActivitySnapshot(
-            mode: OfflineActivityMode.autoFarming,
-            state: OfflineActivityState.configured,
-            selectedDungeonId: 'forgotten_forest',
-          ),
-        );
-        expect(
-          find.text('Mode aktif: Auto Farming — Forgotten Forest'),
-          findsOneWidget,
-        );
-        await tester.ensureVisible(find.text('Pause Progression (Default)'));
-        await tester.tap(find.text('Pause Progression (Default)'));
-        await tester.pump();
-        expect(selectedMode, OfflineActivityMode.pauseProgression);
       },
     );
 
@@ -315,33 +304,37 @@ void main() {
           ),
         );
 
-        for (var i = 0; i < 20; i++) {
+        for (var i = 0; i < 60; i++) {
           await tester.pump();
           await tester.runAsync(_flushAsyncDb);
           await tester.pump();
-          if (find.byType(TownHubView).evaluate().isNotEmpty) {
+          if (find.byType(TownHubView).evaluate().isNotEmpty &&
+              find.byType(OfflineSummaryOverlay).evaluate().isEmpty) {
             break;
           }
         }
         expect(find.byType(TownHubView), findsOneWidget);
 
-        // Pilih Mode B Auto Farming langsung lewat UI Town Hub.
-        await tester.ensureVisible(find.text('Auto Farming: Forgotten Forest'));
-        await tester.tap(find.text('Auto Farming: Forgotten Forest'));
+        // Auto Farming langsung aktif otomatis di Town tanpa perlu menekan tombol aktivasi;
+        // tombol di UI tetap dapat dipakai untuk memilih lokasi farming.
+        expect(
+          find.text('Auto Farming aktif — Lokasi: Forgotten Forest'),
+          findsOneWidget,
+        );
+        var saved = (await tester.runAsync(repo.loadSnapshot))!;
+        expect(saved.offlineActivity.mode, OfflineActivityMode.autoFarming);
+        expect(saved.offlineActivity.state, OfflineActivityState.configured);
+        expect(saved.offlineActivity.selectedDungeonId, 'forgotten_forest');
+
+        await tester.ensureVisible(
+          find.text('Lokasi Farming: Forgotten Forest'),
+        );
+        await tester.tap(find.text('Lokasi Farming: Forgotten Forest'));
         await tester.pump();
         for (var i = 0; i < 5; i++) {
           await tester.pump();
           await tester.runAsync(_flushAsyncDb);
         }
-        expect(
-          find.text('Mode aktif: Auto Farming — Forgotten Forest'),
-          findsOneWidget,
-        );
-
-        var saved = (await tester.runAsync(repo.loadSnapshot))!;
-        expect(saved.offlineActivity.mode, OfflineActivityMode.autoFarming);
-        expect(saved.offlineActivity.state, OfflineActivityState.configured);
-        expect(saved.offlineActivity.selectedDungeonId, 'forgotten_forest');
 
         // Simulasikan keluar 15 menit lalu kembali (AppLifecycleState.paused -> resumed).
         tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -397,7 +390,7 @@ void main() {
             .gold;
         expect(beforeAckGold, greaterThan(100));
 
-        // Tutup & ack Summary -> reset ke Pause Progression & persisten ke SQLite.
+        // Tutup & ack Summary -> otomatis pasang ulang Auto Farming & persisten ke SQLite.
         await tester.tap(find.text('Tutup & Simpan'));
         for (var i = 0; i < 10; i++) {
           await tester.pump();
@@ -405,17 +398,42 @@ void main() {
         }
         expect(find.byType(OfflineSummaryOverlay), findsNothing);
         expect(
-          find.text('Mode aktif: Pause Progression (Default)'),
+          find.text('Auto Farming aktif — Lokasi: Forgotten Forest'),
           findsOneWidget,
         );
 
         final afterAck = (await tester.runAsync(repo.loadSnapshot))!;
-        expect(
-          afterAck.offlineActivity.mode,
-          OfflineActivityMode.pauseProgression,
-        );
-        expect(afterAck.offlineActivity.state, OfflineActivityState.inactive);
-        expect(afterAck.offlineActivity.pendingSummary?.acknowledged, isTrue);
+        expect(afterAck.offlineActivity.mode, OfflineActivityMode.autoFarming);
+        expect(afterAck.offlineActivity.state, OfflineActivityState.configured);
+        expect(afterAck.offlineActivity.selectedDungeonId, 'forgotten_forest');
+
+        // Pastikan timestamp session segar agar saat cold boot tidak memicu offline farming lagi karena jitter waktu eksekusi test suite
+        await tester.runAsync(() async {
+          final current = (await repo.loadSnapshot())!;
+          final freshNow = DateTime.now().millisecondsSinceEpoch;
+          await repo.saveSnapshot(
+            PlayerSaveSnapshot(
+              playerId: current.playerId,
+              character: current.character,
+              inventory: current.inventory,
+              dungeon: current.dungeon,
+              dungeonProgresses: current.dungeonProgresses,
+              cycleProgress: current.cycleProgress,
+              session: GameSessionSnapshot(
+                playerId: current.session.playerId,
+                lastActiveAtMs: freshNow,
+                lastSavedAtMs: freshNow,
+                lastOfflineClaimAtMs: freshNow,
+                autoSkillEnabled: current.session.autoSkillEnabled,
+              ),
+              claimedEventIds: current.claimedEventIds,
+              activeDungeonSession: current.activeDungeonSession,
+              offlineActivity: current.offlineActivity,
+              gachaPityStates: current.gachaPityStates,
+              unlockedSpecializations: current.unlockedSpecializations,
+            ),
+          );
+        });
 
         // Rebuild widget bersih (cold boot ulang) -> summary tidak muncul lagi dan gold tidak bertambah.
         await tester.pumpWidget(
@@ -433,11 +451,12 @@ void main() {
             ),
           ),
         );
-        for (var i = 0; i < 20; i++) {
+        for (var i = 0; i < 60; i++) {
           await tester.pump();
           await tester.runAsync(_flushAsyncDb);
           await tester.pump();
-          if (find.byType(TownHubView).evaluate().isNotEmpty) {
+          if (find.byType(TownHubView).evaluate().isNotEmpty &&
+              find.byType(OfflineSummaryOverlay).evaluate().isEmpty) {
             break;
           }
         }
@@ -445,20 +464,22 @@ void main() {
         final afterReboot = (await tester.runAsync(repo.loadSnapshot))!;
         expect(afterReboot.character.progress.gold, beforeAckGold);
 
-        // Uji Mode A toggle saat berada di dalam dungeon + reset saat keluar ke Town.
+        // Uji Mode A toggle dari dalam Menu Dungeon + reset saat keluar ke Town.
         await tester.tap(find.text('Masuk Forgotten Forest'));
         for (var i = 0; i < 10; i++) {
           await tester.pump();
           await tester.runAsync(_flushAsyncDb);
         }
-        expect(find.text('Offline: Pause'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
+        await tester.pump();
+        expect(find.text('Lanjut Offline: OFF'), findsOneWidget);
 
-        await tester.tap(find.text('Offline: Pause'));
+        await tester.tap(find.byKey(const Key('hud_offline_button')));
         for (var i = 0; i < 5; i++) {
           await tester.pump();
           await tester.runAsync(_flushAsyncDb);
         }
-        expect(find.text('Offline: Lanjut'), findsOneWidget);
+        expect(find.text('Lanjut Offline: ON'), findsOneWidget);
         final modeASaved = (await tester.runAsync(repo.loadSnapshot))!;
         expect(
           modeASaved.offlineActivity.mode,
@@ -466,16 +487,14 @@ void main() {
         );
         expect(modeASaved.offlineActivity.activeRunId, isNotEmpty);
 
-        // Keluar ke Town membatalkan run sehingga Mode A harus reset aman ke Pause.
-        await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
-        await tester.pump();
+        // Keluar ke Town membatalkan Continue Dungeon dan otomatis mengembalikan Auto Farming.
         await tester.tap(find.text('Kembali ke Town'));
         for (var i = 0; i < 10; i++) {
           await tester.pump();
           await tester.runAsync(_flushAsyncDb);
         }
         expect(
-          find.text('Mode aktif: Pause Progression (Default)'),
+          find.text('Auto Farming aktif — Lokasi: Forgotten Forest'),
           findsOneWidget,
         );
       },

@@ -5,23 +5,32 @@ import 'package:flame/components.dart';
 
 import '../../domain/entities/grid_point.dart';
 import '../../domain/services/navigation_grid.dart';
+import '../visuals/environment_tileset.dart';
 import '../visuals/pixel_sprite_atlas.dart';
 
-/// Visual tilemap room berbasis [NavigationGrid] dan [PixelSpriteAtlas]
-/// Forgotten Forest dengan scaling nearest-neighbor (`FilterQuality.none`).
+/// Visual tilemap room berbasis [NavigationGrid], [EnvironmentTilesetRegistry],
+/// dan [PixelSpriteAtlas] dengan scaling nearest-neighbor (`FilterQuality.none`)
+/// yang mendukung diferensiasi visual per-biome (Forgotten Forest, Crystal Cavern,
+/// Ancient Crypt, Ashen Wasteland, Aether Sanctum).
 class DebugRoomComponent extends PositionComponent {
   DebugRoomComponent({
     required this.grid,
     required this.tileSize,
+    this.biome = 'forgotten_forest',
     this.markers = const [],
     this.exitUnlocked = false,
     PixelSpriteAtlas? atlas,
+    EnvironmentTilesetRegistry? environmentRegistry,
   }) : _atlas = atlas ?? PixelSpriteAtlas.instance,
+       _environmentRegistry =
+           environmentRegistry ?? EnvironmentTilesetRegistry.instance,
        super(size: Vector2(grid.columns * tileSize, grid.rows * tileSize));
 
   final NavigationGrid grid;
   final double tileSize;
+  final String biome;
   final PixelSpriteAtlas _atlas;
+  final EnvironmentTilesetRegistry _environmentRegistry;
 
   /// Titik yang diberi penanda (mis. posisi exit).
   final List<GridPoint> markers;
@@ -57,7 +66,9 @@ class DebugRoomComponent extends PositionComponent {
     for (var y = 0; y < grid.rows; y++) {
       for (var x = 0; x < grid.columns; x++) {
         final key = grid.isWalkable(x, y) ? _floorKey(x, y) : 'wall_tree';
-        final sprite = _atlas.tileSprite(key);
+        final sprite =
+            _environmentRegistry.tileSprite(key, biome: biome) ??
+            _atlas.tileSprite(key, biome: biome);
         final dst = Rect.fromLTWH(
           x * tileSize,
           y * tileSize,
@@ -91,7 +102,9 @@ class DebugRoomComponent extends PositionComponent {
     final paint = PixelSpriteAtlas.pixelPaint;
     const src = Rect.fromLTWH(0, 0, 16, 16);
     final exitKey = exitUnlocked ? 'exit_unlocked' : 'exit_locked';
-    final exitSprite = _atlas.tileSprite(exitKey);
+    final exitSprite =
+        _environmentRegistry.tileSprite(exitKey, biome: biome) ??
+        _atlas.tileSprite(exitKey);
     final pulse = (math.sin(_animTime * 4.0) + 1) * 0.5;
 
     for (final m in markers) {

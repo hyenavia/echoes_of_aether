@@ -2,6 +2,7 @@ import 'package:echoes_of_aether/domain/entities/cycle_progress.dart';
 import 'package:echoes_of_aether/domain/entities/difficulty_config.dart';
 import 'package:echoes_of_aether/domain/entities/dungeon_definition.dart';
 import 'package:echoes_of_aether/domain/entities/grid_point.dart';
+import 'package:echoes_of_aether/domain/entities/offline_activity.dart';
 import 'package:echoes_of_aether/domain/entities/player_save_snapshot.dart';
 import 'package:echoes_of_aether/domain/services/difficulty_service.dart';
 import 'package:echoes_of_aether/domain/services/dungeon_progression_service.dart';
@@ -260,6 +261,77 @@ void main() {
           expect(extreme, lessThanOrEqualTo(DifficultyService.kMaxScaledValue));
         },
       );
+
+      test('resolveTownOfflineActivity mengaktifkan Auto Farming otomatis bila ada dungeon clear & tetap pause bila belum ada', () {
+        const rank0 = CycleProgress(ascensionRank: 0);
+        final emptyProgress = <String, DungeonProgressSnapshot>{};
+        final initialPaused = OfflineActivitySnapshot.paused(
+          lastCheckpointAtMs: 5000,
+        );
+
+        final noClear = progression.resolveTownOfflineActivity(
+          current: initialPaused,
+          dungeons: all,
+          cycle: rank0,
+          progresses: emptyProgress,
+          checkpointAtMs: 9000,
+        );
+        expect(noClear.mode, OfflineActivityMode.pauseProgression);
+
+        final d1Cleared = <String, DungeonProgressSnapshot>{
+          'd1': const DungeonProgressSnapshot(
+            currentDungeonId: 'd1',
+            clearsCount: 1,
+            clearedInCycleRank: 0,
+          ),
+        };
+        final autoArmed = progression.resolveTownOfflineActivity(
+          current: initialPaused,
+          dungeons: all,
+          cycle: rank0,
+          progresses: d1Cleared,
+          checkpointAtMs: 9000,
+        );
+        expect(autoArmed.mode, OfflineActivityMode.autoFarming);
+        expect(autoArmed.state, OfflineActivityState.configured);
+        expect(autoArmed.selectedDungeonId, 'd1');
+
+        // Ringkasan offline yang belum dibaca tidak boleh ditimpa dulu.
+        const unackedSummary = OfflineSummarySnapshot(
+          eventId: 'evt-1',
+          mode: OfflineActivityMode.autoFarming,
+          finalState: OfflineActivityState.completed,
+          effectiveElapsedMs: 60000,
+        );
+        final pendingSnapshot = autoArmed
+            .transitionTo(OfflineActivityState.pending)
+            .transitionTo(OfflineActivityState.processing)
+            .transitionTo(
+              OfflineActivityState.completed,
+              pendingSummary: unackedSummary,
+            );
+        final keptSummary = progression.resolveTownOfflineActivity(
+          current: pendingSnapshot,
+          dungeons: all,
+          cycle: rank0,
+          progresses: d1Cleared,
+          checkpointAtMs: 9500,
+        );
+        expect(identical(keptSummary, pendingSnapshot), isTrue);
+
+        // Setelah di-acknowledge, langsung terpasang kembali ke d1.
+        final acked = keptSummary.acknowledgePendingSummary();
+        final rearmed = progression.resolveTownOfflineActivity(
+          current: acked,
+          dungeons: all,
+          cycle: rank0,
+          progresses: d1Cleared,
+          checkpointAtMs: 9500,
+          preferredDungeonId: 'd1',
+        );
+        expect(rearmed.mode, OfflineActivityMode.autoFarming);
+        expect(rearmed.selectedDungeonId, 'd1');
+      });
     },
   );
 }

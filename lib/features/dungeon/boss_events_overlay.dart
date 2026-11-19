@@ -35,11 +35,13 @@ class BossEventsOverlay extends StatelessWidget {
     required this.daily,
     required this.weekly,
     required this.onClose,
+    this.embedded = false,
   });
 
   final BossEventCardData daily;
   final BossEventCardData weekly;
   final VoidCallback onClose;
+  final bool embedded;
 
   static String formatCountdown(Duration duration) {
     final safeSeconds = duration.isNegative ? 0 : duration.inSeconds;
@@ -59,6 +61,19 @@ class BossEventsOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (embedded) {
+      return SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _BossCard(data: daily),
+            const SizedBox(height: 12),
+            _BossCard(data: weekly),
+          ],
+        ),
+      );
+    }
     return Material(
       color: Colors.black54,
       child: Center(

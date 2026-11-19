@@ -1,4 +1,46 @@
+import 'package:flutter/foundation.dart';
+
 import '../../domain/entities/player_character.dart';
+
+/// Informasi skill untuk visualisasi HUD di dalam dungeon.
+@immutable
+class HudSkillInfo {
+  const HudSkillInfo({
+    required this.id,
+    required this.name,
+    this.spritePath,
+    required this.cooldownSeconds,
+    required this.remainingSeconds,
+    required this.progress,
+    this.isReady = false,
+  });
+
+  final String id;
+  final String name;
+  final String? spritePath;
+  final double cooldownSeconds;
+  final double remainingSeconds;
+
+  /// Nilai 0.0 jika siap, atau 0.0 -> 1.0 mewakili sisa cooldown.
+  final double progress;
+  final bool isReady;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HudSkillInfo &&
+          runtimeType == other.runtimeType &&
+          other.id == id &&
+          other.name == name &&
+          other.spritePath == spritePath &&
+          other.cooldownSeconds == cooldownSeconds &&
+          (other.remainingSeconds - remainingSeconds).abs() < 0.05 &&
+          (other.progress - progress).abs() < 0.02 &&
+          other.isReady == isReady;
+
+  @override
+  int get hashCode => Object.hash(id, name, isReady);
+}
 
 /// Snapshot data HUD. Immutable dengan `==` agar `ValueNotifier` hanya
 /// memberi tahu UI ketika nilainya benar-benar berubah.
@@ -26,6 +68,7 @@ class HudState {
     this.isElite = false,
     this.isFinalBoss = false,
     this.skillCooldownText = '',
+    this.skills = const [],
   });
 
   factory HudState.fromCharacter(
@@ -48,6 +91,7 @@ class HudState {
     bool isElite = false,
     bool isFinalBoss = false,
     String skillCooldownText = '',
+    List<HudSkillInfo> skills = const [],
   }) {
     return HudState(
       level: character.level,
@@ -72,6 +116,7 @@ class HudState {
       isElite: isElite,
       isFinalBoss: isFinalBoss,
       skillCooldownText: skillCooldownText,
+      skills: skills,
     );
   }
 
@@ -109,6 +154,7 @@ class HudState {
   final bool isElite;
   final bool isFinalBoss;
   final String skillCooldownText;
+  final List<HudSkillInfo> skills;
 
   bool get isMaxLevel => expToNext <= 0;
 
@@ -144,7 +190,8 @@ class HudState {
       other.bossMaxHp == bossMaxHp &&
       other.isElite == isElite &&
       other.isFinalBoss == isFinalBoss &&
-      other.skillCooldownText == skillCooldownText;
+      other.skillCooldownText == skillCooldownText &&
+      listEquals(other.skills, skills);
 
   @override
   int get hashCode => Object.hashAll([
@@ -170,5 +217,6 @@ class HudState {
     isElite,
     isFinalBoss,
     skillCooldownText,
+    Object.hashAll(skills),
   ]);
 }

@@ -192,6 +192,48 @@ void main() {
       expect(pExtreme.atkMultiplier, lessThanOrEqualTo(1e9));
       expect(pExtreme.defMultiplier, lessThanOrEqualTo(1e9));
     });
+
+    test('Elite dan Boss menerima pengali tier ekstra per Ascension Rank', () {
+      final p0 = service.profileFor(_makeDungeon(1.0), 0);
+      const baseStats = CombatStats(maxHp: 100, atk: 20, def: 5);
+
+      final normalStatsR0 = service.scaleMonsterStats(baseStats, p0);
+      final eliteStatsR0 = service.scaleMonsterStats(
+        baseStats,
+        p0,
+        isElite: true,
+      );
+      final bossStatsR0 = service.scaleMonsterStats(
+        baseStats,
+        p0,
+        isBoss: true,
+      );
+
+      // Pada Rank 0, elite dan boss identik dengan normal
+      expect(eliteStatsR0.maxHp, normalStatsR0.maxHp);
+      expect(eliteStatsR0.atk, normalStatsR0.atk);
+      expect(bossStatsR0.maxHp, normalStatsR0.maxHp);
+      expect(bossStatsR0.atk, normalStatsR0.atk);
+
+      // Pada Rank 5, elite > normal dan boss > elite
+      final p5 = service.profileFor(_makeDungeon(1.0), 5);
+      final normalStatsR5 = service.scaleMonsterStats(baseStats, p5);
+      final eliteStatsR5 = service.scaleMonsterStats(
+        baseStats,
+        p5,
+        isElite: true,
+      );
+      final bossStatsR5 = service.scaleMonsterStats(
+        baseStats,
+        p5,
+        isBoss: true,
+      );
+
+      expect(eliteStatsR5.maxHp, greaterThan(normalStatsR5.maxHp));
+      expect(eliteStatsR5.atk, greaterThan(normalStatsR5.atk));
+      expect(bossStatsR5.maxHp, greaterThanOrEqualTo(eliteStatsR5.maxHp));
+      expect(bossStatsR5.atk, greaterThanOrEqualTo(eliteStatsR5.atk));
+    });
   });
 
   group(
@@ -283,6 +325,24 @@ void main() {
           eqBonus.rolledStats.hp,
           closeTo(eqBase.rolledStats.hp + 10.0, 1e-9),
         );
+      });
+
+      test('computeBossPowerFactor scales safely at Rank 0 and ramps up to balanced cap at Rank 5+', () {
+        // Rank 0: safe base power factors for new players
+        expect(service.computeBossPowerFactor(1.25, 0), 1.25);
+        expect(service.computeBossPowerFactor(1.5, 0), 1.5);
+
+        // Rank 1..4: ramping up gradually
+        final dailyRank1 = service.computeBossPowerFactor(1.25, 1);
+        final weeklyRank1 = service.computeBossPowerFactor(1.5, 1);
+        expect(dailyRank1, closeTo(1.30, 1e-9));
+        expect(weeklyRank1, closeTo(1.60, 1e-9));
+
+        // Rank 5+: full cap scaling (balanced and beatable)
+        expect(service.computeBossPowerFactor(1.25, 5), closeTo(1.50, 1e-9));
+        expect(service.computeBossPowerFactor(1.5, 5), closeTo(2.00, 1e-9));
+        expect(service.computeBossPowerFactor(1.25, 10), closeTo(1.50, 1e-9));
+        expect(service.computeBossPowerFactor(1.5, 300), closeTo(2.00, 1e-9));
       });
     },
   );

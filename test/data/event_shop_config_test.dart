@@ -217,17 +217,27 @@ void main() {
         expect(eventShop.pool, hasLength(8));
         expect(eventShop.cycleLength, 4);
         expect(eventShop.weeklyPurchaseLimit, 1);
-        expect(eventShop.currencyId, 'aether_shard');
+        expect(eventShop.currencyId, 'barter');
 
         for (final entry in eventShop.pool) {
+          expect(entry.isBarter, isTrue);
+          expect(entry.price, 0);
           if (entry.tier == EventItemTier.epic) {
-            expect(entry.price, 100);
+            expect(entry.goldPrice, 25000);
+            expect(entry.materialCosts, {
+              'boss_remnant': 3,
+              'aether_scrap': 30,
+            });
             expect(
               entry.requirements,
               contains(const DungeonClearedRequirement('ancient_crypt')),
             );
           } else {
-            expect(entry.price, 180);
+            expect(entry.goldPrice, 75000);
+            expect(entry.materialCosts, {
+              'boss_remnant': 6,
+              'aether_scrap': 75,
+            });
             expect(
               entry.requirements,
               contains(const MinAscensionRankRequirement(1)),

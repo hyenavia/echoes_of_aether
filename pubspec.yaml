@@ -43,6 +43,9 @@ dependencies:
   flutter_local_notifications: 21.0.0
   timezone: ^0.11.2
   crypto: ^3.0.8
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+  cloud_firestore: ^7.1.0
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +73,21 @@ flutter:
   assets:
     - assets/data/
     - assets/audio/
+    - assets/ui/
+    - assets/sprite/
+    - assets/char/
+    - assets/char/frames/
+    - assets/monster/
+    - assets/monster/frames/
+    - assets/branding/
+    - assets/branding/app_icon/
+    - assets/branding/logo/
+    - assets/branding/symbol/
+    - assets/branding/monochrome/
+    - assets/branding/splash/
+    - assets/environment/fantasy_dreamland/
+    - assets/environment/mines_caves/
+    - assets/environment/biomes/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

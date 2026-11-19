@@ -1,4 +1,5 @@
 import '../../core/errors/config_exception.dart';
+import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/specialization.dart';
 import 'json_reader.dart';
 import 'stat_bonus_parser.dart';
@@ -32,6 +33,8 @@ class SpecializationConfigParser {
         'attack_range',
         'unlock_level',
         'skill_affinities',
+        'rarity',
+        'signature_weapon_id',
       });
 
       final id = _r.string(map, where, 'id');
@@ -43,6 +46,12 @@ class SpecializationConfigParser {
           ? null
           : _r.integer(map, where, 'unlock_level', min: 1);
       final affinities = _parseAffinities(map, where);
+      final rarity = map['rarity'] == null
+          ? ItemRarity.legendary
+          : _parseRarity(_r.string(map, where, 'rarity'), where);
+      final signatureWeaponId = map['signature_weapon_id'] == null
+          ? null
+          : _r.string(map, where, 'signature_weapon_id');
       result[id] = SpecializationDefinition(
         id: id,
         name: _r.string(map, where, 'name'),
@@ -55,10 +64,21 @@ class SpecializationConfigParser {
             : _r.number(map, where, 'attack_range', min: 0, minExclusive: true),
         unlockLevel: specUnlockLevel,
         skillAffinities: affinities,
+        rarity: rarity,
+        signatureWeaponId: signatureWeaponId,
       );
     }
     return SpecializationConfig(unlockLevel: unlockLevel, definitions: result);
   }
+
+  ItemRarity _parseRarity(String raw, String where) => switch (raw) {
+    'legendary' => ItemRarity.legendary,
+    'mythical' => ItemRarity.mythical,
+    _ => throw ConfigException(
+      'specializations.json: $where."rarity" tidak dikenal: "$raw" '
+      '(pilihan: legendary, mythical).',
+    ),
+  };
 
   Map<String, double> _parseAffinities(Map<String, dynamic> map, String where) {
     final raw = map['skill_affinities'];

@@ -42,12 +42,13 @@ abstract final class AppColors {
   static const Color arcaneGlow = Color(0x33A88AD5);
   static const Color emberGlow = Color(0x33D96868);
 
-  // ---- Warna Rarity (Common..Legendary) ----
+  // ---- Warna Rarity (Common..Mythical) ----
   static const Color rarityCommon = Color(0xFFA8B3AE);
   static const Color rarityUncommon = Color(0xFF7FB069);
   static const Color rarityRare = aetherBlue;
   static const Color rarityEpic = arcaneViolet;
   static const Color rarityLegendary = antiqueGold;
+  static const Color rarityMythical = Color(0xFFFF2A6D);
 
   // ---- Semantik Status ----
   static const Color success = Color(0xFF6BBF73);
@@ -62,6 +63,7 @@ abstract final class AppColors {
     ItemRarity.rare => rarityRare,
     ItemRarity.epic => rarityEpic,
     ItemRarity.legendary => rarityLegendary,
+    ItemRarity.mythical => rarityMythical,
   };
 }
 
@@ -157,11 +159,18 @@ abstract final class AppShadows {
     BoxShadow(color: Color(0x5506100D), blurRadius: 10, offset: Offset(0, 4)),
   ];
 
-  static List<BoxShadow> glow(Color color, {double alpha = 0.22}) => [
+  static List<BoxShadow> glow(
+    Color color, {
+    double alpha = 0.22,
+    double blurRadius = 14,
+    double spreadRadius = 1,
+    Offset offset = Offset.zero,
+  }) => [
     BoxShadow(
       color: color.withValues(alpha: alpha),
-      blurRadius: 14,
-      spreadRadius: 1,
+      blurRadius: blurRadius,
+      spreadRadius: spreadRadius,
+      offset: offset,
     ),
   ];
 }

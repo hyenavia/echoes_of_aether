@@ -1,0 +1,63 @@
+{
+  "cycle_days": 21,
+  "cost_per_pull": 30,
+  "cost_per_ten_pull": 300,
+  "currency_id": "aether_shard",
+  "duplicate_currency_id": "soul_prism",
+  "duplicate_granted_amount": 1,
+  "banners": [
+    {
+      "id": "specialization_awakening",
+      "name": "Panggilan Jiwa Kuno",
+      "type": "class",
+      "hard_pity": 40,
+      "base_rate": 0.015,
+      "rate_up_share": 0.5,
+      "featured_pool": [
+        "paladin",
+        "voidblade",
+        "chronomancer",
+        "gunslinger",
+        "necromancer",
+        "stormcaller"
+      ],
+      "standard_pool": [
+        "paladin",
+        "voidblade",
+        "chronomancer",
+        "gunslinger",
+        "necromancer",
+        "stormcaller"
+      ]
+    },
+    {
+      "id": "mythical_armory",
+      "name": "Gudang Senjata Legenda",
+      "type": "weapon",
+      "hard_pity": 30,
+      "base_rate": 0.02,
+      "rate_up_share": 0.5,
+      "featured_pool": [
+        "dawns_aegis_blade",
+        "shadowfang_twinblade",
+        "hourglass_of_eternity",
+        "aether_railgun",
+        "scythe_of_the_harvester",
+        "thunderlords_scepter"
+      ],
+      "standard_pool": [
+        "dawns_aegis_blade",
+        "shadowfang_twinblade",
+        "hourglass_of_eternity",
+        "aether_railgun",
+        "scythe_of_the_harvester",
+        "thunderlords_scepter"
+      ]
+    }
+  ],
+  "sanctuary_exchange": {
+    "currency_id": "soul_prism",
+    "class_cost": 3,
+    "weapon_cost": 2
+  }
+}

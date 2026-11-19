@@ -88,10 +88,12 @@ void main() {
       config: config.progression,
       specializationConfig: config.specializations,
       skillCatalog: config.skills,
-      progress: const PlayerProgress(level: 30, gold: 2000),
+      progress: const PlayerProgress(level: 30, gold: 100000),
       initialSpecializationId: 'vanguard',
     );
-    inventory = Inventory(definitions: config.items);
+    inventory = Inventory(definitions: config.items)
+      ..add('boss_remnant', 20)
+      ..add('aether_scrap', 200);
     views = InventoryViews(inventory: inventory, character: character);
     shopService = ShopService(
       catalog: config.shop,
@@ -131,6 +133,8 @@ void main() {
         effectiveNowMs: week1MondayMs,
         context: buildCtx(unlocked: unlocked),
         currencyBalance: currencyService.balance(kAetherShardCurrencyId),
+        goldBalance: character.gold,
+        inventory: inventory,
         hasInventorySpace: inventory.hasEquipmentSpace,
         purchaseCounts: eventPurchases,
         offset: Duration.zero,
@@ -176,6 +180,7 @@ void main() {
                       effectiveNowMs: week1MondayMs,
                       inventory: inventory,
                       currencyService: currencyService,
+                      character: character,
                       context: buildCtx(unlocked: unlocked),
                       random: math.Random(1),
                       purchaseCounts: eventPurchases,
@@ -214,9 +219,22 @@ void main() {
 
       // Kedua item aktif tampil bersama alasan terkunci & countdown reset.
       expect(find.text(config.items[epicOffer.itemId]!.name), findsOneWidget);
-      expect(find.text(config.items[legOffer.itemId]!.name), findsOneWidget);
       expect(find.textContaining('Pergantian minggu:'), findsOneWidget);
-      expect(find.textContaining('Syarat belum terpenuhi:'), findsNWidgets(2));
+      await tester.scrollUntilVisible(
+        find.text(config.items[legOffer.itemId]!.name),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text(config.items[legOffer.itemId]!.name), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text(config.items[epicOffer.itemId]!.name),
+        -100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(
+        find.textContaining('Syarat belum terpenuhi:'),
+        findsAtLeastNWidgets(1),
+      );
 
       // Tombol beli nonaktif saat syarat belum terpenuhi.
       final lockedBtn = tester.widget<FilledButton>(
@@ -260,6 +278,7 @@ void main() {
                       effectiveNowMs: week1MondayMs,
                       inventory: inventory,
                       currencyService: currencyService,
+                      character: character,
                       context: buildCtx(unlocked: true),
                       random: math.Random(1),
                       purchaseCounts: eventPurchases,
@@ -282,7 +301,7 @@ void main() {
 
       await tester.tap(find.byKey(Key('event_shop_buy_${epicOffer.id}')));
       await tester.pumpAndSettle();
-      expect(find.text('Konfirmasi Pembelian Event'), findsOneWidget);
+      expect(find.text('Konfirmasi Barter Outpost'), findsOneWidget);
 
       await tester.tap(find.text('Batal'));
       await tester.pumpAndSettle();
@@ -295,8 +314,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(buyCalls, 1);
-      expect(currencyService.balance(kAetherShardCurrencyId), 150);
-      expect(find.textContaining('Berhasil membeli'), findsOneWidget);
+      expect(currencyService.balance(kAetherShardCurrencyId), 250);
+      expect(character.gold, 100000 - epicOffer.goldPrice);
+      expect(inventory.quantityOf('boss_remnant'), 17);
+      expect(inventory.quantityOf('aether_scrap'), 170);
+      expect(find.textContaining('Berhasil barter'), findsOneWidget);
       expect(find.text('Sudah dibeli minggu ini (1/1)'), findsOneWidget);
       final afterBuyBtn = tester.widget<FilledButton>(
         find.byKey(Key('event_shop_buy_${epicOffer.id}')),

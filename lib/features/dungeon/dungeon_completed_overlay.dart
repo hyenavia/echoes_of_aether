@@ -77,12 +77,12 @@ class DungeonCompletedOverlay extends StatelessWidget {
                         width: 1.5,
                       ),
                     ),
-                    child: Icon(
-                      isAscension
-                          ? Icons.auto_awesome_outlined
-                          : Icons.emoji_events_outlined,
-                      size: 30,
-                      color: accentColor,
+                    child: const Center(
+                      child: AetherSymbolMark(
+                        variant: AetherSymbolVariant.mark,
+                        size: 34,
+                        glow: true,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),

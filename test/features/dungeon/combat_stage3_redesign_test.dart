@@ -320,21 +320,25 @@ void main() {
       await tester.pump();
       await tester.pump();
 
+      // Di layar combat hanya tombol Menu yang tampil agar hemat tempat
+      expect(find.byKey(const Key('hud_menu_toggle_button')), findsOneWidget);
+      expect(find.byKey(const Key('hud_auto_skill_button')), findsNothing);
+      expect(find.byKey(const Key('hud_offline_button')), findsNothing);
+
+      // Buka Menu Drawer -> cek Auto Skill, Lanjut Offline, dan menu panel
+      await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
+      await tester.pump();
+      expect(find.byKey(const Key('hud_menu_drawer')), findsOneWidget);
+      expect(find.text('Menu Dungeon'), findsOneWidget);
       expect(find.byKey(const Key('hud_auto_skill_button')), findsOneWidget);
       expect(find.byKey(const Key('hud_offline_button')), findsOneWidget);
-      expect(find.byKey(const Key('hud_menu_toggle_button')), findsOneWidget);
 
-      // Toggle Auto Skill
+      // Toggle Auto Skill dari dalam Menu Drawer
       expect(find.text('Auto Skill: ON'), findsOneWidget);
       await tester.tap(find.byKey(const Key('hud_auto_skill_button')));
       await tester.pump();
       expect(find.text('Auto Skill: OFF'), findsOneWidget);
 
-      // Buka Menu Drawer dan buka Tas (InventoryOverlay)
-      await tester.tap(find.byKey(const Key('hud_menu_toggle_button')));
-      await tester.pump();
-      expect(find.byKey(const Key('hud_menu_drawer')), findsOneWidget);
-      expect(find.text('Menu Dungeon'), findsOneWidget);
       expect(find.text('Tas'), findsOneWidget);
       expect(find.text('Perlengkapan'), findsOneWidget);
       expect(find.text('Karakter'), findsOneWidget);

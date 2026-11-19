@@ -275,44 +275,35 @@ void main() {
 
       expect(find.byKey(const Key('town_bottom_nav')), findsOneWidget);
 
-      // Quick Access -> Karakter (Hero tab)
-      await tester.tap(find.byKey(const Key('quick_access_hero')));
+      // Quick Access Strip tidak lagi menumpuk shortcut duplikat Bottom Nav
+      expect(find.byKey(const Key('quick_access_hero')), findsNothing);
+      expect(find.byKey(const Key('quick_access_equipment')), findsNothing);
+      expect(find.byKey(const Key('quick_access_bag')), findsNothing);
+      expect(find.byKey(const Key('quick_access_skills')), findsNothing);
+      expect(find.byKey(const Key('quick_access_shop')), findsNothing);
+
+      // Bottom nav -> Hero (Profil & Gear + Kelas & Skill)
+      await tester.tap(find.text('Hero'));
       await tester.pump();
       expect(find.byType(CharacterOverlay), findsOneWidget);
+      expect(find.text('Profil & Gear'), findsOneWidget);
+      expect(find.text('Perlengkapan Terpasang'), findsOneWidget);
 
-      // Kembali ke Adventure via bottom nav
-      await tester.tap(find.text('Adventure'));
+      await tester.tap(find.text('Kelas & Skill'));
       await tester.pump();
+      expect(find.text('Spesialisasi'), findsOneWidget);
 
-      // Quick Access -> Equip (Bag tab -> Perlengkapan)
-      await tester.tap(find.byKey(const Key('quick_access_equipment')));
+      // Bottom nav -> Bag (Equipment & Item)
+      await tester.tap(find.text('Bag'));
       await tester.pump();
       expect(find.byType(EquipmentOverlay), findsOneWidget);
 
-      // Kembali ke Adventure
-      await tester.tap(find.text('Adventure'));
-      await tester.pump();
-
-      // Quick Access -> Inventori (Bag tab -> Tas)
-      await tester.tap(find.byKey(const Key('quick_access_bag')));
+      await tester.tap(find.text('Item'));
       await tester.pump();
       expect(find.byType(InventoryOverlay), findsOneWidget);
 
-      // Kembali ke Adventure
-      await tester.tap(find.text('Adventure'));
-      await tester.pump();
-
-      // Quick Access -> Skill (Hero tab)
-      await tester.tap(find.byKey(const Key('quick_access_skills')));
-      await tester.pump();
-      expect(find.byType(CharacterOverlay), findsOneWidget);
-
-      // Kembali ke Adventure
-      await tester.tap(find.text('Adventure'));
-      await tester.pump();
-
-      // Quick Access -> Toko (Shop tab)
-      await tester.tap(find.byKey(const Key('quick_access_shop')));
+      // Bottom nav -> Shop
+      await tester.tap(find.text('Shop'));
       await tester.pump();
       expect(find.byType(ShopOverlay), findsOneWidget);
 
@@ -320,6 +311,11 @@ void main() {
       await tester.tap(find.text('Settings'));
       await tester.pump();
       expect(find.byType(SettingsOverlay), findsOneWidget);
+
+      // Kembali ke Adventure
+      await tester.tap(find.text('Adventure'));
+      await tester.pump();
+      expect(find.text('Town / Camp'), findsOneWidget);
 
       expect(tester.takeException(), isNull);
     },
@@ -395,8 +391,8 @@ void main() {
 
       // Pastikan Active Adventure & Daftar Dungeon menampilkan status + progress ruangan
       expect(find.text('Target Aktif'), findsOneWidget);
-      expect(find.text('Progres room tertinggi: 3 / 5'), findsOneWidget);
-      expect(find.text('3 / 5'), findsOneWidget);
+      expect(find.text('Progres room tertinggi: 3 / 6'), findsOneWidget);
+      expect(find.text('3 / 6'), findsOneWidget);
       expect(find.text('5 / 5'), findsOneWidget);
       expect(find.text('Selesai'), findsOneWidget);
       expect(find.text('Terbuka'), findsWidgets);

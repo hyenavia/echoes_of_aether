@@ -202,6 +202,23 @@ class _CampBackdropPainter extends CustomPainter {
               Rect.fromCircle(center: crystalCenter, radius: w * 0.14),
             ),
     );
+    // Subtle rune ring and gold orbit around crystal (Aether branding accent)
+    canvas.drawCircle(
+      crystalCenter,
+      w * 0.08,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..color = AppColors.antiqueGold.withValues(alpha: 0.22),
+    );
+    canvas.drawCircle(
+      crystalCenter,
+      w * 0.11,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.6
+        ..color = AppColors.aetherBlue.withValues(alpha: 0.18),
+    );
     final spire = Path()
       ..moveTo(w * 0.84, h * 0.38)
       ..lineTo(w * 0.89, h * 0.58)

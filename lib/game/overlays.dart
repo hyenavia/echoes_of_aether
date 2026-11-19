@@ -9,6 +9,8 @@ class GameOverlays {
   static const String character = 'character';
   static const String settings = 'settings';
   static const String shop = 'shop';
+  static const String blacksmith = 'blacksmith';
+  static const String altar = 'altar';
   static const String runEnded = 'runEnded';
   static const String dungeonCompleted = 'dungeonCompleted';
 
@@ -18,5 +20,7 @@ class GameOverlays {
     equipment,
     character,
     settings,
+    blacksmith,
+    altar,
   ];
 }

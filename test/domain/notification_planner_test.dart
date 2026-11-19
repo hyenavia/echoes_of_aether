@@ -192,70 +192,64 @@ void main() {
       },
     );
 
-    test(
-      'event_shop_ending dijadwalkan Minggu bila toggle aktif dan ada item layak beli, patuh jam tenang & maxPerDay',
-      () {
-        final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
-        // Tidak ada item layak beli -> tidak dijadwalkan.
-        final noItemPlan = planner.plan(
-          NotificationInputs(
-            nowMs: nowMs,
-            settings: const GameSettingsData(notifyEventShopEnding: true),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            hasPurchasableUnboughtEventItem: false,
-            timeZoneOffset: Duration.zero,
-          ),
-        );
-        expect(noItemPlan, isEmpty);
+    test('event_shop_ending dijadwalkan Minggu bila toggle aktif dan ada item layak beli, patuh jam tenang & maxPerDay', () {
+      final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
+      // Tidak ada item layak beli -> tidak dijadwalkan.
+      final noItemPlan = planner.plan(
+        NotificationInputs(
+          nowMs: nowMs,
+          settings: const GameSettingsData(notifyEventShopEnding: true),
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
+          hasPurchasableUnboughtEventItem: false,
+          timeZoneOffset: Duration.zero,
+        ),
+      );
+      expect(noItemPlan, isEmpty);
 
-        // Toggle aktif + ada item layak beli -> Minggu 2026-11-22 18:00.
-        final eligiblePlan = planner.plan(
-          NotificationInputs(
-            nowMs: nowMs,
-            settings: const GameSettingsData(notifyEventShopEnding: true),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            hasPurchasableUnboughtEventItem: true,
-            timeZoneOffset: Duration.zero,
-          ),
-        );
-        expect(eligiblePlan, hasLength(1));
-        expect(
-          eligiblePlan.single.category,
-          NotificationCategory.eventShopEnding,
-        );
-        expect(eligiblePlan.single.id, NotificationPlanner.idEventShopEnding);
-        expect(
-          eligiblePlan.single.channel,
-          NotificationPlanner.channelEventShop,
-        );
-        expect(
-          eligiblePlan.single.fireAtMs,
-          DateTime.utc(2026, 11, 22, 18, 0).millisecondsSinceEpoch,
-        );
+      // Toggle aktif + ada item layak beli -> Minggu 2026-11-22 18:00.
+      final eligiblePlan = planner.plan(
+        NotificationInputs(
+          nowMs: nowMs,
+          settings: const GameSettingsData(notifyEventShopEnding: true),
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
+          hasPurchasableUnboughtEventItem: true,
+          timeZoneOffset: Duration.zero,
+        ),
+      );
+      expect(eligiblePlan, hasLength(1));
+      expect(
+        eligiblePlan.single.category,
+        NotificationCategory.eventShopEnding,
+      );
+      expect(eligiblePlan.single.id, NotificationPlanner.idEventShopEnding);
+      expect(eligiblePlan.single.channel, NotificationPlanner.channelEventShop);
+      expect(
+        eligiblePlan.single.fireAtMs,
+        DateTime.utc(2026, 11, 22, 18, 0).millisecondsSinceEpoch,
+      );
 
-        // Jam tenang menggeser pengingat pukul 23:00 ke 07:00 keesokan paginya.
-        final quietPlan = planner.plan(
-          NotificationInputs(
-            nowMs: nowMs,
-            settings: const GameSettingsData(
-              notifyEventShopEnding: true,
-              notifyQuietHoursEnabled: true,
-            ),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            hasPurchasableUnboughtEventItem: true,
-            config: const NotificationConfig(weeklyReminderHour: 23),
-            timeZoneOffset: Duration.zero,
+      // Jam tenang menggeser pengingat pukul 23:00 ke 07:00 keesokan paginya.
+      final quietPlan = planner.plan(
+        NotificationInputs(
+          nowMs: nowMs,
+          settings: const GameSettingsData(
+            notifyEventShopEnding: true,
+            notifyQuietHoursEnabled: true,
           ),
-        );
-        expect(
-          quietPlan.single.fireAtMs,
-          DateTime.utc(2026, 11, 23, 7, 0).millisecondsSinceEpoch,
-        );
-      },
-    );
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
+          hasPurchasableUnboughtEventItem: true,
+          config: const NotificationConfig(weeklyReminderHour: 23),
+          timeZoneOffset: Duration.zero,
+        ),
+      );
+      expect(
+        quietPlan.single.fireAtMs,
+        DateTime.utc(2026, 11, 23, 7, 0).millisecondsSinceEpoch,
+      );
+    });
 
     test('event_shop_ending dijadwalkan Minggu bila toggle aktif dan ada item layak beli, patuh jam tenang & maxPerDay', () {
       final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;

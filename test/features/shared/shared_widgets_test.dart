@@ -89,6 +89,92 @@ void main() {
   );
 
   testWidgets(
+    'ItemCard merender sub-stat secara vertikal (list atas ke bawah)',
+    (tester) async {
+      await tester.pumpWidget(
+        wrapWithTheme(
+          Column(
+            children: [
+              const ItemCard(
+                name: 'Celestial Crown',
+                rarity: ItemRarity.legendary,
+                slot: EquipmentSlot.head,
+                statsLines: ['DEF +45', 'HP +220', 'HASTE +12%'],
+              ),
+              const SizedBox(height: 8),
+              const ItemCard(
+                name: 'Aether Robe',
+                rarity: ItemRarity.epic,
+                slot: EquipmentSlot.body,
+                statsSummary: 'DEF +30, HP +150',
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Baris statsLines terpisah vertikal
+      expect(find.text('DEF +45'), findsOneWidget);
+      expect(find.text('HP +220'), findsOneWidget);
+      expect(find.text('HASTE +12%'), findsOneWidget);
+
+      // statsSummary ter-split dan tampil per baris
+      expect(find.text('DEF +30'), findsOneWidget);
+      expect(find.text('HP +150'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'ItemCard menampilkan tombol favorit dan memanggil onToggleFavorite saat ditekan',
+    (tester) async {
+      var toggledCount = 0;
+      var isFav = false;
+
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            return wrapWithTheme(
+              ItemCard(
+                name: 'Excalibur',
+                rarity: ItemRarity.legendary,
+                slot: EquipmentSlot.weapon,
+                isFavorite: isFav,
+                onToggleFavorite: () {
+                  setState(() {
+                    toggledCount++;
+                    isFav = !isFav;
+                  });
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      // Awalnya bukan favorit -> ikon star_border dan tooltip "Jadikan Favorit"
+      expect(find.byIcon(Icons.star_border), findsOneWidget);
+      expect(find.byIcon(Icons.star), findsNothing);
+
+      // Ketuk tombol bintang
+      await tester.tap(find.byIcon(Icons.star_border));
+      await tester.pumpAndSettle();
+
+      expect(toggledCount, 1);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(find.byIcon(Icons.star_border), findsNothing);
+
+      // Ketuk lagi untuk batal favorit
+      await tester.tap(find.byIcon(Icons.star));
+      await tester.pumpAndSettle();
+
+      expect(toggledCount, 2);
+      expect(find.byIcon(Icons.star_border), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Komponen tidak overflow pada lebar 320dp dan skala teks besar 1.5x',
     (tester) async {
       await tester.pumpWidget(

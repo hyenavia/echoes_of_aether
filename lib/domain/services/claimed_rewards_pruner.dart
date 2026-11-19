@@ -14,7 +14,11 @@
 class ClaimedRewardsPruner {
   const ClaimedRewardsPruner();
 
-  static const List<String> neverPrunePrefixes = ['ascension:', 'shop:'];
+  static const List<String> neverPrunePrefixes = [
+    'ascension:',
+    'shop:',
+    'boss_spire:',
+  ];
 
   static const List<String> periodScopedPrefixes = ['bossquest:', 'eventshop:'];
 

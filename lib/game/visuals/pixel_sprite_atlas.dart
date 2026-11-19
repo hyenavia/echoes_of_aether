@@ -1,5 +1,7 @@
 import 'dart:ui' as ui;
 
+import 'pixel_sprite_data.dart';
+
 /// Resolusi dasar pixel art untuk tile dan karakter MVP (16x16).
 class PixelSpriteAtlas {
   PixelSpriteAtlas._();
@@ -31,6 +33,104 @@ class PixelSpriteAtlas {
     'l': 0xFFE2C7A8, // Skin / Bone
     'k': 0xFF161B22, // Outline
   };
+
+  static const Map<String, int> _forestPalette = palette;
+
+  static const Map<String, int> _cavernPalette = {
+    '.': 0x00000000,
+    'd': 0xFF0E1B24, // Deep Cave Slate
+    'g': 0xFF162836, // Damp Cavern Stone
+    'm': 0xFF1F3A4E, // Cobalt Stone
+    's': 0xFF2C4E66, // Chiseled Slate
+    't': 0xFF3E6D8F, // Cavern Ledge
+    'n': 0xFF3A87B0, // Dark Crystal Facet
+    'b': 0xFF69BFE5, // Aether Blue Crystal
+    'p': 0xFF4A90E2, // Crystal Core
+    'a': 0xFF9DE2FF, // Bright Crystal Cyan
+    'y': 0xFFE6BD68, // Mineral Vein
+    'r': 0xFFD95D5D, // Red
+    'w': 0xFFFFFFFF, // Pure Spark Glint
+    'l': 0xFFB4D4E8, // Pale Mineral
+    'k': 0xFF0A121A, // Deep Cavern Outline
+  };
+
+  static const Map<String, int> _cryptPalette = {
+    '.': 0x00000000,
+    'd': 0xFF171322, // Dark Tomb Floor
+    'g': 0xFF241E34, // Aged Sepulcher Stone
+    'm': 0xFF362C4E, // Violet Slate
+    's': 0xFF4E406D, // Chiseled Crypt Block
+    't': 0xFF2A223B, // Dark Mausoleum Stone
+    'n': 0xFF6C5491, // Arcane Shadow
+    'b': 0xFFA88AD5, // Arcane Violet Rune
+    'p': 0xFF7A58B0, // Crypt Violet
+    'a': 0xFFCBB2F0, // Bright Ethereal Spark
+    'y': 0xFFD4AF37, // Tarnished Relic Gold
+    'r': 0xFF9E3A52, // Dried Crimson
+    'w': 0xFFEFEBE9, // Bone Highlight
+    'l': 0xFFD7CCC8, // Ancient Skull / Bone
+    'k': 0xFF0E0B14, // Obsidian Crypt Outline
+  };
+
+  static const Map<String, int> _wastelandPalette = {
+    '.': 0x00000000,
+    'd': 0xFF1C1110, // Volcanic Ash Black
+    'g': 0xFF2D1C1A, // Scorched Basalt
+    'm': 0xFF442925, // Charred Rock Crust
+    's': 0xFF5E3832, // Iron Basalt Stone
+    't': 0xFF38201D, // Hardened Lava Shelf
+    'n': 0xFF8C3B30, // Smoldering Crust
+    'b': 0xFFD95D5D, // Molten Ember Red
+    'p': 0xFF9E2A2B, // Deep Crimson
+    'a': 0xFFE6683B, // Vibrant Magma Orange
+    'y': 0xFFF5A623, // Molten Yellow Core
+    'r': 0xFFD95D5D, // Fire Red
+    'w': 0xFFFFF275, // White-Hot Magma Core
+    'l': 0xFFCCA299, // Ash Dust
+    'k': 0xFF120908, // Obsidian Crag Outline
+  };
+
+  static const Map<String, int> _sanctumPalette = {
+    '.': 0x00000000,
+    'd': 0xFF131926, // Celestial Navy Base
+    'g': 0xFF1D2639, // Polished Sanctum Marble
+    'm': 0xFF2B3852, // Lapis-veined Stone
+    's': 0xFF3E5073, // Marble Bevel Edge
+    't': 0xFF222E45, // Arch Shadow
+    'n': 0xFF997A38, // Antique Bronze Accent
+    'b': 0xFFE6BD68, // Antique Gold Inlay
+    'p': 0xFF4A90E2, // Aether Energy Conduit
+    'a': 0xFF7FD8FF, // Pure Aether Light
+    'y': 0xFFF7DA8B, // Bright Gold Glint
+    'r': 0xFFE57373, // Sacred Rose
+    'w': 0xFFFFFFFF, // Celestial Spark
+    'l': 0xFFD9E2EC, // Pure Marble Inlay
+    'k': 0xFF0A0E17, // Temple Shadow Outline
+  };
+
+  /// Normalisasi ID biome ke kanonikal biome yang didukung.
+  static String normalizeBiome(String? biome) {
+    if (biome == null) return 'forgotten_forest';
+    return switch (biome.trim().toLowerCase()) {
+      'forgotten_forest' => 'forgotten_forest',
+      'crystal_cavern' => 'crystal_cavern',
+      'ancient_crypt' => 'ancient_crypt',
+      'ashen_wasteland' => 'ashen_wasteland',
+      'aether_sanctum' || 'ascension_sanctum' => 'aether_sanctum',
+      _ => 'forgotten_forest',
+    };
+  }
+
+  /// Palet warna yang selaras dengan tema visual biome.
+  static Map<String, int> paletteForBiome(String? biome) {
+    return switch (normalizeBiome(biome)) {
+      'crystal_cavern' => _cavernPalette,
+      'ancient_crypt' => _cryptPalette,
+      'ashen_wasteland' => _wastelandPalette,
+      'aether_sanctum' => _sanctumPalette,
+      _ => _forestPalette,
+    };
+  }
 
   final Map<String, ui.Image> _images = {};
 
@@ -83,19 +183,38 @@ class PixelSpriteAtlas {
     final cached = _images[cacheKey];
     if (cached != null) return cached;
 
+    final frameData = PixelSpriteData.frames[cacheKey];
+    if (frameData != null) {
+      final img = _bakeFrame(frameData);
+      _images[cacheKey] = img;
+      return img;
+    }
+
     final grid = _buildCombatantGrid(species: species, pose: pose);
     final img = _bakeGrid(grid, gridSize, gridSize);
     _images[cacheKey] = img;
     return img;
   }
 
-  /// Mengambil tile Forgotten Forest (floor, wall, exit) ukuran 16x16.
-  ui.Image tileSprite(String key) {
-    final cached = _images['tile_$key'];
+  /// Mengambil tile (floor, wall, exit) ukuran 16x16 untuk [biome] yang diberikan.
+  ui.Image tileSprite(String key, {String? biome}) {
+    final effectiveBiome = normalizeBiome(biome);
+    final cacheKey = key.startsWith('exit_')
+        ? 'tile_$key'
+        : (key == 'wall_tree'
+              ? 'tile_forgotten_forest_wall'
+              : (biome == null && (key.startsWith('floor') || key == 'wall')
+                    ? 'tile_$key'
+                    : 'tile_${effectiveBiome}_$key'));
+
+    final cached = _images[cacheKey];
     if (cached != null) return cached;
-    final grid = _buildTileGrid(key);
-    final img = _bakeGrid(grid, gridSize, gridSize);
-    _images['tile_$key'] = img;
+
+    final resolvedKey = key == 'wall_tree' ? 'wall' : key;
+    final grid = _buildTileGrid(resolvedKey, biome: effectiveBiome);
+    final tilePalette = paletteForBiome(effectiveBiome);
+    final img = _bakeGrid(grid, gridSize, gridSize, palette: tilePalette);
+    _images[cacheKey] = img;
     return img;
   }
 
@@ -126,18 +245,67 @@ class PixelSpriteAtlas {
         return 'aether_slime';
       case 'forest_wolf':
         return 'forest_wolf';
+      case 'goblin':
+        return 'goblin';
       case 'corrupted_treant':
         return 'corrupted_treant';
       case 'corrupted_guardian':
         return 'corrupted_guardian';
       case 'ancient_heart_guardian':
         return 'ancient_heart_guardian';
+      case 'fire_skull':
+        return 'fire_skull';
+      case 'skelly':
+        return 'skelly';
+      case 'mummy':
+        return 'mummy';
+      case 'wraith':
+        return 'wraith';
+      case 'zombie':
+        return 'zombie';
+      case 'orc':
+        return 'orc';
       default:
         return 'enemy_generic';
     }
   }
 
-  ui.Image _bakeGrid(List<String> rows, int width, int height) {
+  ui.Image _bakeFrame(PixelSpriteFrame frame) {
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(recorder);
+    final paint = ui.Paint()..isAntiAlias = false;
+    final palette = frame.palette;
+    final rows = frame.rows;
+
+    for (var y = 0; y < gridSize && y < rows.length; y++) {
+      final row = rows[y];
+      for (var x = 0; x < gridSize && x < row.length; x++) {
+        final code = row.codeUnitAt(x);
+        if (code == 46) continue; // '.' (period) is transparent
+        final index = code <= 57 ? code - 48 : code - 87;
+        if (index >= 0 && index < palette.length) {
+          paint.color = ui.Color(palette[index]);
+          canvas.drawRect(
+            ui.Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 1),
+            paint,
+          );
+        }
+      }
+    }
+
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(gridSize, gridSize);
+    picture.dispose();
+    return image;
+  }
+
+  ui.Image _bakeGrid(
+    List<String> rows,
+    int width,
+    int height, {
+    Map<String, int>? palette,
+  }) {
+    final activePalette = palette ?? _forestPalette;
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     final paint = ui.Paint()..isAntiAlias = false;
@@ -147,7 +315,7 @@ class PixelSpriteAtlas {
       for (var x = 0; x < width && x < row.length; x++) {
         final ch = row[x];
         if (ch == '.' || ch == ' ') continue;
-        final argb = palette[ch];
+        final argb = activePalette[ch];
         if (argb == null) continue;
         paint.color = ui.Color(argb);
         canvas.drawRect(
@@ -473,26 +641,121 @@ class PixelSpriteAtlas {
     ];
   }
 
-  List<String> _buildTileGrid(String key) {
+  List<String> _buildTileGrid(String key, {String biome = 'forgotten_forest'}) {
+    if (key == 'exit_locked') {
+      return const [
+        '................',
+        '....kkkkkkkk....',
+        '...kssssssssk...',
+        '..ksyyyyyyyysk..',
+        '..ksyttttttyyk..',
+        '..ksytddddtysk..',
+        '..ksytdyydtysk..',
+        '..ksytddddtysk..',
+        '..ksyttttttyyk..',
+        '...kssssssssk...',
+        '....kkkkkkkk....',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+      ];
+    }
+    if (key == 'exit_unlocked') {
+      return const [
+        '................',
+        '....kkkkkkkk....',
+        '...kssssssssk...',
+        '..ksaaaaaaaask..',
+        '..ksacwwwwcask..',
+        '..ksacwaaacask..',
+        '..ksawawwawask..',
+        '..ksacwaaacask..',
+        '..ksacwwwwcask..',
+        '...kssssssssk...',
+        '....kkkkkkkk....',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+      ];
+    }
+
+    final normalized = normalizeBiome(biome);
+    return switch (normalized) {
+      'crystal_cavern' => _buildCavernTile(key),
+      'ancient_crypt' => _buildCryptTile(key),
+      'ashen_wasteland' => _buildWastelandTile(key),
+      'aether_sanctum' => _buildSanctumTile(key),
+      _ => _buildForestTile(key),
+    };
+  }
+
+  List<String> _buildForestTile(String key) {
     switch (key) {
       case 'floor0':
-        return List.generate(16, (y) {
-          if (y == 3 || y == 11) return 'dddddddddddddddd';
-          return 'ddddgddddddgdddd';
-        });
+        return const [
+          'dddddddddddddddd',
+          'dddddddddddddddd',
+          'ddddgddddddgdddd',
+          'dddddddddddddddd',
+          'dddddddddddddddd',
+          'ddgddddddddddgdd',
+          'dddddddddddddddd',
+          'dddddddddddddddd',
+          'ddddddgddddddddd',
+          'dddddddddddddddd',
+          'dddddddddddddddd',
+          'ddddgddddddgdddd',
+          'dddddddddddddddd',
+          'dddddddddddddddd',
+          'ddgddddddddddddg',
+          'dddddddddddddddd',
+        ];
       case 'floor1':
-        return List.generate(16, (y) {
-          if (y == 5 || y == 12) return 'dddgdmdddddgdddd';
-          return 'ddddddddgddddddd';
-        });
+        return const [
+          'dddddddddddddddd',
+          'ddddgmmgdddddddd',
+          'dddgmmmmgddddddd',
+          'ddddgmmgdddddddd',
+          'dddddddddddddddd',
+          'ddddddddddgmmgdd',
+          'dddddddddgmmmmgd',
+          'ddddddddddgmmgdd',
+          'dddddddddddddddd',
+          'ddgmmgdddddddddd',
+          'dgmmmmgddddddddd',
+          'ddgmmgddddddssdd',
+          'dddddddddddddddd',
+          'dddddddddddddddd',
+          'ddddddgmmgdddddd',
+          'dddddddddddddddd',
+        ];
       case 'floor2':
-        return List.generate(16, (y) {
-          if (y == 2 || y == 8) return 'ddgddmdddddmdddd';
-          if (y == 14) return 'ddddddssdddddddd';
-          return 'ddddgddddddddddd';
-        });
+        return const [
+          'dddddddddddddddd',
+          'ddnddddddddddddd',
+          'ddnbddddddssdddd',
+          'dddnbbdddddddddd',
+          'ddddnbbddddddddd',
+          'dddddnnbddddgddd',
+          'ddddddnbbddddddd',
+          'dddddddnbbdddddd',
+          'ddddddddnnbddddd',
+          'ddgddddddnbbdddd',
+          'ddddddddddnbbddd',
+          'ddddssdddddnnbdd',
+          'ddddddddddddnbbd',
+          'dddddddddddddnbd',
+          'ddddddddddddddnd',
+          'dddddddddddddddd',
+        ];
+      case 'wall':
       case 'wall_tree':
-        return [
+      default:
+        return const [
           'kkkkkkkkkkkkkkkk',
           'kdddggggggggdddk',
           'kddggmmggmmggddk',
@@ -510,46 +773,334 @@ class PixelSpriteAtlas {
           'kttttttttttttttk',
           'kkkkkkkkkkkkkkkk',
         ];
-      case 'exit_locked':
-        return [
-          '................',
-          '....kkkkkkkk....',
-          '...kssssssssk...',
-          '..ksyyyyyyyysk..',
-          '..ksyttttttyyk..',
-          '..ksytddddtysk..',
-          '..ksytdyydtysk..',
-          '..ksytddddtysk..',
-          '..ksyttttttyyk..',
-          '...kssssssssk...',
-          '....kkkkkkkk....',
-          '................',
-          '................',
-          '................',
-          '................',
-          '................',
+    }
+  }
+
+  List<String> _buildCavernTile(String key) {
+    switch (key) {
+      case 'floor0':
+        return const [
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddddgssgd',
+          'dggggddddddggggd',
+          'dddddddddddddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddddgssgd',
+          'dggggddddddggggd',
+          'dddddddddddddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
         ];
-      case 'exit_unlocked':
-        return [
-          '................',
-          '....kkkkkkkk....',
-          '...kssssssssk...',
-          '..ksaaaaaaaask..',
-          '..ksacwwwwcask..',
-          '..ksacwaaacask..',
-          '..ksawawwawask..',
-          '..ksacwaaacask..',
-          '..ksacwwwwcask..',
-          '...kssssssssk...',
-          '....kkkkkkkk....',
-          '................',
-          '................',
-          '................',
-          '................',
-          '................',
+      case 'floor1':
+        return const [
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddbbgssgd',
+          'dggggdddbaaggggd',
+          'dddddddddbwddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgdbbdssgssgd',
+          'dggggbaadddggggd',
+          'dddddbwddddddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
         ];
+      case 'floor2':
+        return const [
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddddgssgd',
+          'dggggddddddggggd',
+          'ddddddddaddddddd',
+          'dddddddaawdddddd',
+          'ddddddbaawbddddd',
+          'dddddbbaabbddddd',
+          'ddddbbbaabbbdddd',
+          'ddddddbbbbdddddd',
+          'dgssgddbbddgssgd',
+          'dggggddddddggggd',
+          'dddddddddddddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
+        ];
+      case 'wall':
       default:
-        return List.filled(16, 'dddddddddddddddd');
+        return const [
+          'kkkkkkkkkkkkkkkk',
+          'kddggmssssmggddk',
+          'kdgmsssttsmggddk',
+          'kgmssttaawtsmgdk',
+          'kgmsttaawwtsmgdk',
+          'kddgssbaawtsgddk',
+          'kddgssbbawtsgddk',
+          'kdggmsttttsmggdk',
+          'kdgmssssssssmgdk',
+          'kgmsttaatttsmgdk',
+          'kgmsbaawwttsmgdk',
+          'kddgssbaawtsgddk',
+          'kddddgsssstggddk',
+          'kdggmssssssmggdk',
+          'kggmmttttttmmggk',
+          'kkkkkkkkkkkkkkkk',
+        ];
+    }
+  }
+
+  List<String> _buildCryptTile(String key) {
+    switch (key) {
+      case 'floor0':
+        return const [
+          'dddddddddddddddd',
+          'dggggdmmmmdggggd',
+          'dgssgdmsmmdgssgd',
+          'dggggdmmmmdggggd',
+          'dddddddddddddddd',
+          'dmmmmdggggdmmmmd',
+          'dmsmmdgssgdmsmmd',
+          'dmmmmdggggdmmmmd',
+          'dddddddddddddddd',
+          'dggggdmmmmdggggd',
+          'dgssgdmsmmdgssgd',
+          'dggggdmmmmdggggd',
+          'dddddddddddddddd',
+          'dmmmmdggggdmmmmd',
+          'dmsmmdgssgdmsmmd',
+          'dmmmmdggggdmmmmd',
+        ];
+      case 'floor1':
+        return const [
+          'dddddddddddddddd',
+          'dggggdmmmmdggggd',
+          'dgssgdmsmmdgssgd',
+          'dggggdbbbbdggggd',
+          'ddddddbaabdddddd',
+          'dmmmmdbbbbdmmmmd',
+          'dmsmmdgssgdmsmmd',
+          'dmmmmdggggdmmmmd',
+          'dddddddddddddddd',
+          'dggggdmmmmdggggd',
+          'dgssgdmsmmdgssgd',
+          'dggggdbbbbdggggd',
+          'ddddddbaabdddddd',
+          'dmmmmdbbbbdmmmmd',
+          'dmsmmdgssgdmsmmd',
+          'dmmmmdggggdmmmmd',
+        ];
+      case 'floor2':
+        return const [
+          'dddddddddddddddd',
+          'dggggdmmmmdggggd',
+          'dgssgddddddgssgd',
+          'dggggdwwwwdggggd',
+          'dddddwllwwdddddd',
+          'dmmmmwlkllwmmmmd',
+          'dmsmmwllklwmsmmd',
+          'dmmmmdwllwddmmmmd',
+          'ddddddwkwddddddd',
+          'dggggdmmmmdggggd',
+          'dgssgdmsmmdgssgd',
+          'dggggdmmmmdggggd',
+          'dddddddddddddddd',
+          'dmmmmdggggdmmmmd',
+          'dmsmmdgssgdmsmmd',
+          'dmmmmdggggdmmmmd',
+        ];
+      case 'wall':
+      default:
+        return const [
+          'kkkkkkkkkkkkkkkk',
+          'kddggmssssmggddk',
+          'kdgmsssssssmgddk',
+          'kgmsssttttsmgddk',
+          'kgmsstbbttsmgddk',
+          'kgmsstbaatsmgddk',
+          'kgmstbaawatsmgdk',
+          'kgmstbaawatsmgdk',
+          'kgmsstbaatsmgddk',
+          'kgmsstbbttsmgddk',
+          'kdgmsssssssmgddk',
+          'kddgsssttssgdddk',
+          'kddddwllwwdddddk',
+          'kdggmwlkllwmggdk',
+          'kggmmdwllwddmmggk',
+          'kkkkkkkkkkkkkkkk',
+        ];
+    }
+  }
+
+  List<String> _buildWastelandTile(String key) {
+    switch (key) {
+      case 'floor0':
+        return const [
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddddgssgd',
+          'dggggddddddggggd',
+          'dddddddddddddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddddgssgd',
+          'dggggddddddggggd',
+          'dddddddddddddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
+        ];
+      case 'floor1':
+        return const [
+          'dddddddddddddddd',
+          'dggggddddbbggggd',
+          'dgssgddddbaygggd',
+          'dggggddddbbggggd',
+          'dddddddddddddddd',
+          'ddbbddggggdddddd',
+          'dbayddgssgdddddd',
+          'ddbbddggggdddddd',
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddddbbgssgd',
+          'dggggddddbaygggd',
+          'dddddddddbbddddd',
+          'ddddddggggdddddd',
+          'ddddddgssgdddddd',
+          'ddddddggggdddddd',
+        ];
+      case 'floor2':
+        return const [
+          'dddddddddddddddd',
+          'dggggddddddggggd',
+          'dgssgddbbddgssgd',
+          'dggggdbaaddggggd',
+          'dddddaywaddddddd',
+          'dddddaywaddddddd',
+          'dddddbaaddggggdd',
+          'ddddddbbddgssgdd',
+          'ddddddddddggggdd',
+          'dggggddddddddddd',
+          'dgssgddbbddddddd',
+          'dggggdbaaddggggd',
+          'dddddaywaddddddd',
+          'dddddaywaddggggd',
+          'dddddbbaadgssgd',
+          'ddddddbbddggggdd',
+        ];
+      case 'wall':
+      default:
+        return const [
+          'kkkkkkkkkkkkkkkk',
+          'kddggmssssmggddk',
+          'kdgmsssssssmgddk',
+          'kgmstttttttsmgdk',
+          'kgmsttbbtttsmgdk',
+          'kgmstbaatttsmgdk',
+          'kgmstbayattsmgdk',
+          'kgmstbawyattsmgk',
+          'kgmstbayattsmgdk',
+          'kgmstbaatttsmgdk',
+          'kgmsttbbtttsmgdk',
+          'kdgmsssssssmgddk',
+          'kddgsssttssgdddk',
+          'kdggmsttttsmggdk',
+          'kggmmttttttmmggk',
+          'kkkkkkkkkkkkkkkk',
+        ];
+    }
+  }
+
+  List<String> _buildSanctumTile(String key) {
+    switch (key) {
+      case 'floor0':
+        return const [
+          'dddddddddddddddd',
+          'dggggggggggggggd',
+          'dgmmmmmmmmmmmmgd',
+          'dgmssssssssssmgd',
+          'dgmssssssssssmgd',
+          'dgmssddddddssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssddddddssmgd',
+          'dgmssssssssssmgd',
+          'dgmssssssssssmgd',
+          'dgmmmmmmmmmmmmgd',
+          'dggggggggggggggd',
+          'dddddddddddddddd',
+        ];
+      case 'floor1':
+        return const [
+          'dddddddddddddddd',
+          'dybbggggggggbbyd',
+          'dbymmmmmmmmmmybd',
+          'dgmssssssssssmgd',
+          'dgmssssssssssmgd',
+          'dgmssddddddssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssdggggdssmgd',
+          'dgmssddddddssmgd',
+          'dgmssssssssssmgd',
+          'dgmssssssssssmgd',
+          'dbymmmmmmmmmmybd',
+          'dybbggggggggbbyd',
+          'dddddddddddddddd',
+        ];
+      case 'floor2':
+        return const [
+          'dddddddddddddddd',
+          'dybbggggggggbbyd',
+          'dbymmmbaabmmmybd',
+          'dgmssbaawabbssmd',
+          'dgmssbaawabbssmd',
+          'dgmssddbbddssmgd',
+          'dgbaadaaaaadaabd',
+          'dgwaaddawwaddawd',
+          'dgwaaddawwaddawd',
+          'dgbaadaaaaadaabd',
+          'dgmssddbbddssmgd',
+          'dgmssbaawabbssmd',
+          'dgmssbaawabbssmd',
+          'dbymmmbaabmmmybd',
+          'dybbggggggggbbyd',
+          'dddddddddddddddd',
+        ];
+      case 'wall':
+      default:
+        return const [
+          'kkkkkkkkkkkkkkkk',
+          'kddggmssssmggddk',
+          'kdgybbbbbbbbygdk',
+          'kdybbmmmmmmbbydk',
+          'kdgmsttttttsmgdk',
+          'kdgmstpaaptssmgk',
+          'kdgmstpaaptssmgk',
+          'kdgmstpaaptssmgk',
+          'kdgmstpaaptssmgk',
+          'kdgmstpaaptssmgk',
+          'kdgmstpaaptssmgk',
+          'kdybbmmmmmmbbydk',
+          'kdgybbbbbbbbygdk',
+          'kdggmssssssmggdk',
+          'kggmmttttttmmggk',
+          'kkkkkkkkkkkkkkkk',
+        ];
     }
   }
 }

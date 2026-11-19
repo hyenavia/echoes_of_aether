@@ -5,6 +5,7 @@ import '../entities/dungeon_definition.dart';
 import '../entities/equipment.dart';
 import '../entities/game_config.dart';
 import '../entities/inventory.dart';
+import '../entities/item_definition.dart';
 import '../entities/offline_activity.dart';
 import '../entities/player_character.dart';
 import '../entities/player_save_snapshot.dart';
@@ -48,6 +49,8 @@ class OfflineProgressionResult {
     this.overflowStacks = const {},
     this.addedEquipment = const [],
     this.droppedEquipment = const [],
+    this.autoSoldEquipmentCount = 0,
+    this.autoSoldEquipmentGold = 0,
     required this.newLastOfflineClaimAtMs,
     this.stopReason,
     this.updatedOfflineActivity,
@@ -109,6 +112,8 @@ class OfflineProgressionResult {
   final Map<String, int> overflowStacks;
   final List<EquipmentInstance> addedEquipment;
   final List<EquipmentInstance> droppedEquipment;
+  final int autoSoldEquipmentCount;
+  final int autoSoldEquipmentGold;
   final int newLastOfflineClaimAtMs;
   final OfflineDungeonStopReason? stopReason;
   final OfflineActivitySnapshot? updatedOfflineActivity;
@@ -126,7 +131,8 @@ class OfflineProgressionResult {
       expGained > 0 ||
       goldGained > 0 ||
       addedStacks.isNotEmpty ||
-      addedEquipment.isNotEmpty;
+      addedEquipment.isNotEmpty ||
+      autoSoldEquipmentCount > 0;
 }
 
 /// Orkestrator **Hybrid Offline Progression** (M6 Stage 2):
@@ -143,6 +149,10 @@ class OfflineProgressionService {
     this.lootService = const LootService(),
     this.timeCalculator = const OfflineTimeCalculator(),
     this.runner = const OfflineDungeonRunner(),
+    this.autoSellEquipmentRarities = const {
+      ItemRarity.common,
+      ItemRarity.uncommon,
+    },
   });
 
   static const Duration maxOfflineDuration =
@@ -151,6 +161,7 @@ class OfflineProgressionService {
   final LootService lootService;
   final OfflineTimeCalculator timeCalculator;
   final OfflineDungeonRunner runner;
+  final Set<ItemRarity> autoSellEquipmentRarities;
 
   OfflineProgressionResult process({
     required PlayerCharacter character,
@@ -493,8 +504,10 @@ class OfflineProgressionService {
       final reason = dungeonDef == null
           ? 'Auto Farming ditolak: dungeon "$targetDungeonId" tidak ditemukan.'
           : switch (dungeonDef.kind) {
-              DungeonKind.bossDaily || DungeonKind.bossWeekly =>
-                'Auto Farming ditolak: Boss Event ("$targetDungeonId") hanya dimainkan manual.',
+              DungeonKind.bossDaily ||
+              DungeonKind.bossWeekly ||
+              DungeonKind.bossSpire =>
+                'Auto Farming ditolak: Boss Event / Spire ("$targetDungeonId") hanya dimainkan manual.',
               DungeonKind.ascension =>
                 'Auto Farming ditolak: Ascension Dungeon ("$targetDungeonId") hanya dimainkan manual.',
               DungeonKind.normal =>
@@ -595,6 +608,7 @@ class OfflineProgressionService {
           lootService: lootService,
           equipmentFactory: EquipmentFactory(config.equipment),
           claimedEventIds: mergedClaimedIds,
+          autoSellEquipmentRarities: autoSellEquipmentRarities,
         );
 
     final effectiveRunner =
@@ -716,6 +730,8 @@ class OfflineProgressionService {
       overflowStacks: outcome.overflowStacks,
       addedEquipment: outcome.addedEquipment,
       droppedEquipment: outcome.droppedEquipment,
+      autoSoldEquipmentCount: outcome.autoSoldEquipmentCount,
+      autoSoldEquipmentGold: outcome.autoSoldEquipmentGold,
       newLastOfflineClaimAtMs: newClaimAtMs,
       stopReason: outcome.stopReason,
       updatedOfflineActivity: updatedActivity,
@@ -780,6 +796,10 @@ class OfflineProgressionService {
           (prev?.addedEquipmentCount ?? 0) + outcome.addedEquipment.length,
       droppedEquipmentCount:
           (prev?.droppedEquipmentCount ?? 0) + outcome.droppedEquipment.length,
+      autoSoldEquipmentCount:
+          (prev?.autoSoldEquipmentCount ?? 0) + outcome.autoSoldEquipmentCount,
+      autoSoldEquipmentGold:
+          (prev?.autoSoldEquipmentGold ?? 0) + outcome.autoSoldEquipmentGold,
       acknowledged: false,
       generatedAtMs: generatedAtMs,
       cycleRank: cycleRank,

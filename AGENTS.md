@@ -4,6 +4,8 @@ Panduan ini wajib diikuti oleh AI coding agents saat menganalisis, mengembangkan
 
 Dokumen ini menjadi aturan kerja proyek. Jika instruksi pengguna secara eksplisit berbeda dari aturan di sini, ikuti instruksi pengguna kecuali bertentangan dengan keamanan, integritas data, atau batasan teknis yang tidak dapat diabaikan. Jika terdapat konflik dengan dokumentasi desain atau implementasi aktual, jelaskan konflik tersebut dan minta keputusan bila berdampak pada desain game.
 
+Aturan khusus milestone atau stage di prompt tugas melengkapi dokumen ini, tidak menggantikannya. Dokumen ini memuat aturan yang berlaku lintas milestone; status terkini proyek ada di tracker (lihat bagian 2.1), bukan di sini.
+
 ## 1. Identitas dan Prinsip Proyek
 
 Echoes of Aether adalah **2D Top-down Pixel Art Idle Dungeon RPG** dengan karakter utama tunggal yang dapat memilih class specialization.
@@ -17,6 +19,8 @@ Prinsip desain yang sudah ditetapkan:
 - Auto-revive mengikuti aturan game yang telah ditetapkan di Game Design Document.
 - Batas offline reward maksimal 8 jam.
 - Android menjadi platform prioritas; jangan menganggap dukungan platform lain sudah siap tanpa verifikasi.
+- Aplikasi dikunci portrait. Pada tablet, konten berada di kolom tengah dengan lebar maksimal, bukan melar penuh layar.
+- Cloud (M14) memakai Firebase paket Spark untuk cadangan, pemulihan, dan sinkronisasi, dengan validasi lewat Firestore Security Rules. Database lokal tetap sumber kebenaran, dan game harus berjalan penuh tanpa internet maupun tanpa Firebase.
 
 Jangan mengubah keputusan desain inti secara diam-diam. Jika perubahan diperlukan, jelaskan alasan, dampak terhadap sistem yang sudah ada, alternatif, dan dokumentasi yang perlu diperbarui.
 
@@ -26,11 +30,13 @@ Jangan mengubah keputusan desain inti secara diam-diam. Jika perubahan diperluka
 
 Sebelum mengubah kode:
 1. Baca bagian relevan dari `AGENTS.md`.
-2. Periksa `docs/GAME_DESIGN_DOCUMENT.md`.
-3. Periksa `docs/TECHNICAL_DESIGN_DOCUMENT.md`.
-4. Periksa `docs/MASTER_DEVELOPMENT_ROADMAP.md`.
-5. Periksa `docs/MILESTONE_STATUS.md`.
-6. Audit implementasi yang sudah ada sebelum menyimpulkan suatu fitur belum tersedia.
+2. Baca tracker terbaru: berkas `MILESTONE_STATUS_*.md` dengan versi tertinggi di folder dokumen. Isinya status milestone, blocker, baseline test dan analyze, dan versi schema database.
+3. Baca prompt tugas, roadmap, dan addendum desain yang relevan: GDD dan TDD awal, addendum v1.1, v1.2, v1.3, serta roadmap M8–M11, M12–M14, dan M14.
+4. Audit implementasi yang sudah ada sebelum menyimpulkan suatu fitur belum tersedia.
+
+Folder dokumen aktual adalah `doc101/`. Periksa dulu; jangan membuat folder `docs/` baru atau berkas duplikat dengan nama yang hampir sama.
+
+Prioritas dokumen: addendum terbaru lebih tinggi dari addendum lama, dan addendum lebih tinggi dari dokumen awal. Kode dan konfigurasi nyata menang atas dokumen; laporkan setiap selisih sebelum mengubah kode.
 
 Jangan mengasumsikan status milestone hanya dari percakapan atau nama branch. Gunakan repository aktual, test, dan dokumentasi yang tersedia sebagai bukti.
 
@@ -68,7 +74,7 @@ Struktur konseptual:
 - `data`: database, datasource, model persistence, dan repository implementation.
 
 Aturan wajib:
-1. Domain tidak boleh bergantung pada Flutter atau Flame.
+1. Domain tidak boleh bergantung pada Flutter, Flame, Drift, atau `dart:io`.
 2. Flame components bukan sumber authoritative untuk state atau aturan gameplay.
 3. Damage calculation, reward calculation, progression, dan aturan penting game harus berada pada layer yang tepat, bukan tersebar di komponen visual.
 4. UI menampilkan state dan mengirim intent; UI bukan sumber kebenaran data game.
@@ -120,76 +126,42 @@ Final stats harus dihitung melalui satu mekanisme terpusat berdasarkan sumber mo
 - Tangani timestamp negatif/tidak valid/masa depan secara eksplisit.
 - Jangan mengklaim anti-cheat sempurna untuk game offline lokal.
 
-## 5. Panduan Milestone 5 — Dungeon System
+## 5. Aturan Sistem Lanjutan (sejak M8)
 
-Milestone 5 berfokus pada implementasi dungeon room-based dan integrasinya dengan combat serta progression yang telah dibuat.
+### 5.1 Disiplin tugas
+- Kerjakan satu stage atau satu tugas per sesi. Berhenti di akhir dan lapor; jangan memulai stage berikutnya.
+- Tandai milestone `READY FOR REVIEW`, bukan `COMPLETED`, sampai pemilik project menyetujui.
+- Perbarui tracker (checklist, Development Log, blocker, technical debt) di akhir setiap tugas.
+- Jika uji perangkat tidak dapat dijalankan, nyatakan dengan jelas dan catat sebagai blocker terbuka.
 
-### 5.1 Desain yang sudah ditetapkan
-- Dungeon menggunakan room-based structure.
-- MVP memakai jalur linear; data model boleh mendukung graph/branch di masa depan, tetapi jangan membangun branching gameplay sebelum diminta.
-- Biome pertama: **Forgotten Forest**.
-- Urutan room MVP:
-  1. Forest Entrance
-  2. Ancient Path
-  3. Ruined Shrine
-  4. Hidden Chamber
-  5. Ancient Heart
-- Monster MVP:
-  - Aether Slime
-  - Forest Wolf
-  - Corrupted Treant
-  - Corrupted Guardian (elite)
-  - Ancient Heart Guardian (boss)
+### 5.2 Paritas online dan offline
+Jalur online (`CombatSystem`/`CombatSimulation`) dan offline (`OfflineDungeonRunner`) adalah dua implementasi. Setiap perubahan pada combat, stat, reward, difficulty, atau drop wajib diterapkan di kedua jalur dan dibuktikan dengan test paritas.
 
-### 5.2 Tanggung jawab dungeon system
+### 5.3 Waktu dan acak
+- Waktu disuntikkan lewat `GameClock`; periode memakai `PeriodService`, dan jam dijaga `ClockGuard`. Jangan memanggil `DateTime.now()` langsung di logika game.
+- `Random` disuntikkan dan deterministik pada test.
 
-Audit dan implementasikan sesuai kebutuhan:
-- Dungeon definitions dan room definitions berbasis konfigurasi.
-- Dungeon start dan session state.
-- Room loading dan room lifecycle.
-- Spawn configuration dan spawn points.
-- Room completion conditions.
-- Room transition.
-- Elite encounter.
-- Boss encounter.
-- Dungeon completion.
-- Reward handoff ke progression/reward system.
-- Penanganan player downed, revive, dan run ended sesuai aturan yang sudah ditetapkan.
-- Save/resume behavior jika didukung desain dan persistence saat ini.
+### 5.4 Hadiah, pembelian, dan mata uang
+- Semua pemberian hadiah, pembelian, dan perubahan mata uang bersifat idempotent (id klaim) dan atomik: validasi seluruh kondisi sebelum mutasi, satu transaksi, dan kegagalan tidak meninggalkan efek samping.
+- Hadiah periodik (quest, boss, event shop) dihitung dari kunci periode, bukan dari kondisi UI.
 
-Room configuration sebaiknya memuat data yang dibutuhkan seperti ID, map configuration, entry/exit positions, spawn configuration, completion condition, dan reward reference. Sesuaikan dengan model yang sudah ada; jangan membuat duplikasi schema.
+### 5.5 Schema dan migrasi
+- Setiap perubahan schema memakai migrasi bertahap (`from < N`) dalam satu transaksi, dengan test migrasi dari SETIAP versi lama berisi data nyata dan catatan breaking change.
+- Versi schema saat ini ada di `app_database.dart` dan tracker; jangan mengandalkan angka dari dokumen lama.
 
-### 5.3 Aturan implementasi Milestone 5
-- Audit kode M1–M4 terlebih dahulu.
-- Gunakan sistem combat, reward, inventory, equipment, stats, dan persistence yang sudah ada.
-- Jangan mengimplementasikan ulang sistem yang sudah stabil.
-- Jangan mengikat dungeon progression ke widget atau Flame component.
-- Dungeon manager/orchestrator mengoordinasikan alur; aturan domain tetap berada di domain/application.
-- Jangan membuat procedural dungeon, multiplayer, guild, PvP, trading, gacha, atau online sync sebagai bagian milestone ini kecuali diminta secara eksplisit.
-- Jangan menambahkan biome lain sebelum Forgotten Forest MVP selesai dan diverifikasi.
-- Jangan menambahkan monster baru di luar scope MVP tanpa persetujuan.
-- Pastikan satu room completion dan satu dungeon completion tidak dapat diproses dua kali.
-- Pastikan transisi room tidak menggandakan spawn, reward, atau event listener.
-- Tangani kondisi aplikasi ditutup atau dipulihkan sesuai kemampuan save/session design yang sudah disepakati.
+### 5.6 Balancing
+- Angka balancing berada di JSON konfigurasi dan divalidasi, bukan konstanta di kode.
+- Setiap perubahan angka dicatat: nilai lama, nilai baru, alasan, dan bukti simulasi.
+- Jangan melonggarkan target atau vektor uji agar test lulus. Jika target tidak tercapai, laporkan sebagai selisih.
 
-### 5.4 Acceptance criteria Milestone 5
+### 5.7 Konten berbasis data
+- Dungeon, monster, boss, item, dan shop didefinisikan lewat JSON. Jangan meng-hardcode id konten di logika.
+- Saat menambah nilai pada enum yang dipakai di banyak tempat (misalnya `DungeonKind`), perbarui semua `switch` dan percabangan terkait.
 
-Milestone 5 belum boleh dinyatakan selesai sebelum hal-hal berikut diverifikasi:
-- Dungeon dapat dimulai.
-- Room yang tepat dapat dimuat.
-- Spawn configuration bekerja.
-- Room completion condition bekerja.
-- Transisi antar-room bekerja.
-- Elite encounter dapat dijalankan.
-- Boss encounter dapat dijalankan.
-- Dungeon completion dan reward berjalan satu kali.
-- Kematian/revive/run-ended mengikuti aturan game.
-- Integrasi combat dan progression tidak mengalami regresi.
-- State dungeon yang perlu dipersistenkan konsisten.
-- Test domain/application/data/game yang relevan lulus.
-- `flutter analyze` lulus tanpa issue baru yang tidak dijelaskan.
-
-Jika sebagian acceptance criteria belum termasuk implementasi milestone berdasarkan roadmap aktual, tandai secara eksplisit sebagai belum dikerjakan; jangan menyatakan selesai berdasarkan asumsi.
+### 5.8 Platform cloud
+- Firebase paket Spark saja. Jangan menambah Cloud Functions, App Check, atau paket Blaze tanpa persetujuan eksplisit.
+- Pemulihan save dari cloud tidak pernah otomatis: selalu atas konfirmasi pemain dan dengan cadangan lokal terlebih dahulu.
+- Agent tidak men-deploy ke Firebase; siapkan berkas dan perintahnya untuk pemilik.
 
 ## 6. Coding Standards dan Konfigurasi
 
@@ -201,7 +173,8 @@ Jika sebagian acceptance criteria belum termasuk implementasi milestone berdasar
 - Jangan menelan exception tanpa logging atau error handling yang sesuai.
 - Jangan menggunakan `dynamic` secara luas untuk menghindari pemodelan tipe.
 - Hindari dependency baru jika standard library atau dependency yang sudah tersedia cukup.
-- Jangan mengubah versi Flutter/Dart, Gradle, Kotlin, Android Gradle Plugin, atau package besar tanpa alasan teknis dan penjelasan dampak.
+- Jangan mengubah versi Flutter/Dart, Gradle, Kotlin, Android Gradle Plugin, atau package besar tanpa alasan teknis dan penjelasan dampak. Dependensi atau plugin yang disetujui tertulis di prompt tugas (misalnya plugin Firebase) boleh ditambahkan dengan penjelasan dampak, termasuk perubahan `minSdk`.
+- Dependensi baru hanya jika disetujui tertulis di prompt tugas.
 
 ## 7. Testing dan Kriteria Sukses
 
@@ -213,6 +186,7 @@ Sebelum menyatakan tugas selesai:
 5. Jalankan `flutter test` atau test terarah selama iterasi.
 6. Jalankan regression tests yang relevan.
 7. Untuk perubahan build/platform, jalankan build atau uji perangkat jika lingkungan mendukung.
+8. Baseline: jumlah test dan hasil analyze terakhir di tracker harus tetap terpenuhi. Jika terpaksa mengubah test lama, daftarkan tiap perubahan dan alasannya di laporan.
 
 Jangan mengklaim test/build berhasil jika belum dijalankan.
 
@@ -236,8 +210,9 @@ Area sensitif proyek meliputi:
 
 Aturan:
 - Jangan hardcode secret, API key, token, atau credential.
+- Jangan membaca, menampilkan, atau meng-commit `key.properties`, `*.jks`, `*.keystore`, atau kata sandi. `google-services.json` diletakkan pemilik project; jangan membuat atau mengubah isinya, dan jangan di-commit kecuali pemilik menyetujui.
 - Jangan commit `.env`, keystore, credential, atau file rahasia.
-- Jangan menghapus atau mereset save pemain sebagai solusi default.
+- Jangan menghapus atau mereset save pemain sebagai solusi default. Pengecualian: pemulihan dari cloud atas konfirmasi pemain dengan cadangan lokal.
 - Jangan melonggarkan validasi data atau constraint database tanpa alasan dan persetujuan yang sesuai.
 - Perubahan schema wajib memiliki migration yang aman dan test.
 - Perubahan reward/economy wajib memeriksa kemungkinan duplikasi, exploit tidak sengaja, dan kehilangan data.
@@ -263,14 +238,10 @@ Jika perubahan merupakan fitur, perbaikan, atau perubahan desain yang bermakna:
 - Gunakan format Keep a Changelog dengan kategori `Added`, `Changed`, `Fixed`, dan `Removed`.
 - Bahasa changelog mengikuti konvensi file yang sudah ada; jika belum ada, gunakan Bahasa Inggris.
 - Perbarui dokumen desain/teknis/roadmap yang terdampak.
-- Perbarui `docs/MILESTONE_STATUS.md` berdasarkan hasil yang benar-benar diverifikasi.
+- Perbarui tracker terbaru (`MILESTONE_STATUS_*.md` dengan versi tertinggi) berdasarkan hasil yang benar-benar diverifikasi.
 - Jangan menandai milestone/phase selesai hanya karena kode sudah ditulis; gunakan acceptance criteria dan test.
 
-Dokumentasi utama:
-- `docs/GAME_DESIGN_DOCUMENT.md`
-- `docs/TECHNICAL_DESIGN_DOCUMENT.md`
-- `docs/MASTER_DEVELOPMENT_ROADMAP.md`
-- `docs/MILESTONE_STATUS.md`
+Dokumentasi berada di folder dokumen (`doc101/`): GDD dan TDD awal, addendum desain, roadmap per rentang milestone, tracker `MILESTONE_STATUS_*.md`, dan `PROGRESS_REPORT_TEMPLATE.md`.
 
 Jika file atau struktur dokumentasi aktual berbeda, audit terlebih dahulu dan jangan membuat duplikat dengan nama yang hampir sama.
 
@@ -281,6 +252,7 @@ Jika file atau struktur dokumentasi aktual berbeda, audit terlebih dahulu dan ja
 - Jangan membuat commit atas nama pengguna kecuali diminta.
 - Sebelum perubahan besar, periksa status Git agar perubahan pengguna yang belum di-commit tidak tertimpa.
 - Jangan mengubah workflow release atau signing configuration tanpa menjelaskan dampaknya.
+- Jangan men-deploy ke layanan eksternal (misalnya Firebase). Siapkan berkas dan perintahnya agar pemilik yang menjalankan.
 - Jika push ke branch utama memicu build/release otomatis, beri tahu pengguna sebelum tindakan tersebut.
 
 ## 11. Aturan UI dan Asset
@@ -292,6 +264,7 @@ Jika file atau struktur dokumentasi aktual berbeda, audit terlebih dahulu dan ja
 - Jangan mengganti atau menghapus aset yang ada tanpa memeriksa referensi penggunaannya.
 - UI Flutter dan visual game Flame harus memiliki batas tanggung jawab yang jelas.
 - Jangan menambahkan UI atau fitur kosmetik di luar scope tugas tanpa persetujuan.
+- Pemilik project merancang tampilan sendiri. Untuk fitur baru, buat UI fungsional minimal (daftar, tombol, teks status) di berkas widget terpisah. Jangan membuat sistem tema, mengubah navigasi, atau me-restyle layar yang ada kecuali diminta.
 - Jangan mengarang aset, font, atau lisensi pihak ketiga. Catat sumber/lisensi jika menggunakan aset eksternal.
 
 ## 12. Fitur yang Ditunda
@@ -306,26 +279,19 @@ Kecuali pengguna secara eksplisit mengubah prioritas, jangan memasukkan fitur be
 - Pet system.
 - Complex crafting.
 - Multiple playable characters.
-- Online sync/server-dependent progression.
+- Progres yang bergantung server (server-authoritative), Cloud Functions, App Check, dan paket Blaze. Cloud backup dan sinkronisasi dengan Firebase Spark diizinkan hanya dalam lingkup milestone M14.
 - Social features.
 
 Fitur-fitur tersebut dapat dipertimbangkan setelah MVP stabil dan pengguna menyetujuinya.
 
 ## 13. Format Laporan Setelah Tugas
 
-Setelah tugas selesai, berikan laporan ringkas namun dapat diverifikasi:
-1. **Audit awal** — kondisi implementasi sebelum perubahan.
-2. **Perubahan** — file yang dibuat/diubah dan alasannya.
-3. **Implementasi** — perilaku atau sistem yang berhasil dibuat.
-4. **Arsitektur** — dampak terhadap batas layer dan integrasi.
-5. **Testing** — perintah yang dijalankan dan hasil aktual.
-6. **Regression** — fitur lama yang diperiksa.
-7. **Dokumentasi** — file dokumentasi yang diperbarui.
-8. **Risiko/technical debt** — hal yang belum terselesaikan.
-9. **Status** — selesai, sebagian selesai, atau terblokir.
-10. **Langkah berikutnya** — hanya rekomendasi yang sesuai roadmap.
+Gunakan format `PROGRESS_REPORT_TEMPLATE.md` (di folder dokumen) sebagai format laporan utama. Isinya sudah mencakup audit awal, pekerjaan selesai, file diubah, test (baru dan lama yang diubah), analyzer, verifikasi perangkat, angka balancing, konflik desain, technical debt, dan pembaruan tracker.
 
-Jangan menyatakan tugas selesai jika kriteria sukses belum terpenuhi. Bedakan dengan jelas antara implementasi selesai, test lulus, build berhasil, dan pengujian manual di perangkat.
+Aturan tambahan:
+- Bedakan dengan jelas **IMPLEMENTED** (kode ada), **TESTED** (test lulus), dan **VERIFIED** (dijalankan di perangkat atau simulasi). Jangan menyatakan tugas selesai jika kriteria sukses belum terpenuhi.
+- Laporkan hasil perintah yang benar-benar dijalankan, bukan perkiraan.
+- Rekomendasi langkah berikutnya hanya yang sesuai roadmap.
 
 ## 14. Prinsip Akhir
 

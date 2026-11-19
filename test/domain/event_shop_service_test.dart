@@ -67,6 +67,15 @@ void main() {
   late EventShopService service;
   late Inventory inventory;
   late CurrencyService currencyService;
+  late PlayerCharacter character;
+
+  PlayerCharacter createCharacter({int gold = 0}) => PlayerCharacter(
+    config: config.progression,
+    specializationConfig: config.specializations,
+    skillCatalog: config.skills,
+    progress: PlayerProgress(level: 30, gold: gold),
+    initialSpecializationId: 'vanguard',
+  );
 
   final week1MondayMs = DateTime.utc(
     2026,
@@ -116,9 +125,10 @@ void main() {
     );
     inventory = Inventory(definitions: config.items);
     currencyService = CurrencyService(definitions: config.currencies);
+    character = createCharacter();
   });
 
-  group('EventShopService — M13 Stage 3', () {
+  group('EventShopService — M13 Stage 3 & M15 Stage 4 Barter', () {
     test('seluruh sealed error (NotFound, NotInRotation, RequirementNotMet, InsufficientCurrency, InventoryFull, LimitReached) tidak memutasi saldo, tas, maupun hitungan', () {
       final active = service.activeEntriesAt(
         week1MondayMs,
@@ -134,12 +144,8 @@ void main() {
       );
 
       final purchaseCounts = <(String, String), int>{};
-      currencyService.grant(
-        kAetherShardCurrencyId,
-        activeEpic.price - 1,
-        claimId: 'seed_short',
-      );
-      final initialBalance = currencyService.balance(kAetherShardCurrencyId);
+      character.addGold(activeEpic.goldPrice - 1);
+      final initialGold = character.gold;
 
       // 1. NotFound
       final notFound = service.buy(
@@ -147,6 +153,7 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -159,6 +166,7 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -171,6 +179,7 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(ancientCryptClears: 0, ascensionRank: 0),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -182,54 +191,85 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(ascensionRank: 0, highestAscensionRank: 0),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
       );
       expect(lockedLeg, isA<EventShopBuyRequirementNotMet>());
 
-      // 4. InsufficientCurrency (kurang 1 shard)
-      final poor = service.buy(
+      // 4. InsufficientCurrency (kurang 1 Gold)
+      final poorGold = service.buy(
         entryId: activeEpic.id,
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
       );
       expect(
-        poor,
+        poorGold,
         isA<EventShopBuyInsufficientCurrency>()
-            .having((r) => r.requiredAmount, 'required', activeEpic.price)
-            .having((r) => r.currentBalance, 'balance', activeEpic.price - 1),
+            .having((r) => r.currencyId, 'currencyId', 'gold')
+            .having((r) => r.requiredAmount, 'required', activeEpic.goldPrice)
+            .having(
+              (r) => r.currentBalance,
+              'balance',
+              activeEpic.goldPrice - 1,
+            ),
       );
-      expect(currencyService.balance(kAetherShardCurrencyId), initialBalance);
+      expect(character.gold, initialGold);
       expect(inventory.equipmentCount, 0);
       expect(purchaseCounts, isEmpty);
 
-      // 5. InventoryFull (top-up shard cukup, tapi tas penuh 0 slot)
-      currencyService.grant(kAetherShardCurrencyId, 500, claimId: 'seed_rich');
-      final richBalance = currencyService.balance(kAetherShardCurrencyId);
+      // 4b. InsufficientCurrency (Gold cukup, Boss Remnant kurang)
+      character.addGold(100000);
+      final poorMat = service.buy(
+        entryId: activeEpic.id,
+        effectiveNowMs: week1MondayMs,
+        inventory: inventory,
+        currencyService: currencyService,
+        character: character,
+        context: fullAccessContext(),
+        purchaseCounts: purchaseCounts,
+        timeZoneOffset: Duration.zero,
+      );
+      expect(
+        poorMat,
+        isA<EventShopBuyInsufficientCurrency>().having(
+          (r) => r.currencyId,
+          'currencyId',
+          'boss_remnant',
+        ),
+      );
+
+      // 5. InventoryFull (Gold & Material cukup, tapi tas penuh 0 slot)
+      final richGold = character.gold;
       final fullBag = Inventory(
         definitions: config.items,
         maxEquipmentCapacity: 0,
       );
+      for (final mat in activeEpic.materialCosts.entries) {
+        fullBag.add(mat.key, mat.value);
+      }
       final invFull = service.buy(
         entryId: activeEpic.id,
         effectiveNowMs: week1MondayMs,
         inventory: fullBag,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
       );
       expect(invFull, isA<EventShopBuyInventoryFull>());
-      expect(currencyService.balance(kAetherShardCurrencyId), richBalance);
+      expect(character.gold, richGold);
       expect(purchaseCounts, isEmpty);
     });
 
-    test('pembelian dengan shard pas berhasil, double-tap & beli ulang minggu sama diblokir, pindah minggu berganti rotasi', () {
+    test('barter dengan Gold & Material pas berhasil tanpa menyentuh Aether Shard, double-tap & beli ulang minggu sama diblokir', () {
       final activeW1 = service.activeEntriesAt(
         week1MondayMs,
         offset: Duration.zero,
@@ -237,18 +277,19 @@ void main() {
       final epicW1 = activeW1.firstWhere((e) => e.tier == EventItemTier.epic);
       final purchaseCounts = <(String, String), int>{};
 
-      currencyService.grant(
-        kAetherShardCurrencyId,
-        epicW1.price,
-        claimId: 'exact_shard',
-      );
+      currencyService.grant(kAetherShardCurrencyId, 50, claimId: 'shard_safe');
+      character.addGold(epicW1.goldPrice);
+      for (final mat in epicW1.materialCosts.entries) {
+        inventory.add(mat.key, mat.value);
+      }
 
-      // Beli pertama dengan shard pas
+      // Beli pertama dengan barter pas
       final first = service.buy(
         entryId: epicW1.id,
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -256,26 +297,27 @@ void main() {
       );
       expect(first, isA<EventShopBuySuccess>());
       final ok = first as EventShopBuySuccess;
-      expect(ok.currencySpent, epicW1.price);
-      expect(ok.remainingBalance, 0);
+      expect(ok.currencySpent, 0);
+      expect(ok.goldSpent, epicW1.goldPrice);
+      expect(ok.remainingGold, 0);
+      expect(currencyService.balance(kAetherShardCurrencyId), 50);
       expect(ok.newPurchaseCount, 1);
       expect(ok.purchasedEquipment, isNotNull);
       expect(ok.wasDuplicate, isFalse);
       expect(inventory.equipmentCount, 1);
 
       // Top up lagi untuk memastikan pemblokiran datang dari batas/idempotency, bukan saldo.
-      currencyService.grant(
-        kAetherShardCurrencyId,
-        500,
-        claimId: 'extra_shard',
-      );
+      character.addGold(500000);
+      inventory.add('boss_remnant', 50);
+      inventory.add('aether_scrap', 500);
 
-      // Double-tap dengan actionId sama -> idempotent duplicate (currencySpent: 0).
+      // Double-tap dengan actionId sama -> idempotent duplicate (goldSpent: 0).
       final dupAction = service.buy(
         entryId: epicW1.id,
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(eventPurchases: purchaseCounts),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -289,7 +331,7 @@ void main() {
           isTrue,
         ),
       );
-      expect(currencyService.balance(kAetherShardCurrencyId), 500);
+      expect(character.gold, 500000);
       expect(inventory.equipmentCount, 1);
 
       // Tap kedua dengan actionId berbeda di minggu yang sama -> LimitReached.
@@ -298,13 +340,14 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(eventPurchases: purchaseCounts),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
         actionId: 'tap_2',
       );
       expect(secondInSameWeek, isA<EventShopBuyLimitReached>());
-      expect(currencyService.balance(kAetherShardCurrencyId), 500);
+      expect(character.gold, 500000);
       expect(inventory.equipmentCount, 1);
 
       // Jam mundur via ClockGuard tidak membuka kembali minggu lama.
@@ -319,6 +362,7 @@ void main() {
         effectiveNowMs: reading.effectiveMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(eventPurchases: purchaseCounts),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -341,6 +385,7 @@ void main() {
         effectiveNowMs: week2MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(eventPurchases: purchaseCounts),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -352,7 +397,9 @@ void main() {
 
     test('periode berbeda untuk entryId yang sama tetap memakai batas terpisah (entryId, periodKey)', () {
       final purchaseCounts = <(String, String), int>{};
-      currencyService.grant(kAetherShardCurrencyId, 500, claimId: 'c1');
+      character.addGold(500000);
+      inventory.add('boss_remnant', 50);
+      inventory.add('aether_scrap', 500);
 
       final activeW1 = service.activeEntriesAt(
         week1MondayMs,
@@ -367,6 +414,7 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -378,6 +426,7 @@ void main() {
         effectiveNowMs: week1MondayMs + 86400000,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(eventPurchases: purchaseCounts),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -404,6 +453,7 @@ void main() {
         effectiveNowMs: nextOccurrenceMs,
         inventory: inventory,
         currencyService: currencyService,
+        character: character,
         context: fullAccessContext(eventPurchases: purchaseCounts),
         purchaseCounts: purchaseCounts,
         timeZoneOffset: Duration.zero,
@@ -439,22 +489,23 @@ void main() {
       final leg = active.firstWhere((e) => e.tier == EventItemTier.legendary);
       final expectedStats = config.items[leg.itemId]!.equipment!.baseStats;
 
-      final invA = Inventory(definitions: config.items);
-      final invB = Inventory(definitions: config.items);
-      final currA = CurrencyService(
-        definitions: config.currencies,
-        initialBalances: {kAetherShardCurrencyId: 500},
-      );
-      final currB = CurrencyService(
-        definitions: config.currencies,
-        initialBalances: {kAetherShardCurrencyId: 500},
-      );
+      final invA = Inventory(definitions: config.items)
+        ..add('boss_remnant', 10)
+        ..add('aether_scrap', 100);
+      final invB = Inventory(definitions: config.items)
+        ..add('boss_remnant', 10)
+        ..add('aether_scrap', 100);
+      final currA = CurrencyService(definitions: config.currencies);
+      final currB = CurrencyService(definitions: config.currencies);
+      final charA = createCharacter(gold: 500000);
+      final charB = createCharacter(gold: 500000);
 
       final resA = service.buy(
         entryId: leg.id,
         effectiveNowMs: week1MondayMs,
         inventory: invA,
         currencyService: currA,
+        character: charA,
         context: fullAccessContext(),
         random: math.Random(1),
         timeZoneOffset: Duration.zero,
@@ -464,6 +515,7 @@ void main() {
         effectiveNowMs: week1MondayMs,
         inventory: invB,
         currencyService: currB,
+        character: charB,
         context: fullAccessContext(),
         random: math.Random(999),
         timeZoneOffset: Duration.zero,

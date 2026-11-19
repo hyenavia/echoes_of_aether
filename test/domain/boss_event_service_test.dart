@@ -182,6 +182,7 @@ void main() {
           DungeonKind.ascension => 'ascension',
           DungeonKind.bossDaily => 'bossDaily',
           DungeonKind.bossWeekly => 'bossWeekly',
+          DungeonKind.bossSpire => 'bossSpire',
         };
         expect(label, isNotEmpty);
       }

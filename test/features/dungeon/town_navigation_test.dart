@@ -157,20 +157,21 @@ void main() {
         'eq_nav_1',
       );
 
-      // Sub-tab Tas di Bag menampilkan Slime Gel
+      // Sub-tab Item di Bag menampilkan Slime Gel
       await tester.tap(
         find.descendant(
           of: find.byType(SegmentedButton<int>),
-          matching: find.text('Tas'),
+          matching: find.text('Item'),
         ),
       );
       await tester.pumpAndSettle();
       expect(find.text('Slime Gel'), findsOneWidget);
 
-      // Pindah ke Hero
+      // Pindah ke Hero -> menampilkan Profil & Gear + Perlengkapan Terpasang
       await tester.tap(find.descendant(of: nav, matching: find.text('Hero')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Karakter'), findsWidgets);
+      expect(find.text('Profil & Gear'), findsOneWidget);
+      expect(find.text('Perlengkapan Terpasang'), findsOneWidget);
 
       // Pindah ke Shop
       await tester.tap(find.descendant(of: nav, matching: find.text('Shop')));

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/theme/echoes_theme.dart';
+import 'pixel_ui_box.dart';
 
-/// Bingkai panel bergaya RPG/pixel dengan border ganda dan aksen sudut opsional.
+/// Bingkai panel bergaya RPG/pixel dengan border ganda, aksen sudut opsional,
+/// atau gaya 9-slice pixel art retro terintegrasi.
 class PanelFrame extends StatelessWidget {
   const PanelFrame({
     super.key,
@@ -16,7 +18,22 @@ class PanelFrame extends StatelessWidget {
     this.borderRadius = AppRadius.md,
     this.elevation = AppElevation.panel,
     this.boxShadow,
+    this.pixelStyle,
   });
+
+  /// Varian panel berbasis 9-slice pixel art retro (misal: frame batu atau emas).
+  const PanelFrame.pixel({
+    super.key,
+    required this.child,
+    this.pixelStyle = PixelUiBoxStyle.darkStoneFrame,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    this.boxShadow,
+  }) : borderColor = null,
+       backgroundColor = null,
+       gradient = null,
+       showCornerOrnaments = false,
+       borderRadius = AppRadius.md,
+       elevation = AppElevation.panel;
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -27,9 +44,23 @@ class PanelFrame extends StatelessWidget {
   final double borderRadius;
   final double elevation;
   final List<BoxShadow>? boxShadow;
+  final PixelUiBoxStyle? pixelStyle;
 
   @override
   Widget build(BuildContext context) {
+    if (pixelStyle != null) {
+      final pixelPanel = PixelUiBox(
+        style: pixelStyle!,
+        padding: padding,
+        child: child,
+      );
+      if (boxShadow == null || boxShadow!.isEmpty) return pixelPanel;
+      return DecoratedBox(
+        decoration: BoxDecoration(boxShadow: boxShadow),
+        child: pixelPanel,
+      );
+    }
+
     final ext = EchoesTheme.of(context);
     final outerBorder = borderColor ?? ext.panelBorder;
     final panel = Material(

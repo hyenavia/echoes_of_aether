@@ -89,3 +89,74 @@ final class HealEvent extends CombatEvent {
   final int amount;
   final String? skillId;
 }
+
+/// Perisai (Shield) menyerap damage serangan.
+final class ShieldEvent extends CombatEvent {
+  const ShieldEvent(
+    super.tick, {
+    required this.targetId,
+    required this.shieldRemaining,
+    required this.absorbedDamage,
+  });
+
+  final String targetId;
+  final int shieldRemaining;
+  final int absorbedDamage;
+}
+
+/// Tipe pemicu efek Weapon Resonance.
+enum WeaponResonanceTrigger {
+  paladinHolyNova,
+  voidbladeShadowMark,
+  voidbladeTrueDamage,
+  chronomancerFreeze,
+  gunslingerPiercing,
+  necromancerShadowMinion,
+  stormcallerChainLightning,
+  stormcallerShock,
+}
+
+/// Event saat Signature Weapon Resonance terpicu dalam combat (GDD Addendum v1.4).
+final class WeaponResonanceEvent extends CombatEvent {
+  const WeaponResonanceEvent(
+    super.tick, {
+    required this.resonanceClassId,
+    required this.trigger,
+    this.targetId,
+    this.value = 0,
+    this.message,
+  });
+
+  final String resonanceClassId;
+  final WeaponResonanceTrigger trigger;
+  final String? targetId;
+  final int value;
+  final String? message;
+}
+
+/// Tipe mekanik/skill khusus musuh (Elite / Boss).
+enum EnemySpecialType {
+  berserk,
+  heavyStrike,
+  groundSlam,
+  summonMinions,
+  elementalWard,
+  blazingSurge,
+  lifeSiphon,
+  cataclysm,
+  finalStand,
+}
+
+/// Event saat musuh Elite atau Boss mengaktifkan mekanik khusus.
+final class EnemySpecialEvent extends CombatEvent {
+  const EnemySpecialEvent(
+    super.tick, {
+    required this.enemyId,
+    required this.specialType,
+    this.message,
+  });
+
+  final String enemyId;
+  final EnemySpecialType specialType;
+  final String? message;
+}

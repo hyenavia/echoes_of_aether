@@ -92,6 +92,16 @@ void main() {
     );
   });
 
+  test('equipmentStatLines mengembalikan daftar baris stat terpisah', () {
+    expect(
+      equipmentStatLines(
+        const EquipmentStats(atk: 15, critRate: 0.05, def: 8, lifesteal: 0.03),
+      ),
+      ['ATK +15', 'DEF +8', 'CRIT +5%', 'LIFESTEAL +3%'],
+    );
+    expect(equipmentStatLines(EquipmentStats.zero), isEmpty);
+  });
+
   test('computeEquipmentStatDeltas menghitung delta stat persentase', () {
     final deltas = computeEquipmentStatDeltas(
       const EquipmentStats(atk: 10, hpPct: 0.15, atkPct: 0.1, defPct: 0.05),

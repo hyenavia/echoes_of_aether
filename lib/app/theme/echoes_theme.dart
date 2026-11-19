@@ -22,6 +22,7 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
     required this.rarityRare,
     required this.rarityEpic,
     required this.rarityLegendary,
+    this.rarityMythical = AppColors.rarityMythical,
   });
 
   final Color panelBackground;
@@ -39,6 +40,7 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
   final Color rarityRare;
   final Color rarityEpic;
   final Color rarityLegendary;
+  final Color rarityMythical;
 
   static const EchoesThemeExtension dark = EchoesThemeExtension(
     panelBackground: AppColors.panelDark,
@@ -56,6 +58,7 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
     rarityRare: AppColors.rarityRare,
     rarityEpic: AppColors.rarityEpic,
     rarityLegendary: AppColors.rarityLegendary,
+    rarityMythical: AppColors.rarityMythical,
   );
 
   Color colorForRarity(ItemRarity rarity) => switch (rarity) {
@@ -64,6 +67,7 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
     ItemRarity.rare => rarityRare,
     ItemRarity.epic => rarityEpic,
     ItemRarity.legendary => rarityLegendary,
+    ItemRarity.mythical => rarityMythical,
   };
 
   @override
@@ -83,6 +87,7 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
     Color? rarityRare,
     Color? rarityEpic,
     Color? rarityLegendary,
+    Color? rarityMythical,
   }) {
     return EchoesThemeExtension(
       panelBackground: panelBackground ?? this.panelBackground,
@@ -100,6 +105,7 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
       rarityRare: rarityRare ?? this.rarityRare,
       rarityEpic: rarityEpic ?? this.rarityEpic,
       rarityLegendary: rarityLegendary ?? this.rarityLegendary,
+      rarityMythical: rarityMythical ?? this.rarityMythical,
     );
   }
 
@@ -129,6 +135,8 @@ class EchoesThemeExtension extends ThemeExtension<EchoesThemeExtension> {
       rarityRare: Color.lerp(rarityRare, other.rarityRare, t)!,
       rarityEpic: Color.lerp(rarityEpic, other.rarityEpic, t)!,
       rarityLegendary: Color.lerp(rarityLegendary, other.rarityLegendary, t)!,
+      rarityMythical:
+          Color.lerp(rarityMythical, other.rarityMythical, t) ?? rarityMythical,
     );
   }
 }

@@ -10,7 +10,9 @@ class EventShopEntry {
     required this.id,
     required this.itemId,
     required this.tier,
-    required this.price,
+    this.price = 0,
+    this.goldPrice = 0,
+    this.materialCosts = const {},
     this.requirements = const [],
     this.slot,
   });
@@ -19,11 +21,16 @@ class EventShopEntry {
   final String itemId;
   final EventItemTier tier;
   final int price;
+  final int goldPrice;
+  final Map<String, int> materialCosts;
   final List<PurchaseRequirement> requirements;
 
   /// Slot equipment opsional (umumnya diisi dari `items.json`, atau langsung
   /// pada fixture unit test).
   final EquipmentSlot? slot;
+
+  /// True jika pembelian menggunakan skema barter (Gold dan/atau Material).
+  bool get isBarter => goldPrice > 0 || materialCosts.isNotEmpty;
 }
 
 /// Konfigurasi statis Weekly Event Shop (`assets/data/event_shop.json`).

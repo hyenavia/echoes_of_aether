@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import '../services/derived_stats_calculator.dart';
 import '../services/progression_service.dart';
 import 'combat_stats.dart';
+import 'equipment.dart';
 import 'equipment_loadout.dart';
+import 'item_definition.dart';
 import 'player_progress.dart';
 import 'player_save_snapshot.dart';
 import 'progression_config.dart';
@@ -46,11 +48,13 @@ class PlayerCharacter {
     this.skillCatalog = const {},
     this.specializationConfig = const SpecializationConfig(),
     this.statsCalculator = const DerivedStatsCalculator(),
+    Map<String, ItemDefinition> itemCatalog = const {},
     String? initialSpecializationId,
     Map<String, int> skillLevels = const {},
   }) : _service = ProgressionService(config),
        _progress = progress ?? const PlayerProgress(),
        loadout = loadout ?? EquipmentLoadout(),
+       _itemCatalog = itemCatalog, // ignore: prefer_initializing_formals
        _specializationId = initialSpecializationId,
        _skillLevels = {
          for (final entry in skillLevels.entries)
@@ -60,6 +64,27 @@ class PlayerCharacter {
   final ProgressionConfig config;
   final ProgressionService _service;
   final EquipmentLoadout loadout;
+  Map<String, ItemDefinition> _itemCatalog;
+
+  Map<String, ItemDefinition> get itemCatalog => Map.unmodifiable(_itemCatalog);
+
+  set itemCatalog(Map<String, ItemDefinition> catalog) {
+    _itemCatalog = catalog;
+    buildRevision++;
+  }
+
+  /// Mengembalikan id class yang sedang aktif resonansi senjatanya, atau null jika tidak aktif.
+  String? get activeResonanceClassId {
+    final specId = _specializationId;
+    if (specId == null) return null;
+    final weaponInstance = loadout.instanceIn(EquipmentSlot.weapon);
+    if (weaponInstance == null) return null;
+    final itemDef = _itemCatalog[weaponInstance.definitionId];
+    if (itemDef?.equipment?.signatureClassId == specId) {
+      return specId;
+    }
+    return null;
+  }
 
   /// Seluruh definisi skill dan specialization yang ada di game.
   final Map<String, SkillDefinition> skillCatalog;
@@ -69,10 +94,19 @@ class PlayerCharacter {
   PlayerProgress _progress;
   String? _specializationId;
   final Map<String, int> _skillLevels;
+  EquipmentStats _altarBonus = EquipmentStats.zero;
 
-  /// Bertambah setiap kali specialization berubah (untuk mendeteksi perubahan
-  /// stat/skill tanpa membandingkan seluruh isi).
+  /// Bertambah setiap kali specialization atau altar blessing berubah
+  /// (untuk mendeteksi perubahan stat/skill tanpa membandingkan seluruh isi).
   int buildRevision = 0;
+
+  EquipmentStats get altarBonus => _altarBonus;
+
+  /// Memperbarui bonus stat dari Camp Altar.
+  void updateAltarBonus(EquipmentStats bonus) {
+    _altarBonus = bonus;
+    buildRevision++;
+  }
 
   PlayerProgress get progress => _progress;
   int get level => _progress.level;
@@ -220,14 +254,17 @@ class PlayerCharacter {
 
   /// Stat tempur saat ini (single source of truth melalui
   /// [DerivedStatsCalculator]):
-  /// Base Stats (level) + Equipment Modifiers + Specialization Modifiers
-  /// + Passive Skill Modifiers (beserta affinity specialization).
+  /// Base Stats (level) + Equipment Modifiers + Altar Modifiers
+  /// + Specialization Modifiers + Passive Skill Modifiers
+  /// (beserta affinity specialization).
   CombatStats get stats => statsCalculator.calculate(
     baseStats: config.statsAt(level),
     equipmentBonus: loadout.totalBonus,
+    altarBonus: _altarBonus,
     specialization: specialization,
     passiveSkills: passiveSkills,
     skillLevelOf: skillLevel,
+    activeResonanceClassId: activeResonanceClassId,
   );
 
   /// Menambahkan reward dan mengembalikan jumlah level yang naik.

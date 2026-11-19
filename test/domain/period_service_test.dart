@@ -215,6 +215,88 @@ void main() {
       expect(service.weekIndex(at4am), 1);
       expect(service.nextResetMs(Period.daily, before4am), at4am);
     });
+
+    test('siklus 2-mingguan: biweekIndex, biweeklyKey, dan nextBiweeklyResetMs tepat pada reset_hour 4 AM', () {
+      const tz = Duration(hours: 7);
+      final service = PeriodService(
+        config: const TimeConfig(resetHour: 4, epochMonday: '2026-11-16'),
+        timeZoneOffset: () => tz,
+      );
+
+      // Hari pertama siklus 0: 16 Nov 2026 10:00 WIB
+      final week0Day1 = _localMs(
+        year: 2026,
+        month: 11,
+        day: 16,
+        hour: 10,
+        offset: tz,
+      );
+      expect(service.biweekIndex(week0Day1), 0);
+      expect(service.biweeklyKey(week0Day1), '2026-11-16');
+
+      // Akhir minggu pertama (22 Nov): masih di siklus 0
+      final week0End = _localMs(
+        year: 2026,
+        month: 11,
+        day: 22,
+        hour: 20,
+        offset: tz,
+      );
+      expect(service.biweekIndex(week0End), 0);
+      expect(service.biweeklyKey(week0End), '2026-11-16');
+
+      // Minggu kedua (25 Nov): masih di siklus 0
+      final week1Mid = _localMs(
+        year: 2026,
+        month: 11,
+        day: 25,
+        hour: 12,
+        offset: tz,
+      );
+      expect(service.biweekIndex(week1Mid), 0);
+      expect(service.biweeklyKey(week1Mid), '2026-11-16');
+
+      // Sesaat sebelum reset 2-mingguan (30 Nov 03:59:59 WIB)
+      final beforeReset = _localMs(
+        year: 2026,
+        month: 11,
+        day: 30,
+        hour: 3,
+        minute: 59,
+        second: 59,
+        offset: tz,
+      );
+      expect(service.biweekIndex(beforeReset), 0);
+      expect(service.biweeklyKey(beforeReset), '2026-11-16');
+
+      // Tepat saat reset 2-mingguan (30 Nov 04:00:00 WIB): masuk ke siklus 1!
+      final atReset = _localMs(
+        year: 2026,
+        month: 11,
+        day: 30,
+        hour: 4,
+        minute: 0,
+        second: 0,
+        offset: tz,
+      );
+      expect(service.biweekIndex(atReset), 1);
+      expect(service.biweeklyKey(atReset), '2026-11-30');
+
+      // nextBiweeklyResetMs sebelum reset menunjuk ke 30 Nov 04:00 WIB
+      expect(service.nextBiweeklyResetMs(beforeReset), atReset);
+
+      // nextBiweeklyResetMs saat reset menunjuk ke 14 Dec 04:00 WIB
+      final nextNextReset = _localMs(
+        year: 2026,
+        month: 12,
+        day: 14,
+        hour: 4,
+        minute: 0,
+        second: 0,
+        offset: tz,
+      );
+      expect(service.nextBiweeklyResetMs(atReset), nextNextReset);
+    });
   });
 
   group('TimeConfig & ClaimedRewardsConfig parser/validator', () {

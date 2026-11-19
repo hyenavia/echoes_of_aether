@@ -23,6 +23,8 @@ class EquipmentStats {
     this.moveSpeed = 0,
     this.attackRange = 0,
     this.skillHaste = 0,
+    this.lifesteal = 0,
+    this.spellVamp = 0,
   });
 
   static const EquipmentStats zero = EquipmentStats();
@@ -42,6 +44,8 @@ class EquipmentStats {
   final double moveSpeed;
   final double attackRange;
   final double skillHaste;
+  final double lifesteal;
+  final double spellVamp;
 
   bool get isEmpty =>
       hp == 0 &&
@@ -55,7 +59,9 @@ class EquipmentStats {
       attackSpeed == 0 &&
       moveSpeed == 0 &&
       attackRange == 0 &&
-      skillHaste == 0;
+      skillHaste == 0 &&
+      lifesteal == 0 &&
+      spellVamp == 0;
 
   EquipmentStats operator +(EquipmentStats o) => EquipmentStats(
     hp: hp + o.hp,
@@ -70,6 +76,8 @@ class EquipmentStats {
     moveSpeed: moveSpeed + o.moveSpeed,
     attackRange: attackRange + o.attackRange,
     skillHaste: skillHaste + o.skillHaste,
+    lifesteal: lifesteal + o.lifesteal,
+    spellVamp: spellVamp + o.spellVamp,
   );
 
   EquipmentStats scaled(double factor) => factor == 1.0
@@ -87,6 +95,8 @@ class EquipmentStats {
           moveSpeed: moveSpeed * factor,
           attackRange: attackRange * factor,
           skillHaste: skillHaste * factor,
+          lifesteal: lifesteal * factor,
+          spellVamp: spellVamp * factor,
         );
 
   /// Mengacak setiap stat yang tidak nol dalam rentang ±[variance]
@@ -118,6 +128,8 @@ class EquipmentStats {
       moveSpeed: r(moveSpeed),
       attackRange: r(attackRange),
       skillHaste: r(skillHaste),
+      lifesteal: r(lifesteal),
+      spellVamp: r(spellVamp),
     );
   }
 
@@ -136,6 +148,8 @@ class EquipmentStats {
       maxSkillHaste,
       math.max(0.0, base.skillHaste + skillHaste),
     ),
+    lifesteal: math.min(1.0, math.max(0.0, base.lifesteal + lifesteal)),
+    spellVamp: math.min(1.0, math.max(0.0, base.spellVamp + spellVamp)),
   );
 }
 
@@ -146,16 +160,24 @@ class EquipmentData {
     required this.baseStats,
     this.weaponType,
     this.fixedStats = false,
+    this.signatureClassId,
+    this.resonanceDescription,
   });
 
   final EquipmentSlot slot;
   final EquipmentStats baseStats;
 
-  /// sword / staff / bow; hanya untuk slot weapon.
+  /// sword / staff / bow / gun / scythe; hanya untuk slot weapon.
   final String? weaponType;
 
   /// Jika `true`, item tidak di-roll saat dibuat oleh [EquipmentFactory].
   final bool fixedStats;
+
+  /// Class specialization yang bersinergi dengan senjata ini (jika ada).
+  final String? signatureClassId;
+
+  /// Penjelasan efek khusus saat dipakai oleh signature class.
+  final String? resonanceDescription;
 }
 
 /// Satu item equipment milik player dengan hasil roll tersendiri (GDD 13).
@@ -168,6 +190,7 @@ class EquipmentInstance {
     required this.rarity,
     required this.rolledStats,
     this.enhancementLevel = 0,
+    this.isFavorite = false,
   });
 
   final String id;
@@ -176,6 +199,49 @@ class EquipmentInstance {
   final ItemRarity rarity;
   final EquipmentStats rolledStats;
 
-  /// Dipakai oleh fitur enhancement (di luar MVP awal).
+  /// Tingkat enhancement item (+1 sampai +10).
   final int enhancementLevel;
+
+  /// Menandai apakah item ini difavoritkan sehingga terlindungi dari penjualan.
+  final bool isFavorite;
+
+  EquipmentInstance copyWith({
+    String? id,
+    String? definitionId,
+    EquipmentSlot? slot,
+    ItemRarity? rarity,
+    EquipmentStats? rolledStats,
+    int? enhancementLevel,
+    bool? isFavorite,
+  }) => EquipmentInstance(
+    id: id ?? this.id,
+    definitionId: definitionId ?? this.definitionId,
+    slot: slot ?? this.slot,
+    rarity: rarity ?? this.rarity,
+    rolledStats: rolledStats ?? this.rolledStats,
+    enhancementLevel: enhancementLevel ?? this.enhancementLevel,
+    isFavorite: isFavorite ?? this.isFavorite,
+  );
+
+  /// Stat efektif setelah memperhitungkan enhancement (+5% per level pada flat stats).
+  EquipmentStats get effectiveStats {
+    if (enhancementLevel <= 0) return rolledStats;
+    final factor = 1.0 + (enhancementLevel * 0.05);
+    return EquipmentStats(
+      hp: rolledStats.hp * factor,
+      atk: rolledStats.atk * factor,
+      def: rolledStats.def * factor,
+      hpPct: rolledStats.hpPct,
+      atkPct: rolledStats.atkPct,
+      defPct: rolledStats.defPct,
+      critRate: rolledStats.critRate,
+      critDamage: rolledStats.critDamage,
+      attackSpeed: rolledStats.attackSpeed,
+      moveSpeed: rolledStats.moveSpeed,
+      attackRange: rolledStats.attackRange,
+      skillHaste: rolledStats.skillHaste,
+      lifesteal: rolledStats.lifesteal,
+      spellVamp: rolledStats.spellVamp,
+    );
+  }
 }

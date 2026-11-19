@@ -292,6 +292,41 @@ void main() {
       expect(badSvc.equip('eq_bad'), isFalse);
       expect(corruptedBag.equipmentSnapshot(), hasLength(1));
     });
+
+    test('toggleFavorite mengubah status isFavorite pada tas dan loadout terpasang', () {
+      final inv = Inventory(definitions: {'sword': sword, 'cap': cap});
+      final loadout = EquipmentLoadout();
+      final svc = EquipmentService(inventory: inv, loadout: loadout);
+
+      final w1 = make('w1', sword);
+      final c1 = make('c1', cap);
+      inv.addEquipment(w1);
+      inv.addEquipment(c1);
+
+      // Pasang w1 ke loadout
+      expect(svc.equip('w1'), isTrue);
+      expect(loadout.instanceIn(EquipmentSlot.weapon)?.isFavorite, isFalse);
+      expect(inv.equipmentById('c1')?.isFavorite, isFalse);
+
+      // Toggle favorit pada item di tas (c1)
+      expect(svc.toggleFavorite('c1'), isTrue);
+      expect(inv.equipmentById('c1')?.isFavorite, isTrue);
+
+      // Toggle lagi membalikkan ke false
+      expect(svc.toggleFavorite('c1'), isTrue);
+      expect(inv.equipmentById('c1')?.isFavorite, isFalse);
+
+      // Toggle favorit pada item terpasang (w1)
+      expect(svc.toggleFavorite('w1'), isTrue);
+      expect(loadout.instanceIn(EquipmentSlot.weapon)?.isFavorite, isTrue);
+
+      // Toggle lagi membalikkan ke false
+      expect(svc.toggleFavorite('w1'), isTrue);
+      expect(loadout.instanceIn(EquipmentSlot.weapon)?.isFavorite, isFalse);
+
+      // Id tidak ada mengembalikan false
+      expect(svc.toggleFavorite('unknown_id'), isFalse);
+    });
   });
 
   group('PlayerCharacter + equipment', () {

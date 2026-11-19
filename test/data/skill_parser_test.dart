@@ -176,7 +176,17 @@ void main() {
     test('membaca specializations.json yang dikirim bersama game', () {
       final c = specParser.parse(asset('specializations.json'));
       expect(c.unlockLevel, 5);
-      expect(c.definitions.keys.toSet(), {'vanguard', 'arcanist', 'ranger'});
+      expect(c.definitions.keys.toSet(), {
+        'vanguard',
+        'arcanist',
+        'ranger',
+        'paladin',
+        'voidblade',
+        'chronomancer',
+        'gunslinger',
+        'necromancer',
+        'stormcaller',
+      });
 
       final vanguard = c.definitions['vanguard']!;
       expect(vanguard.bonus.hp, 60);
@@ -242,20 +252,17 @@ void main() {
       );
     });
 
-    test(
-      'setiap specialization punya skill; skill-nya terbuka >= unlock_level',
-      () {
-        final c = loadReal();
-        final unlock = c.specializations.unlockLevel;
-        for (final id in c.specializations.definitions.keys) {
-          final own = c.skills.values.where((s) => s.specializationId == id);
-          expect(own, isNotEmpty, reason: id);
-          for (final s in own) {
-            expect(s.unlockLevel, greaterThanOrEqualTo(unlock), reason: s.id);
-          }
+    test('setiap starter specialization punya skill; skill-nya terbuka >= unlock_level', () {
+      final c = loadReal();
+      final unlock = c.specializations.unlockLevel;
+      for (final id in ['vanguard', 'arcanist', 'ranger']) {
+        final own = c.skills.values.where((s) => s.specializationId == id);
+        expect(own, isNotEmpty, reason: id);
+        for (final s in own) {
+          expect(s.unlockLevel, greaterThanOrEqualTo(unlock), reason: s.id);
         }
-      },
-    );
+      }
+    });
 
     test('skill yang merujuk specialization tidak ada ditolak', () {
       final broken = loadReal(
@@ -357,6 +364,38 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('seluruh 6 class Mythical memiliki skill pasif & aktif khusus di skills.json', () {
+      final config = loadReal();
+      expect(
+        () => const GameConfigValidator().validate(config),
+        returnsNormally,
+      );
+
+      const mythicalIds = [
+        'paladin',
+        'voidblade',
+        'chronomancer',
+        'gunslinger',
+        'necromancer',
+        'stormcaller',
+      ];
+      for (final specId in mythicalIds) {
+        final classSkills = config.skills.values
+            .where((s) => s.specializationId == specId)
+            .toList();
+        expect(
+          classSkills.where((s) => s.isPassive),
+          hasLength(1),
+          reason: '$specId harus memiliki 1 skill pasif khusus',
+        );
+        expect(
+          classSkills.where((s) => s.isActive),
+          hasLength(2),
+          reason: '$specId harus memiliki 2 skill aktif khusus',
+        );
+      }
     });
   });
 }

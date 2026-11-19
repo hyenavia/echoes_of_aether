@@ -393,13 +393,15 @@ class EncounterTracker {
       );
     }
 
+    final isBoss = config.isBoss || definition.isBoss;
+    final isElite = !isBoss && (config.isElite || definition.isElite);
     final modifiedStats = config.statModifier.applyTo(definition.stats);
     final effectiveStats = difficultyService.scaleMonsterStats(
       modifiedStats,
       _activeDifficultyProfile,
+      isElite: isElite,
+      isBoss: isBoss,
     );
-    final isBoss = config.isBoss || definition.isBoss;
-    final isElite = !isBoss && (config.isElite || definition.isElite);
     final cells = _resolveSpawnCells(
       grid: grid,
       origin: config.position,

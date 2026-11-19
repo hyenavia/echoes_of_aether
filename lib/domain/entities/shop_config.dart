@@ -70,10 +70,7 @@ class ShopEntry {
 /// Aturan penjualan item ke Shop.
 class SellRules {
   const SellRules({
-    this.sellableCategories = const {
-      ItemCategory.equipment,
-      ItemCategory.material,
-    },
+    this.sellableCategories = const {ItemCategory.equipment},
     this.confirmMinRarity = ItemRarity.rare,
     this.equippedSellable = false,
     this.maxSellRatio = 0.4,

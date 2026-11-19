@@ -4,7 +4,12 @@
       "id": "evt_dawn_blade",
       "item_id": "event_dawn_blade",
       "tier": "epic",
-      "price": 100,
+      "price": 0,
+      "gold_price": 25000,
+      "material_costs": {
+        "boss_remnant": 3,
+        "aether_scrap": 30
+      },
       "requirements": [
         { "type": "dungeon_cleared", "dungeon_id": "ancient_crypt" }
       ]
@@ -13,7 +18,12 @@
       "id": "evt_eclipse_blade",
       "item_id": "event_eclipse_blade",
       "tier": "legendary",
-      "price": 180,
+      "price": 0,
+      "gold_price": 75000,
+      "material_costs": {
+        "boss_remnant": 6,
+        "aether_scrap": 75
+      },
       "requirements": [
         { "type": "min_ascension_rank", "value": 1 }
       ]
@@ -22,7 +32,12 @@
       "id": "evt_aegis_mail",
       "item_id": "event_aegis_mail",
       "tier": "epic",
-      "price": 100,
+      "price": 0,
+      "gold_price": 25000,
+      "material_costs": {
+        "boss_remnant": 3,
+        "aether_scrap": 30
+      },
       "requirements": [
         { "type": "dungeon_cleared", "dungeon_id": "ancient_crypt" }
       ]
@@ -31,7 +46,12 @@
       "id": "evt_bulwark_plate",
       "item_id": "event_bulwark_plate",
       "tier": "legendary",
-      "price": 180,
+      "price": 0,
+      "gold_price": 75000,
+      "material_costs": {
+        "boss_remnant": 6,
+        "aether_scrap": 75
+      },
       "requirements": [
         { "type": "min_ascension_rank", "value": 1 }
       ]
@@ -40,7 +60,12 @@
       "id": "evt_warden_helm",
       "item_id": "event_warden_helm",
       "tier": "epic",
-      "price": 100,
+      "price": 0,
+      "gold_price": 25000,
+      "material_costs": {
+        "boss_remnant": 3,
+        "aether_scrap": 30
+      },
       "requirements": [
         { "type": "dungeon_cleared", "dungeon_id": "ancient_crypt" }
       ]
@@ -49,7 +74,12 @@
       "id": "evt_crown_of_dusk",
       "item_id": "event_crown_of_dusk",
       "tier": "legendary",
-      "price": 180,
+      "price": 0,
+      "gold_price": 75000,
+      "material_costs": {
+        "boss_remnant": 6,
+        "aether_scrap": 75
+      },
       "requirements": [
         { "type": "min_ascension_rank", "value": 1 }
       ]
@@ -58,7 +88,12 @@
       "id": "evt_ember_ring",
       "item_id": "event_ember_ring",
       "tier": "epic",
-      "price": 100,
+      "price": 0,
+      "gold_price": 25000,
+      "material_costs": {
+        "boss_remnant": 3,
+        "aether_scrap": 30
+      },
       "requirements": [
         { "type": "dungeon_cleared", "dungeon_id": "ancient_crypt" }
       ]
@@ -67,12 +102,17 @@
       "id": "evt_aether_pendant",
       "item_id": "event_aether_pendant",
       "tier": "legendary",
-      "price": 180,
+      "price": 0,
+      "gold_price": 75000,
+      "material_costs": {
+        "boss_remnant": 6,
+        "aether_scrap": 75
+      },
       "requirements": [
         { "type": "min_ascension_rank", "value": 1 }
       ]
     }
   ],
   "weekly_purchase_limit": 1,
-  "currency_id": "aether_shard"
+  "currency_id": "barter"
 }
