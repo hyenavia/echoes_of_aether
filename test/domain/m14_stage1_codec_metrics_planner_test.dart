@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:echoes_of_aether/core/errors/config_exception.dart';
 import 'package:echoes_of_aether/data/models/boss_events_config_parser.dart';
+import 'package:echoes_of_aether/data/models/boss_spire_config_parser.dart';
 import 'package:echoes_of_aether/data/models/dungeon_config_parser.dart';
 import 'package:echoes_of_aether/data/models/event_shop_config_parser.dart';
 import 'package:echoes_of_aether/data/models/game_config_parser.dart';
@@ -74,6 +75,9 @@ GameConfig _loadRealConfig() {
     shop: const ShopConfigParser().parse(_readAsset('shop.json')),
     eventShop: const EventShopConfigParser().parse(
       _readAsset('event_shop.json'),
+    ),
+    bossSpire: const BossSpireConfigParser().parse(
+      _readAsset('boss_spire.json'),
     ),
   );
   const GameConfigValidator().validate(config);
@@ -435,6 +439,7 @@ void main() {
       final base = _buildRichSnapshot(config);
       const dailyBossId = 'boss_daily:daily_ash_tyrant';
       const weeklyBossId = 'boss_weekly:weekly_crimson_sovereign';
+      const spireFloorId = 'boss_spire:floor_1';
 
       const bossProgress = DungeonProgressSnapshot(
         currentDungeonId: dailyBossId,
@@ -464,6 +469,20 @@ void main() {
         ),
       );
 
+      const spireProgress = DungeonProgressSnapshot(
+        currentDungeonId: spireFloorId,
+        currentRoomId: 'spire_floor_1_room',
+        currentRoomIndex: 0,
+        highestClearedRoomIndex: 0,
+        clearsCount: 1,
+        clearedInCycleRank: 1,
+        rewardState: DungeonRewardStateSnapshot(
+          lastRunId: 'run_spire_1',
+          completionRewardClaimed: true,
+          claimedRoomRewardIds: {'spire_floor_1_room'},
+        ),
+      );
+
       final withBoss = PlayerSaveSnapshot(
         playerId: base.playerId,
         character: base.character,
@@ -473,6 +492,7 @@ void main() {
           ...base.dungeonProgresses,
           dailyBossId: bossProgress,
           weeklyBossId: weeklyProgress,
+          spireFloorId: spireProgress,
         },
         cycleProgress: base.cycleProgress,
         session: GameSessionSnapshot(
@@ -505,6 +525,8 @@ void main() {
       expect(decoded.dungeonProgresses[dailyBossId]!.clearsCount, 5);
       expect(decoded.dungeonProgresses.containsKey(weeklyBossId), isTrue);
       expect(decoded.dungeonProgresses[weeklyBossId]!.clearsCount, 2);
+      expect(decoded.dungeonProgresses.containsKey(spireFloorId), isTrue);
+      expect(decoded.dungeonProgresses[spireFloorId]!.clearsCount, 1);
       expect(decoded.session.consecutiveDefeats[dailyBossId], 2);
       expect(decoded.session.lastFailedDungeonId, dailyBossId);
 
@@ -518,6 +540,26 @@ void main() {
 
       expect(
         () => codec.decodeFromMap(badBossMap, config: config),
+        throwsA(
+          isA<SaveCodecException>().having(
+            (e) => e.code,
+            'code',
+            SaveCodecErrorCode.unknownReferenceId,
+          ),
+        ),
+      );
+
+      // Menolak boss spire floor di luar jangkauan (mis. floor_999)
+      final badSpireMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      final badSpireProgresses = Map<String, dynamic>.from(
+        badSpireMap['dungeonProgresses'] as Map<String, dynamic>,
+      );
+      badSpireProgresses['boss_spire:floor_999'] =
+          badSpireProgresses[spireFloorId];
+      badSpireMap['dungeonProgresses'] = badSpireProgresses;
+
+      expect(
+        () => codec.decodeFromMap(badSpireMap, config: config),
         throwsA(
           isA<SaveCodecException>().having(
             (e) => e.code,
@@ -620,82 +662,77 @@ void main() {
       );
     });
 
-    test(
-      'mempertahankan isFavorite pada equipment bag dan equipped, serta fallback false untuk snapshot warisan tanpa isFavorite',
-      () {
-        final base = _buildRichSnapshot(config);
-        final favWeapon = base.character.equipped[EquipmentSlot.weapon]!
-            .copyWith(isFavorite: true);
-        final favBagItem = base.inventory.equipment.first.copyWith(
-          isFavorite: true,
-        );
-        final nonFavBagItem = base.inventory.equipment[1].copyWith(
-          isFavorite: false,
-        );
+    test('mempertahankan isFavorite pada equipment bag dan equipped, serta fallback false untuk snapshot warisan tanpa isFavorite', () {
+      final base = _buildRichSnapshot(config);
+      final favWeapon = base.character.equipped[EquipmentSlot.weapon]!.copyWith(
+        isFavorite: true,
+      );
+      final favBagItem = base.inventory.equipment.first.copyWith(
+        isFavorite: true,
+      );
+      final nonFavBagItem = base.inventory.equipment[1].copyWith(
+        isFavorite: false,
+      );
 
-        final withFavs = PlayerSaveSnapshot(
-          playerId: base.playerId,
-          character: PlayerCharacterSnapshot(
-            progress: base.character.progress,
-            specializationId: base.character.specializationId,
-            skillLevels: base.character.skillLevels,
-            skillCooldownTicks: base.character.skillCooldownTicks,
-            equipped: {
-              ...base.character.equipped,
-              EquipmentSlot.weapon: favWeapon,
-            },
-            currentHp: base.character.currentHp,
-          ),
-          inventory: InventorySnapshot(
-            stacks: base.inventory.stacks,
-            equipment: [favBagItem, nonFavBagItem],
-            equipmentCounter: base.inventory.equipmentCounter,
-          ),
-          dungeon: base.dungeon,
-          dungeonProgresses: base.dungeonProgresses,
-          cycleProgress: base.cycleProgress,
-          session: base.session,
-          claimedEventIds: base.claimedEventIds,
-          currencies: base.currencies,
-          clockState: base.clockState,
-        );
+      final withFavs = PlayerSaveSnapshot(
+        playerId: base.playerId,
+        character: PlayerCharacterSnapshot(
+          progress: base.character.progress,
+          specializationId: base.character.specializationId,
+          skillLevels: base.character.skillLevels,
+          skillCooldownTicks: base.character.skillCooldownTicks,
+          equipped: {
+            ...base.character.equipped,
+            EquipmentSlot.weapon: favWeapon,
+          },
+          currentHp: base.character.currentHp,
+        ),
+        inventory: InventorySnapshot(
+          stacks: base.inventory.stacks,
+          equipment: [favBagItem, nonFavBagItem],
+          equipmentCounter: base.inventory.equipmentCounter,
+        ),
+        dungeon: base.dungeon,
+        dungeonProgresses: base.dungeonProgresses,
+        cycleProgress: base.cycleProgress,
+        session: base.session,
+        claimedEventIds: base.claimedEventIds,
+        currencies: base.currencies,
+        clockState: base.clockState,
+      );
 
-        final jsonString = codec.encodeToCanonicalJson(withFavs);
-        expect(jsonString.contains('"isFavorite":true'), isTrue);
+      final jsonString = codec.encodeToCanonicalJson(withFavs);
+      expect(jsonString.contains('"isFavorite":true'), isTrue);
 
-        final decoded = codec.decodeFromCanonicalJson(
-          jsonString,
-          config: config,
-        );
-        expect(
-          decoded.character.equipped[EquipmentSlot.weapon]!.isFavorite,
-          isTrue,
-        );
-        expect(decoded.inventory.equipment[0].isFavorite, isTrue);
-        expect(decoded.inventory.equipment[1].isFavorite, isFalse);
+      final decoded = codec.decodeFromCanonicalJson(jsonString, config: config);
+      expect(
+        decoded.character.equipped[EquipmentSlot.weapon]!.isFavorite,
+        isTrue,
+      );
+      expect(decoded.inventory.equipment[0].isFavorite, isTrue);
+      expect(decoded.inventory.equipment[1].isFavorite, isFalse);
 
-        // Snapshot warisan tanpa field isFavorite fallback ke false
-        final legacyMap = jsonDecode(jsonString) as Map<String, dynamic>;
-        final charMap = Map<String, dynamic>.from(
-          legacyMap['character'] as Map<String, dynamic>,
-        );
-        final eqMap = Map<String, dynamic>.from(
-          charMap['equipped'] as Map<String, dynamic>,
-        );
-        final weaponMap = Map<String, dynamic>.from(
-          eqMap['weapon'] as Map<String, dynamic>,
-        )..remove('isFavorite');
-        eqMap['weapon'] = weaponMap;
-        charMap['equipped'] = eqMap;
-        legacyMap['character'] = charMap;
+      // Snapshot warisan tanpa field isFavorite fallback ke false
+      final legacyMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      final charMap = Map<String, dynamic>.from(
+        legacyMap['character'] as Map<String, dynamic>,
+      );
+      final eqMap = Map<String, dynamic>.from(
+        charMap['equipped'] as Map<String, dynamic>,
+      );
+      final weaponMap = Map<String, dynamic>.from(
+        eqMap['weapon'] as Map<String, dynamic>,
+      )..remove('isFavorite');
+      eqMap['weapon'] = weaponMap;
+      charMap['equipped'] = eqMap;
+      legacyMap['character'] = charMap;
 
-        final decodedLegacy = codec.decodeFromMap(legacyMap, config: config);
-        expect(
-          decodedLegacy.character.equipped[EquipmentSlot.weapon]!.isFavorite,
-          isFalse,
-        );
-      },
-    );
+      final decodedLegacy = codec.decodeFromMap(legacyMap, config: config);
+      expect(
+        decodedLegacy.character.equipped[EquipmentSlot.weapon]!.isFavorite,
+        isFalse,
+      );
+    });
 
     test('determinisme: urutan Map/Set/List berbeda menghasilkan byte gzip dan SHA-256 identik', () {
       final base = _buildRichSnapshot(config);

@@ -88,8 +88,9 @@ class SaveSnapshotCodec {
   }
 
   /// Memeriksa apakah [dungeonId] valid, baik sebagai dungeon statis di
-  /// [GameConfig.dungeons] maupun Boss Event dinamis di [GameConfig.bossEvents]
-  /// (`boss_daily:<id>` atau `boss_weekly:<id>`).
+  /// [GameConfig.dungeons], Boss Event dinamis di [GameConfig.bossEvents]
+  /// (`boss_daily:<id>` atau `boss_weekly:<id>`), maupun Menara Bos di
+  /// [GameConfig.bossSpire] (`boss_spire:floor_<x>`).
   static bool isValidDungeonId(String dungeonId, GameConfig config) {
     if (config.dungeons.containsKey(dungeonId)) return true;
     final bossEvents = config.bossEvents;
@@ -101,6 +102,15 @@ class SaveSnapshotCodec {
       if (dungeonId.startsWith('boss_weekly:')) {
         final bossId = dungeonId.substring('boss_weekly:'.length);
         return bossEvents.periodForBossId(bossId) == Period.weekly;
+      }
+    }
+    final bossSpire = config.bossSpire;
+    if (bossSpire != null) {
+      if (dungeonId == bossSpire.spireId) return true;
+      if (dungeonId.startsWith('boss_spire:floor_')) {
+        final floorStr = dungeonId.substring('boss_spire:floor_'.length);
+        final floor = int.tryParse(floorStr);
+        return floor != null && bossSpire.hasFloor(floor);
       }
     }
     return false;
