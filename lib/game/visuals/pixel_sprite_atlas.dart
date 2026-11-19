@@ -233,6 +233,18 @@ class PixelSpriteAtlas {
         return 'hero_arcanist';
       case 'ranger':
         return 'hero_ranger';
+      case 'paladin':
+        return 'hero_paladin';
+      case 'voidblade':
+        return 'hero_voidblade';
+      case 'chronomancer':
+        return 'hero_chronomancer';
+      case 'gunslinger':
+        return 'hero_gunslinger';
+      case 'necromancer':
+        return 'hero_necromancer';
+      case 'stormcaller':
+        return 'hero_stormcaller';
       default:
         return 'hero_base';
     }
@@ -359,11 +371,88 @@ class PixelSpriteAtlas {
     final isVanguard = species == 'hero_vanguard';
     final isArcanist = species == 'hero_arcanist';
     final isRanger = species == 'hero_ranger';
+    final isPaladin = species == 'hero_paladin';
+    final isVoidblade = species == 'hero_voidblade';
+    final isChronomancer = species == 'hero_chronomancer';
+    final isGunslinger = species == 'hero_gunslinger';
+    final isNecromancer = species == 'hero_necromancer';
+    final isStormcaller = species == 'hero_stormcaller';
 
-    final hood = isVanguard ? 's' : (isArcanist ? 'p' : (isRanger ? 'g' : 'c'));
-    final trim = isVanguard ? 'y' : (isArcanist ? 'a' : (isRanger ? 'y' : 's'));
-    final body = isVanguard ? 's' : (isArcanist ? 'v' : (isRanger ? 'd' : 'a'));
-    final weapon = isArcanist ? 'a' : (isRanger ? 'b' : 'w');
+    final hood = isVanguard
+        ? 's'
+        : (isArcanist
+              ? 'p'
+              : (isRanger
+                    ? 'g'
+                    : (isPaladin
+                          ? 'y'
+                          : (isVoidblade
+                                ? 'w'
+                                : (isChronomancer
+                                      ? 'a'
+                                      : (isGunslinger
+                                            ? 't'
+                                            : (isNecromancer
+                                                  ? 'v'
+                                                  : (isStormcaller
+                                                        ? 'w'
+                                                        : 'c'))))))));
+
+    final trim = isVanguard
+        ? 'y'
+        : (isArcanist
+              ? 'a'
+              : (isRanger
+                    ? 'y'
+                    : (isPaladin
+                          ? 'w'
+                          : (isVoidblade
+                                ? 'p'
+                                : (isChronomancer
+                                      ? 'y'
+                                      : (isGunslinger
+                                            ? 'r'
+                                            : (isNecromancer
+                                                  ? 'm'
+                                                  : (isStormcaller
+                                                        ? 'y'
+                                                        : 's'))))))));
+
+    final body = isVanguard
+        ? 's'
+        : (isArcanist
+              ? 'v'
+              : (isRanger
+                    ? 'd'
+                    : (isPaladin
+                          ? 'y'
+                          : (isVoidblade
+                                ? 'v'
+                                : (isChronomancer
+                                      ? 'c'
+                                      : (isGunslinger
+                                            ? 'b'
+                                            : (isNecromancer
+                                                  ? 'd'
+                                                  : (isStormcaller
+                                                        ? 'c'
+                                                        : 'a'))))))));
+
+    final weapon = isArcanist
+        ? 'a'
+        : (isRanger
+              ? 'b'
+              : (isPaladin
+                    ? 'w'
+                    : (isVoidblade
+                          ? 'p'
+                          : (isChronomancer
+                                ? 'y'
+                                : (isGunslinger
+                                      ? 'a'
+                                      : (isNecromancer
+                                            ? 'l'
+                                            : (isStormcaller ? 'a' : 'w')))))));
 
     if (pose == 'downed') {
       return [

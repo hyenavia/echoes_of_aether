@@ -10,7 +10,7 @@
 
 > Dokumen ini melanjutkan `MILESTONE_STATUS_M14.md`. Simpan berdampingan di folder `doc101/`. Seluruh Update Rules dan konvensi arsitektur tetap berlaku.
 
-**Baseline saat ini:** `flutter test` = 991 lulus (0 gagal), `flutter analyze` = 0 issue, Drift `schemaVersion = 10`.
+**Baseline saat ini:** `flutter test` = 1007 lulus (0 gagal), `flutter analyze` = 0 issue, Drift `schemaVersion = 10`.
 
 ---
 
@@ -157,3 +157,18 @@
 - **Tambahan Pasca-Review (Skill Khusus 6 Class Mythical):**
   - Menambahkan 18 skill baru (1 Pasif + 2 Aktif untuk setiap Class Mythical) pada [assets/data/skills.json](file:///e:/myLittleProject/echoes_of_aether/assets/data/skills.json), memperbarui `skill_affinities` di [assets/data/specializations.json](file:///e:/myLittleProject/echoes_of_aether/assets/data/specializations.json), serta mendaftarkan sprite ke-18 skill pada `ItemSpriteRegistry.skillSprites`.
   - Verifikasi: `flutter analyze` = 0 issues, `test/data/skill_parser_test.dart` = 15/15 PASS, `test/data/m15_stage1_gacha_schema_and_config_test.dart` & `test/domain/signature_resonance_combat_test.dart` PASS.
+
+### 2026-11-19 — Visual Assets Update (10 Class Character Sheets & Crest Icons)
+
+- **Pemotongan & Ekstraksi Aset Visual (tool/slice_character_assets.py):**
+  - Mengekstrak 10 ilustrasi portrait karakter resolusi tinggi berlatar transparan ke [assets/char/](file:///e:/myLittleProject/echoes_of_aether/assets/char/): `hero_base.png` (Adventurer), `hero_vanguard.png`, `hero_arcanist.png`, `hero_ranger.png`, `hero_paladin.png`, `hero_voidblade.png`, `hero_chronomancer.png`, `hero_gunslinger.png`, `hero_necromancer.png`, `hero_stormcaller.png`.
+  - Mengekstrak 60 frame gameplay in-engine ke [assets/char/frames/](file:///e:/myLittleProject/echoes_of_aether/assets/char/frames/): mencakup 6 pose animasi (`idle0`, `idle1`, `walk0`, `walk1`, `attack`, `downed`) untuk ke-10 karakter.
+  - Mengekstrak 10 lambang lambang class (_crest icon_) ke [assets/icons/class/](file:///e:/myLittleProject/echoes_of_aether/assets/icons/class/) dan mendaftarkannya pada [pubspec.yaml](file:///e:/myLittleProject/echoes_of_aether/pubspec.yaml).
+- **Integrasi Domain & Engine:**
+  - Memperbarui `CharacterVisualSpec.resolve` di [game_assets.dart](file:///e:/myLittleProject/echoes_of_aether/lib/features/shared/assets/game_assets.dart) untuk memetakan spesifikasi visual resmi (judul, subjudul, warna primer, aksen, aura, weapon style, pose summary, dan assetPath) seluruh 10 class.
+  - Memperbarui `PixelSpriteAtlas._playerSpecies` dan `_heroGrid` di [pixel_sprite_atlas.dart](file:///e:/myLittleProject/echoes_of_aether/lib/game/visuals/pixel_sprite_atlas.dart) untuk mendukung 6 class Mythical dengan palet warna dan siluet sesuai lembar referensi.
+- **Hasil Verifikasi:**
+  - Unit test baru `test/features/shared/character_visual_spec_test.dart` (12/12 PASS).
+  - Regresi `test/game/pixel_combatant_sprites_test.dart` diperluas dan lulus 100% untuk 10 class.
+  - `flutter analyze`: 0 issues found (bersih).
+  - Full test suite: **1007 / 1007 tests passed (100%)**.

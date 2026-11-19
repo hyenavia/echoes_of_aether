@@ -51,6 +51,12 @@ void main() {
           'hero_vanguard',
           'hero_arcanist',
           'hero_ranger',
+          'hero_paladin',
+          'hero_voidblade',
+          'hero_chronomancer',
+          'hero_gunslinger',
+          'hero_necromancer',
+          'hero_stormcaller',
         ];
         for (final hero in heroes) {
           for (final pose in poses) {

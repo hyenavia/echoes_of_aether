@@ -96,26 +96,32 @@ class CharacterVisualSpec {
       'vanguard' => _vanguard,
       'arcanist' => _arcanist,
       'ranger' => _ranger,
+      'paladin' => _paladin,
+      'voidblade' => _voidblade,
+      'chronomancer' => _chronomancer,
+      'gunslinger' => _gunslinger,
+      'necromancer' => _necromancer,
+      'stormcaller' => _stormcaller,
       _ => _base,
     };
   }
 
   static const CharacterVisualSpec _base = CharacterVisualSpec(
     classId: 'base',
-    title: 'Aether Wanderer',
-    subtitle: 'Unawakened Adventurer',
+    title: 'Adventurer',
+    subtitle: 'New Player Starting Class (Adventurer)',
     primaryColor: AppColors.forestGreen,
     accentColor: AppColors.antiqueGold,
     auraColor: AppColors.aetherBlue,
-    weaponStyle: 'Traveler Blade & Lantern',
-    poseSummary: '3/4 front stance, hooded cloak, steady blade at side',
+    weaponStyle: 'Traveler Blade & Scarf',
+    poseSummary: 'A brave wanderer, ready to explore the world of Aether',
     assetPath: '${GameAssetDirectories.characters}hero_base.png',
   );
 
   static const CharacterVisualSpec _vanguard = CharacterVisualSpec(
     classId: 'vanguard',
     title: 'Vanguard',
-    subtitle: 'Ironclad Frontliner',
+    subtitle: 'Frontline Warrior',
     primaryColor: AppColors.antiqueGold,
     accentColor: AppColors.emberRed,
     auraColor: AppColors.campAmber,
@@ -127,7 +133,7 @@ class CharacterVisualSpec {
   static const CharacterVisualSpec _arcanist = CharacterVisualSpec(
     classId: 'arcanist',
     title: 'Arcanist',
-    subtitle: 'Resonance Spellweaver',
+    subtitle: 'Arcane Mage',
     primaryColor: AppColors.aetherBlue,
     accentColor: AppColors.arcaneViolet,
     auraColor: AppColors.aetherBlue,
@@ -139,13 +145,86 @@ class CharacterVisualSpec {
   static const CharacterVisualSpec _ranger = CharacterVisualSpec(
     classId: 'ranger',
     title: 'Ranger',
-    subtitle: 'Forest Windstalker',
+    subtitle: 'Precision Archer',
     primaryColor: AppColors.mossGreen,
     accentColor: AppColors.antiqueGold,
     auraColor: AppColors.success,
     weaponStyle: 'Enchanted Recurve Bow & Quiver',
     poseSummary: '3/4 agile crouch-ready stance, drawn bowstring glow',
     assetPath: '${GameAssetDirectories.characters}hero_ranger.png',
+  );
+
+  static const CharacterVisualSpec _paladin = CharacterVisualSpec(
+    classId: 'paladin',
+    title: 'Paladin',
+    subtitle: 'Holy Knight',
+    primaryColor: AppColors.antiqueGold,
+    accentColor: AppColors.campAmber,
+    auraColor: AppColors.antiqueGold,
+    weaponStyle: 'Radiant Bastion Shield & Holy Blade',
+    poseSummary: 'Resolute holy knight guard, gold & white plated armor, radiant cross shield',
+    assetPath: '${GameAssetDirectories.characters}hero_paladin.png',
+  );
+
+  static const CharacterVisualSpec _voidblade = CharacterVisualSpec(
+    classId: 'voidblade',
+    title: 'Voidblade',
+    subtitle: 'Shadow Assassin',
+    primaryColor: AppColors.arcaneViolet,
+    accentColor: AppColors.aetherBlue,
+    auraColor: AppColors.arcaneViolet,
+    weaponStyle: 'Twin Nether Blades',
+    poseSummary: 'Low agile assassin stance, silver spiky hair, glowing purple void daggers',
+    assetPath: '${GameAssetDirectories.characters}hero_voidblade.png',
+  );
+
+  static const CharacterVisualSpec _chronomancer = CharacterVisualSpec(
+    classId: 'chronomancer',
+    title: 'Chronomancer',
+    subtitle: 'Time Mage',
+    primaryColor: AppColors.aetherBlue,
+    accentColor: AppColors.antiqueGold,
+    auraColor: AppColors.aetherBlue,
+    weaponStyle: 'Temporal Scepter & Hourglass of Aether',
+    poseSummary: 'Graceful temporal casting stance, flowing cyan hair, hourglass artifact',
+    assetPath: '${GameAssetDirectories.characters}hero_chronomancer.png',
+  );
+
+  static const CharacterVisualSpec _gunslinger = CharacterVisualSpec(
+    classId: 'gunslinger',
+    title: 'Gunslinger',
+    subtitle: 'Aether Gunner',
+    primaryColor: AppColors.earthBrown,
+    accentColor: AppColors.emberRed,
+    auraColor: AppColors.campAmber,
+    weaponStyle: 'Dual Aether Revolvers & Outlaw Rifle',
+    poseSummary: 'Goggled marksman stance, long leather duster coat, drawn aether pistol',
+    assetPath: '${GameAssetDirectories.characters}hero_gunslinger.png',
+  );
+
+  static const CharacterVisualSpec _necromancer = CharacterVisualSpec(
+    classId: 'necromancer',
+    title: 'Necromancer',
+    subtitle: 'Soul Summoner',
+    primaryColor: AppColors.deepForest,
+    accentColor: AppColors.mossGreen,
+    auraColor: AppColors.success,
+    weaponStyle: 'Grim Soul Scythe & Relic Skull',
+    poseSummary: 'Shrouded necromantic stance, deep cowl, curved soul scythe with green wisp',
+    assetPath: '${GameAssetDirectories.characters}hero_necromancer.png',
+  );
+
+  static const CharacterVisualSpec _stormcaller = CharacterVisualSpec(
+    classId: 'stormcaller',
+    title: 'Stormcaller',
+    subtitle: 'Lightning Mage',
+    primaryColor: AppColors.aetherBlue,
+    accentColor: AppColors.antiqueGold,
+    auraColor: AppColors.aetherBlue,
+    weaponStyle: 'Lightning Conduit Staff',
+    poseSummary:
+        'Electrified magus stance, wild silver-blue hair, crackling storm rod',
+    assetPath: '${GameAssetDirectories.characters}hero_stormcaller.png',
   );
 }
 

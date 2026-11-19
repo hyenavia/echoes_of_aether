@@ -88,6 +88,7 @@ flutter:
     - assets/environment/fantasy_dreamland/
     - assets/environment/mines_caves/
     - assets/environment/biomes/
+    - assets/icons/class/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
