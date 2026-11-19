@@ -446,13 +446,16 @@ void main() {
         (e) => e.skillId == 'holy_nova',
       );
       expect(healEvents.isNotEmpty, isTrue);
-      expect(healEvents.first.amount, equals((200 * 0.05).round())); // 10 HP
+      expect(
+        healEvents.first.amount,
+        equals((200 * 0.03).round()),
+      ); // 6 HP (REC-06: 3% Max HP)
 
       // Musuh di dekat player terkena retaliation damage
       expect(sim.enemies.first.hp, lessThan(enemyHpBefore));
     });
 
-    test('Voidblade menerapkan Shadow Mark pada critical hit dan menghasilkan True Damage mengabaikan DEF', () {
+    test('Voidblade menerapkan Shadow Mark pada critical hit dan menghasilkan 50% DEF bypass', () {
       final player = Combatant(
         id: 'player',
         team: Team.player,

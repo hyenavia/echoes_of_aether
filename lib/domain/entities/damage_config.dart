@@ -7,7 +7,7 @@ class DamageConfig {
   final DamageFormula formula;
 
   /// Membuat [DamageCalculator] sesuai konfigurasi rumus saat ini.
-  DamageCalculator createCalculator({double magicDefenseFactor = 1.0}) =>
+  DamageCalculator createCalculator({double magicDefenseFactor = 0.80}) =>
       DamageCalculator(
         magicDefenseFactor: magicDefenseFactor,
         formula: formula,

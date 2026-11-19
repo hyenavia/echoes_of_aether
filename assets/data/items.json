@@ -654,12 +654,12 @@
         "weapon_type": "sword",
         "fixed_stats": true,
         "signature_class_id": "paladin",
-        "resonance_description": "Saat memblokir serangan, memicu holy nova yang memulihkan 5% Max HP dan memberikan damage area sebesar 35% DEF.",
+        "resonance_description": "Saat memblokir serangan, memicu holy nova yang memulihkan 3% Max HP dan memberikan damage area sebesar 35% DEF (cooldown 5 detik).",
         "stats": {
-          "atk": 45,
-          "def": 25,
-          "def_pct": 0.12,
-          "hp_pct": 0.10
+          "atk": 28,
+          "def": 20,
+          "def_pct": 0.10,
+          "hp_pct": 0.08
         }
       }
     },
@@ -675,12 +675,12 @@
         "weapon_type": "sword",
         "fixed_stats": true,
         "signature_class_id": "voidblade",
-        "resonance_description": "Serangan kritikal memberi tanda Shadow Mark. Menyerang target bertanda menghasilkan True Damage (mengabaikan 100% Armor).",
+        "resonance_description": "Serangan kritikal memberi tanda Shadow Mark. Menyerang target bertanda menghasilkan True Damage (mengabaikan 50% Armor).",
         "stats": {
-          "atk": 55,
-          "crit_rate": 0.12,
-          "crit_damage": 0.25,
-          "atk_pct": 0.10
+          "atk": 34,
+          "crit_rate": 0.08,
+          "crit_damage": 0.20,
+          "atk_pct": 0.08
         }
       }
     },
@@ -698,9 +698,9 @@
         "signature_class_id": "chronomancer",
         "resonance_description": "Setiap 4x penggunaan skill, membekukan (Freeze) seluruh monster biasa di ruangan selama 2 detik.",
         "stats": {
-          "atk": 40,
-          "skill_haste": 0.15,
-          "atk_pct": 0.10
+          "atk": 28,
+          "skill_haste": 0.12,
+          "atk_pct": 0.08
         }
       }
     },
@@ -718,10 +718,10 @@
         "signature_class_id": "gunslinger",
         "resonance_description": "Jangkauan serang +2 petak. Peluru menembus seluruh monster dalam satu garis lurus tanpa pengurangan damage.",
         "stats": {
-          "atk": 60,
-          "crit_damage": 0.25,
-          "crit_rate": 0.08,
-          "atk_pct": 0.12
+          "atk": 36,
+          "crit_damage": 0.20,
+          "crit_rate": 0.06,
+          "atk_pct": 0.08
         }
       }
     },
@@ -739,10 +739,10 @@
         "signature_class_id": "necromancer",
         "resonance_description": "Serangan menghasilkan +8% Lifesteal pasif. Minion bayangan mewarisi 50% HP dan ATK hero.",
         "stats": {
-          "atk": 48,
-          "lifesteal": 0.08,
-          "hp_pct": 0.10,
-          "atk_pct": 0.08
+          "atk": 30,
+          "lifesteal": 0.06,
+          "hp_pct": 0.08,
+          "atk_pct": 0.06
         }
       }
     },
@@ -760,9 +760,9 @@
         "signature_class_id": "stormcaller",
         "resonance_description": "Serangan petir menyambar ke +2 musuh tambahan dan menyebabkan efek Shock (+15% damage diterima).",
         "stats": {
-          "atk": 50,
-          "attack_speed": 0.25,
-          "atk_pct": 0.12
+          "atk": 32,
+          "attack_speed": 0.18,
+          "atk_pct": 0.08
         }
       }
     }

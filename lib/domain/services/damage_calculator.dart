@@ -29,7 +29,7 @@ class DamageResult {
 /// sehingga simulasi dengan seed sama menghasilkan hasil sama.
 class DamageCalculator {
   const DamageCalculator({
-    this.magicDefenseFactor = 1.0,
+    this.magicDefenseFactor = 0.80,
     this.formula = DamageFormula.ratio,
   });
 

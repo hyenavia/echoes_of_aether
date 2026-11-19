@@ -173,7 +173,10 @@ void main() {
           ),
         );
         sim.spawnEnemy(armored, const GridPoint(2, 2));
-        final hit = run(sim, 1).whereType<AttackEvent>().single;
+        final hit = run(
+          sim,
+          1,
+        ).whereType<AttackEvent>().firstWhere((e) => e.attackerId == 'player');
         expect(hit.damage, 25); // round(20 x 1.5) - 5
       },
     );
@@ -188,7 +191,10 @@ void main() {
       );
       final sim = makeSim(makePlayer(), [powerStrike]);
       sim.spawnEnemy(armored, const GridPoint(2, 2));
-      final hit = run(sim, 1).whereType<AttackEvent>().single;
+      final hit = run(
+        sim,
+        1,
+      ).whereType<AttackEvent>().firstWhere((e) => e.attackerId == 'player');
       // 30 * 30 / (30 + 5) = 900 / 35 = 25.714... -> round = 26
       expect(hit.damage, 26);
     });
@@ -602,7 +608,10 @@ void main() {
         },
       );
       sim.spawnEnemy(dummy, const GridPoint(2, 2));
-      final hit = run(sim, 1).whereType<AttackEvent>().single;
+      final hit = run(
+        sim,
+        1,
+      ).whereType<AttackEvent>().firstWhere((e) => e.attackerId == 'player');
       expect(hit.skillId, 'power_strike');
       expect(hit.damage, 38);
     });
@@ -737,7 +746,10 @@ void main() {
         },
       );
       simPhys.spawnEnemy(dummy, const GridPoint(2, 2));
-      final physHit = run(simPhys, 1).whereType<AttackEvent>().single;
+      final physHit = run(
+        simPhys,
+        1,
+      ).whereType<AttackEvent>().firstWhere((e) => e.attackerId == 'player');
       expect(physHit.skillId, 'power_strike');
       expect(physHit.damageType, SkillDamageType.physical);
       expect(physHit.damage, 34);
@@ -764,7 +776,10 @@ void main() {
       final far = simMagic.spawnEnemy(dummy, const GridPoint(10, 2));
 
       final events = run(simMagic, 1);
-      final magicHits = events.whereType<AttackEvent>().toList();
+      final magicHits = events
+          .whereType<AttackEvent>()
+          .where((e) => e.attackerId == 'player')
+          .toList();
       expect(magicHits.map((e) => e.targetId).toSet(), {near1.id, near2.id});
       expect(magicHits.any((e) => e.targetId == far.id), isFalse);
       expect(

@@ -242,5 +242,60 @@ void main() {
       expect(enemy.isAtSpawn, isTrue);
       expect(enemy.aiState, MonsterAiState.idle);
     });
+
+    test('REC-01: serangan dari luar detectionRange memicu aggro dan monster mengejar', () {
+      const sniperEnemy = EnemyDefinition(
+        id: 'blind_slime',
+        name: 'Blind Slime',
+        level: 1,
+        detectionRange: 3.0, // Deteksi hanya 3 petak
+        leashRange: 12.0,
+        stats: CombatStats(
+          maxHp: 200,
+          atk: 5,
+          def: 1,
+          attackSpeed: 1.0,
+          moveSpeed: 2.0,
+          attackRange: 1.0,
+        ),
+      );
+
+      final player = Combatant(
+        id: 'player',
+        team: Team.player,
+        stats: const CombatStats(
+          maxHp: 500,
+          atk: 25,
+          def: 5,
+          attackSpeed: 1.0,
+          moveSpeed: 0.0, // Diam di tempat
+          attackRange: 8.0, // Menembak jauh melebihi detectionRange 3.0
+        ),
+        cell: const GridPoint(1, 1),
+      );
+
+      final sim = makeSim(NavigationGrid.open(columns: 10, rows: 3), player);
+      // Spawn musuh di (7, 1), jarak ke player adalah 6 petak (6.0 > 3.0)
+      final enemy = sim.spawnEnemy(sniperEnemy, const GridPoint(7, 1));
+
+      expect(enemy.aggroed, isFalse);
+      expect(enemy.aiState, MonsterAiState.idle);
+
+      // Jalankan 1-2 tick sampai player menyerang musuh
+      sim.tick();
+
+      expect(
+        enemy.hp,
+        lessThan(200),
+        reason: 'Musuh harus sudah menerima damage',
+      );
+      expect(
+        enemy.aggroed,
+        isTrue,
+        reason: 'Musuh harus ter-aggro meski di luar detectionRange',
+      );
+      expect(enemy.targetId, 'player');
+      expect(enemy.aiState, MonsterAiState.chase);
+    });
   });
 }

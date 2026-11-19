@@ -990,14 +990,13 @@ class CombatSimulation {
     var defenderDef = target.stats.def;
     var effectiveDamageType = damageType;
 
-    // Voidblade: True damage jika target memiliki Shadow Mark (mengabaikan 100% Armor)
+    // REC-05: Voidblade Shadow Mark mengabaikan 50% DEF musuh
     final isVoidbladeTrueDamage =
         attacker.team == Team.player &&
         activeResonanceClassId == 'voidblade' &&
         (target.isShadowMarked || target.shadowMarkTicks > 0);
     if (isVoidbladeTrueDamage) {
-      defenderDef = 0;
-      effectiveDamageType = SkillDamageType.trueDamage;
+      defenderDef = (defenderDef * 0.5).round();
     }
 
     final result = damageCalculator.roll(
@@ -1078,6 +1077,17 @@ class CombatSimulation {
       );
     }
     target.hp = math.max(0, target.hp - unabsorbedDamage);
+
+    // REC-01: Serangan valid memicu aggro musuh terlepas dari jangkauan deteksi
+    if (finalDamage > 0 &&
+        target.isAlive &&
+        target.team == Team.enemy &&
+        !target.aggroed &&
+        attacker.isAlive) {
+      target.aggroed = true;
+      target.targetId = attacker.id;
+      target.aiState = MonsterAiState.chase;
+    }
 
     // Lifesteal (Basic Attack) & Spell Vamp (Skill Damage)
     if (finalDamage > 0 && attacker.isAlive) {
@@ -1168,13 +1178,13 @@ class CombatSimulation {
       );
     }
 
-    // Paladin: Holy Nova retaliation saat menerima damage
+    // REC-06/07: Paladin Holy Nova retaliation saat menerima damage (CD 5.0s, Heal 3% Max HP)
     if (identical(target, player) &&
         activeResonanceClassId == 'paladin' &&
         _paladinHolyNovaCooldownTicks == 0 &&
         finalDamage > 0) {
-      _paladinHolyNovaCooldownTicks = (3.0 * ticksPerSecond).round();
-      final healAmount = math.max(1, (player.stats.maxHp * 0.05).round());
+      _paladinHolyNovaCooldownTicks = (5.0 * ticksPerSecond).round();
+      final healAmount = math.max(1, (player.stats.maxHp * 0.03).round());
       player.heal(healAmount);
       _events.add(
         HealEvent(

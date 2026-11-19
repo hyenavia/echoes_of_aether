@@ -65,10 +65,11 @@ void main() {
     test('physical vs magic damage path dan magicDefenseFactor', () {
       const defaultCalc = DamageCalculator(formula: DamageFormula.subtractive);
       expect(defaultCalc.physicalDamage(20, 6), 14);
-      expect(defaultCalc.magicDamage(20, 6), 14);
+      // REC-09: default magicDefenseFactor = 0.80 -> 20 - round(6 * 0.8) = 20 - 5 = 15
+      expect(defaultCalc.magicDamage(20, 6), 15);
       expect(
         defaultCalc.baseDamage(20, 6, damageType: SkillDamageType.magic),
-        14,
+        15,
       );
 
       const splitDefCalc = DamageCalculator(

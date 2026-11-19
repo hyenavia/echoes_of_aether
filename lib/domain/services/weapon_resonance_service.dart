@@ -52,8 +52,8 @@ class WeaponResonanceService {
 
   /// Mendapatkan deskripsi efek resonansi untuk [classId].
   String? getResonanceDescription(String classId) => switch (classId) {
-    paladin => 'Saat memblokir/terkena serangan, memicu holy nova yang memulihkan 5% Max HP dan memberikan damage area sebesar 35% DEF (cooldown 3 detik).',
-    voidblade => 'Serangan kritikal memberi tanda Shadow Mark. Menyerang target bertanda menghasilkan True Damage (mengabaikan 100% Armor).',
+    paladin => 'Saat memblokir/terkena serangan, memicu holy nova yang memulihkan 3% Max HP dan memberikan damage area sebesar 35% DEF (cooldown 5 detik).',
+    voidblade => 'Serangan kritikal memberi tanda Shadow Mark. Menyerang target bertanda menghasilkan True Damage (mengabaikan 50% Armor).',
     chronomancer => 'Setiap 4x penggunaan skill, membekukan (Freeze) seluruh monster biasa di ruangan selama 2 detik.',
     gunslinger => 'Jangkauan serang +2 petak. Peluru menembus seluruh monster dalam satu garis lurus tanpa pengurangan damage.',
     necromancer => 'Serangan menghasilkan +8% Lifesteal pasif. Mengalahkan musuh memanggil Minion Bayangan yang mewarisi 50% HP dan ATK hero selama 6 detik.',

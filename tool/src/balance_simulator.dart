@@ -343,6 +343,7 @@ class BalanceSimulator {
       name: label,
       maxRarity: ceiling,
       specializationId: canChooseSpec ? 'vanguard' : null,
+      isAscension: dungeon.order >= 5,
     );
   }
 
@@ -370,7 +371,7 @@ class BalanceSimulator {
         name: base.name,
         maxRarity: base.maxRarity,
         specializationId: canChooseSpec ? specializationId : null,
-        isAscension: false,
+        isAscension: dungeon.order >= 5 || dungeon.isAscension,
       );
     }
 

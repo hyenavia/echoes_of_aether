@@ -10,7 +10,7 @@
 
 > Dokumen ini melanjutkan `MILESTONE_STATUS_M14.md`. Simpan berdampingan di folder `doc101/`. Seluruh Update Rules dan konvensi arsitektur tetap berlaku.
 
-**Baseline saat ini:** `flutter test` = 1007 lulus (0 gagal), `flutter analyze` = 0 issue, Drift `schemaVersion = 10`.
+**Baseline saat ini:** `flutter test` = 1008 lulus (0 gagal), `flutter analyze` = 0 issue, Drift `schemaVersion = 10`.
 
 ---
 
@@ -72,6 +72,19 @@
 - [x] Menu Sanctuary Exchange UI (2 Soul Prism -> Senjata Mythical, 3 Soul Prism -> Class Mythical).
 - [x] Tombol pintas Gacha di Town Hub View (`quick_access_gacha`) serta integrasi persistensi `gachaPityStates` & `unlockedSpecializations` di `DungeonScreen`, `GameSessionCoordinator`, dan `CharacterOverlay`.
 - [x] Verifikasi responsive layout di resolusi mobile sempit (320x640) & tablet (800x1024) via `test/features/gacha_ui_test.dart`.
+
+### Global Game Balance Polish — Stage 1 (Implementation)
+
+**Status:** COMPLETED (Disetujui Pemilik Project — 2026-11-19)
+
+- [x] **REC-01:** AI Aggro fix pada hit valid > 0 (chase & counter-attack penyerang out-of-range) di `CombatSimulation` & `OfflineCombatRuntime`.
+- [x] **REC-02:** Kalibrasi Base HP Ash Tyrant (D4 Boss) ke 1.250 (Effective HP 4.218).
+- [x] **REC-03:** Kalibrasi Base HP (1.900) & ATK (28) Aether Sovereign (D5 Boss).
+- [x] **REC-05:** Voidblade Shadow Mark disesuaikan ke 50% DEF bypass (mempertahankan True Damage pada `void_execution`).
+- [x] **REC-06/07:** Cooldown Paladin Holy Nova disesuaikan ke 5.0 detik dan heal ke 3% Max HP.
+- [x] **REC-08:** Kalibrasi Base ATK & Secondary Stats 6 Senjata Mythical berbasis arketipe role.
+- [x] **REC-09:** Kalibrasi `magicDefenseFactor = 0.80` pada formula damage magic.
+- [x] **REC-10..12 (KEEP):** Mempertahankan tanpa perubahan: Gacha rate/pity, early game EXP, dan batas offline 8 jam.
 
 ---
 
@@ -172,3 +185,25 @@
   - Regresi `test/game/pixel_combatant_sprites_test.dart` diperluas dan lulus 100% untuk 10 class.
   - `flutter analyze`: 0 issues found (bersih).
   - Full test suite: **1007 / 1007 tests passed (100%)**.
+
+### 2026-11-19 — Global Game Balance Stage 1 Implementation (REC-01 s/d REC-09)
+
+- **Implementasi Balancing Disetujui (Stage 0C Final Reconciliation):**
+  - **REC-01 (Aggro Target Fix):** `CombatSimulation` dan `OfflineCombatRuntime` (`OfflineDungeonRunner`) kini memicu aggro (`aggroed = true`, `targetId = attacker.id`, `aiState = chase`) ketika monster menerima damage valid > 0, menyelesaikan isu musuh pasif terhadap serangan jarak jauh di luar detection range.
+  - **REC-02 (Ash Tyrant D4 Boss Base HP):** Dinaikkan dari 465 menjadi 1.250 di `assets/data/monsters.json` (Effective HP 4.218 pada rank 0), menjaga ATK 23 dan DEF 7.
+  - **REC-03 (Aether Sovereign D5 Boss Base HP & ATK):** Base HP dinaikkan dari 480 menjadi 1.900, Base ATK dinaikkan dari 24 menjadi 28 di `assets/data/monsters.json` (Effective HP 9.618, Effective ATK 141), menjaga DEF 8.
+  - **REC-05 (Voidblade Armor Penetration):** Shadow Mark DEF bypass disesuaikan dari 100% menjadi 50% (`(defenderDef * 0.5).round()`) di pipeline combat online & offline, menjaga True Damage pada skill aktif `void_execution`.
+  - **REC-06/07 (Paladin Holy Nova Cooldown & Heal):** Cooldown disesuaikan menjadi 5.0 detik (100 ticks) dan healing disesuaikan menjadi 3% Max HP (dari 5%) di pipeline combat online & offline.
+  - **REC-08 (Mythical Weapon ATK Calibration):** Mengkalibrasi ulang base ATK 6 senjata Mythical di `assets/data/items.json`:
+    - Dawn's Aegis Blade: ATK 28, DEF 20, DEF% 10%, HP% 8%.
+    - Shadowfang Twinblade: ATK 34, Crit Rate 10%, Crit DMG 25%.
+    - Hourglass of Eternity: ATK 28, Skill Haste 20%, Mana Regen 15%.
+    - Aether Railgun: ATK 36, Attack Speed 15%, Crit Rate 8%.
+    - Scythe of the Harvester: ATK 30, Lifesteal 8%, Max HP 200.
+    - Thunderlord's Scepter: ATK 32, Magic DMG% 15%, Skill Haste 12%.
+  - **REC-09 (Magic Defense Factor Calibration):** Mengatur default `magicDefenseFactor = 0.80` pada `DamageConfig` dan `DamageCalculator` sehingga serangan magic menghitung DEF musuh secara proporsional.
+  - **REC-10..12 (KEEP):** Mempertahankan tanpa perubahan: Gacha rates & pity system (M15), kurva EXP early game (Lv 1..5), dan 8-hour offline auto farming cap.
+- **Hasil Verifikasi:**
+  - `flutter analyze`: 0 issues found (bersih).
+  - `dart format`: 13 file diformat rapi sesuai pedoman repository.
+  - Full test suite: **1008 / 1008 tests passed (100%)**.

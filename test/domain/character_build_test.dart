@@ -421,7 +421,9 @@ void main() {
       ], skillAffinities: c.activeSkillAffinities);
       sim.spawnEnemy(dummyDef, const GridPoint(2, 2));
       sim.tick();
-      final vanguardHit = sim.drainEvents().whereType<AttackEvent>().single;
+      final vanguardHit = sim.drainEvents().whereType<AttackEvent>().firstWhere(
+        (e) => e.attackerId == 'player',
+      );
       expect(vanguardHit.skillId, 'power_strike');
       expect(vanguardHit.damage, (22 * 1.8).round()); // 40
 
