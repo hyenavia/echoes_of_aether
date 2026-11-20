@@ -272,7 +272,8 @@ void main() {
       expect(find.text('Ascension Selesai!'), findsOneWidget);
       expect(find.text('Final Boss'), findsOneWidget);
       expect(find.text('Ascension Rank 0 → Rank 1'), findsOneWidget);
-      expect(find.textContaining('+5K EXP • +12K Gold'), findsOneWidget);
+      expect(find.textContaining('+5K EXP'), findsOneWidget);
+      expect(find.textContaining('+12K Gold'), findsOneWidget);
 
       await tester.pumpWidget(
         MaterialApp(

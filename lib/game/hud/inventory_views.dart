@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier;
 
 import '../../domain/entities/combat_stats.dart';
 import '../../domain/entities/equipment.dart';
+import '../../domain/entities/hero_ascension.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/player_character.dart';
 import '../../domain/entities/skill_definition.dart';
@@ -60,6 +61,11 @@ class CharacterSnapshot {
     required this.skills,
     this.skillNames = const {},
     this.unlockedSpecializations = const {},
+    this.ascensionPhase = 0,
+    this.isAscendReady = false,
+    this.effectiveLevelCap = 20,
+    this.heroAscensionConfig = const HeroAscensionConfig(),
+    this.hasGoldenAura = false,
   });
 
   factory CharacterSnapshot.from(
@@ -112,6 +118,13 @@ class CharacterSnapshot {
       unlockedSpecializations: Set<String>.unmodifiable(
         unlockedSpecializations,
       ),
+      ascensionPhase: c.ascensionPhase,
+      isAscendReady: c.isAscendReady,
+      effectiveLevelCap: c.effectiveLevelCap,
+      heroAscensionConfig: c.heroAscensionConfig,
+      hasGoldenAura: c.heroAscensionConfig.hasGoldenAuraForPhase(
+        c.ascensionPhase,
+      ),
     );
   }
 
@@ -125,6 +138,11 @@ class CharacterSnapshot {
   final List<SkillEntry> skills;
   final Map<String, String> skillNames;
   final Set<String> unlockedSpecializations;
+  final int ascensionPhase;
+  final bool isAscendReady;
+  final int effectiveLevelCap;
+  final HeroAscensionConfig heroAscensionConfig;
+  final bool hasGoldenAura;
 }
 
 /// Jembatan antara domain (Inventory, PlayerCharacter) dan overlay Flutter.

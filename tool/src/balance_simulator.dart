@@ -333,9 +333,13 @@ class BalanceSimulator {
         ceiling = ItemRarity.epic;
         label = 'T4 Epic';
         break;
-      default:
+      case 5:
         ceiling = ItemRarity.legendary;
         label = 'T5 Legendary';
+        break;
+      default:
+        ceiling = ItemRarity.legendary;
+        label = dungeon.order >= 6 ? 'T6 Abyssal' : 'T5 Legendary';
         break;
     }
 
@@ -344,6 +348,7 @@ class BalanceSimulator {
       maxRarity: ceiling,
       specializationId: canChooseSpec ? 'vanguard' : null,
       isAscension: dungeon.order >= 5,
+      isAbyssal: dungeon.order >= 6,
     );
   }
 
@@ -372,6 +377,7 @@ class BalanceSimulator {
         maxRarity: base.maxRarity,
         specializationId: canChooseSpec ? specializationId : null,
         isAscension: dungeon.order >= 5 || dungeon.isAscension,
+        isAbyssal: dungeon.order >= 6,
       );
     }
 
@@ -386,6 +392,7 @@ class BalanceSimulator {
       maxRarity: ItemRarity.legendary,
       specializationId: canChooseSpec ? specializationId : null,
       isAscension: true,
+      isAbyssal: dungeon.order >= 6,
     );
   }
 
@@ -397,6 +404,7 @@ class BalanceSimulator {
     required String? specializationId,
     bool includeNonSellable = false,
     bool isAscension = false,
+    bool isAbyssal = false,
   }) {
     final bySlot = <EquipmentSlot, ItemDefinition>{};
     for (final slot in EquipmentSlot.values) {
@@ -406,6 +414,7 @@ class BalanceSimulator {
             if (eq == null || eq.slot != slot) return false;
             if (!includeNonSellable && !item.sellable) return false;
             if (!isAscension && _isAscensionTierItem(item.id)) return false;
+            if (!isAbyssal && _isAbyssalTierItem(item.id)) return false;
             return item.rarity.index <= maxRarity.index;
           }).toList()..sort((a, b) {
             final rCmp = b.rarity.index.compareTo(a.rarity.index);
@@ -447,6 +456,20 @@ class BalanceSimulator {
       'aether_ring',
     };
     return ascensionItems.contains(itemId);
+  }
+
+  static bool _isAbyssalTierItem(String itemId) {
+    const abyssalItems = {
+      'abyssal_blade',
+      'abyssal_bow',
+      'abyssal_staff',
+      'abyssal_cowl',
+      'void_cleaver',
+      'void_carapace',
+      'void_crown',
+      'abyssal_eye',
+    };
+    return abyssalItems.contains(itemId);
   }
 
   static double _itemScore(EquipmentStats stats) =>
@@ -1485,8 +1508,9 @@ class BalanceSimulator {
     }
     final difficultyService = DifficultyService(config.difficulty);
     final dungeonProgression = DungeonProgressionService(config.difficulty);
-    final normals = config.dungeons.values.where((d) => d.isNormal).toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+    final normals =
+        config.dungeons.values.where((d) => d.isNormal && d.order <= 5).toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
 
     final dailyBase = bossEvents.daily.reward;
     final weeklyBase = bossEvents.weekly.reward;
@@ -1726,8 +1750,9 @@ class BalanceSimulator {
     int seedCount = 15,
   }) {
     final dungeonProg = DungeonProgressionService(config.difficulty);
-    final normals = config.dungeons.values.where((d) => d.isNormal).toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+    final normals =
+        config.dungeons.values.where((d) => d.isNormal && d.order <= 5).toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
     final ascDungeon = config.dungeons['ascension_sanctum']!;
     final epicGear = eventSetGearProfile(EventItemTier.epic);
     final legGear = eventSetGearProfile(EventItemTier.legendary);

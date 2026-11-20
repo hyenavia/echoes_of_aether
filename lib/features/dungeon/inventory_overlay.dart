@@ -5,6 +5,7 @@ import '../../app/theme/app_tokens.dart';
 import '../../app/theme/echoes_theme.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../theme/app_theme.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'item_filter_widgets.dart';
 
@@ -31,6 +32,7 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
   ItemCategoryFilter _categoryFilter = ItemCategoryFilter.all;
   ItemRarity? _rarityFilter;
   _InventorySort _sort = _InventorySort.defaultOrder;
+  late bool _isGridView = widget.embedded;
 
   List<InventoryEntry> _applySort(List<InventoryEntry> items) {
     final sorted = [...items];
@@ -160,6 +162,12 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
                     onSelected: (_) =>
                         setState(() => _sort = _InventorySort.nameAsc),
                   ),
+                  IconButton(
+                    icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+                    tooltip: _isGridView ? 'Mode Daftar' : 'Mode Grid Slot',
+                    onPressed: () => setState(() => _isGridView = !_isGridView),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -189,6 +197,242 @@ class _InventoryOverlayState extends State<InventoryOverlay> {
                           icon: Icons.filter_alt_off_outlined,
                           title: 'Tidak ada item yang sesuai filter.',
                         ),
+                      )
+                    : _isGridView
+                    ? GridView.builder(
+                        key: const Key('inventory_bag_grid'),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 140,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 0.94,
+                            ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final e = filtered[index];
+                          final rarityColor = switch (e.definition.rarity) {
+                            ItemRarity.common => AppTheme.rarityCommon,
+                            ItemRarity.uncommon => AppTheme.rarityUncommon,
+                            ItemRarity.rare => AppTheme.rarityRare,
+                            ItemRarity.epic => AppTheme.rarityEpic,
+                            ItemRarity.legendary => AppTheme.rarityLegendary,
+                            ItemRarity.mythical => AppTheme.rarityMythical,
+                          };
+                          final isGlow =
+                              e.definition.rarity == ItemRarity.legendary ||
+                              e.definition.rarity == ItemRarity.mythical;
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: rarityColor,
+                                width: 2.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                                if (isGlow)
+                                  BoxShadow(
+                                    color: rarityColor.withValues(alpha: 0.4),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: rarityColor.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          e.definition.rarity.name
+                                              .toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: rarityColor,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      'x${e.quantity}',
+                                      style: AppTheme.statNumber(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.gold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Expanded(
+                                  child: Center(
+                                    child: PixelItemIcon(
+                                      itemId: e.definition.id,
+                                      category: e.definition.category,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  e.definition.name,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      )
+                    : _isGridView
+                    ? GridView.builder(
+                        key: const Key('inventory_bag_grid'),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 140,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 0.94,
+                            ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final e = filtered[index];
+                          final rarityColor = switch (e.definition.rarity) {
+                            ItemRarity.common => AppTheme.rarityCommon,
+                            ItemRarity.uncommon => AppTheme.rarityUncommon,
+                            ItemRarity.rare => AppTheme.rarityRare,
+                            ItemRarity.epic => AppTheme.rarityEpic,
+                            ItemRarity.legendary => AppTheme.rarityLegendary,
+                            ItemRarity.mythical => AppTheme.rarityMythical,
+                          };
+                          final isGlow =
+                              e.definition.rarity == ItemRarity.legendary ||
+                              e.definition.rarity == ItemRarity.mythical;
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: rarityColor,
+                                width: 2.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                                if (isGlow)
+                                  BoxShadow(
+                                    color: rarityColor.withValues(alpha: 0.4),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: rarityColor.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          e.definition.rarity.name
+                                              .toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: rarityColor,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      'x${e.quantity}',
+                                      style: AppTheme.statNumber(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.gold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Expanded(
+                                  child: Center(
+                                    child: PixelItemIcon(
+                                      itemId: e.definition.id,
+                                      category: e.definition.category,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  e.definition.name,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       )
                     : ListView.separated(
                         itemCount: filtered.length,

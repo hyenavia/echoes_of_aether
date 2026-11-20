@@ -4,6 +4,7 @@ import 'dungeon_session.dart';
 import 'equipment.dart';
 import 'event_shop_purchase.dart';
 import 'gacha_config.dart';
+import 'infinite_spire.dart';
 import 'offline_activity.dart';
 import 'periodic_quest_state.dart';
 import 'player_progress.dart';
@@ -66,6 +67,18 @@ class InventorySnapshot {
   final Map<String, int> stacks;
   final List<EquipmentInstance> equipment;
   final int equipmentCounter;
+
+  InventorySnapshot copyWith({
+    Map<String, int>? stacks,
+    List<EquipmentInstance>? equipment,
+    int? equipmentCounter,
+  }) {
+    return InventorySnapshot(
+      stacks: stacks ?? this.stacks,
+      equipment: equipment ?? this.equipment,
+      equipmentCounter: equipmentCounter ?? this.equipmentCounter,
+    );
+  }
 }
 
 /// Snapshot status klaim reward tingkat dungeon (`DungeonProgresses.rewardStateJson`).
@@ -227,6 +240,7 @@ class PlayerSaveSnapshot {
     this.periodicQuestStates = const [],
     this.gachaPityStates = const {},
     this.unlockedSpecializations = const {'vanguard', 'arcanist', 'ranger'},
+    this.infiniteSpireProgress = const InfiniteSpireProgressSnapshot(),
   });
 
   final String playerId;
@@ -267,6 +281,9 @@ class PlayerSaveSnapshot {
   /// ID class specialization yang telah dibuka pemain (`UnlockedSpecializations`).
   final Set<String> unlockedSpecializations;
 
+  /// Progres tantangan The Infinite Spire (`InfiniteSpireProgresses`).
+  final InfiniteSpireProgressSnapshot infiniteSpireProgress;
+
   PlayerSaveSnapshot copyWith({
     String? playerId,
     PlayerCharacterSnapshot? character,
@@ -286,6 +303,7 @@ class PlayerSaveSnapshot {
     List<PeriodicQuestState>? periodicQuestStates,
     Map<String, GachaPityState>? gachaPityStates,
     Set<String>? unlockedSpecializations,
+    InfiniteSpireProgressSnapshot? infiniteSpireProgress,
   }) {
     return PlayerSaveSnapshot(
       playerId: playerId ?? this.playerId,
@@ -308,6 +326,8 @@ class PlayerSaveSnapshot {
       gachaPityStates: gachaPityStates ?? this.gachaPityStates,
       unlockedSpecializations:
           unlockedSpecializations ?? this.unlockedSpecializations,
+      infiniteSpireProgress:
+          infiniteSpireProgress ?? this.infiniteSpireProgress,
     );
   }
 

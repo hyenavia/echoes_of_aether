@@ -114,7 +114,7 @@ class PixelSpriteAtlas {
     return switch (biome.trim().toLowerCase()) {
       'forgotten_forest' => 'forgotten_forest',
       'crystal_cavern' => 'crystal_cavern',
-      'ancient_crypt' => 'ancient_crypt',
+      'ancient_crypt' || 'abyssal_rift' => 'ancient_crypt',
       'ashen_wasteland' => 'ashen_wasteland',
       'aether_sanctum' || 'ascension_sanctum' => 'aether_sanctum',
       _ => 'forgotten_forest',

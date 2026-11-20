@@ -14,6 +14,7 @@ import '../../domain/entities/event_shop_purchase.dart';
 import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
+import '../../domain/entities/infinite_spire.dart';
 import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/periodic_quest_state.dart';
@@ -219,6 +220,7 @@ class DriftPlayerSaveRepository
       level: safeLevel,
       currentExp: safeExp,
       gold: math.max(0, row.gold),
+      ascensionPhase: row.ascensionPhase,
     );
   }
 
@@ -237,6 +239,7 @@ class DriftPlayerSaveRepository
               level: progress.level,
               currentExp: progress.currentExp,
               gold: progress.gold,
+              ascensionPhase: Value(progress.ascensionPhase),
               baseStatsJson: jsonEncode(_encodeCombatStats(baseStats)),
               lastSavedAtMs: nowMs,
             ),
@@ -312,6 +315,7 @@ class DriftPlayerSaveRepository
       periodicQuestStates: snapshot.periodicQuestStates,
       gachaPityStates: snapshot.gachaPityStates,
       unlockedSpecializations: snapshot.unlockedSpecializations,
+      infiniteSpireProgress: snapshot.infiniteSpireProgress,
     );
     final prepared = _validateAndPrepareSnapshot(sanitizedSnapshot);
 
@@ -554,6 +558,9 @@ class DriftPlayerSaveRepository
       )..where((t) => t.playerId.equals(pid))).go();
       await db.delete(db.gachaPityStates).go();
       await db.delete(db.unlockedSpecializations).go();
+      await (db.delete(
+        db.infiniteSpireProgresses,
+      )..where((t) => t.playerId.equals(pid))).go();
     } else {
       if (rewriteEquipped) {
         await (db.delete(
@@ -585,6 +592,7 @@ class DriftPlayerSaveRepository
             level: progress.level,
             currentExp: progress.currentExp,
             gold: progress.gold,
+            ascensionPhase: Value(progress.ascensionPhase),
             currentHp: Value(snapshot.character.currentHp),
             activeSpecializationId: Value(specId),
             baseStatsJson: jsonEncode(_encodeCombatStats(baseStats)),
@@ -894,6 +902,23 @@ class DriftPlayerSaveRepository
         );
       }
     }
+
+    await db
+        .into(db.infiniteSpireProgresses)
+        .insertOnConflictUpdate(
+          InfiniteSpireProgressesCompanion.insert(
+            playerId: pid,
+            highestFloorCleared: Value(
+              snapshot.infiniteSpireProgress.highestFloorCleared,
+            ),
+            claimedRewardsBlob: Value(
+              jsonEncode(
+                snapshot.infiniteSpireProgress.claimedFloorRewards.toList()
+                  ..sort(),
+              ),
+            ),
+          ),
+        );
   }
 
   @override
@@ -1270,6 +1295,26 @@ class DriftPlayerSaveRepository
         unlockedSpecializations.addAll(['vanguard', 'arcanist', 'ranger']);
       }
 
+      final spireRow = await (db.select(
+        db.infiniteSpireProgresses,
+      )..where((t) => t.playerId.equals(playerId))).getSingleOrNull();
+      final InfiniteSpireProgressSnapshot infiniteSpire;
+      if (spireRow != null) {
+        Set<int> claimed = {};
+        try {
+          final decoded = jsonDecode(spireRow.claimedRewardsBlob);
+          if (decoded is List) {
+            claimed = decoded.map((e) => (e as num).toInt()).toSet();
+          }
+        } catch (_) {}
+        infiniteSpire = InfiniteSpireProgressSnapshot(
+          highestFloorCleared: math.max(0, spireRow.highestFloorCleared),
+          claimedFloorRewards: claimed,
+        );
+      } else {
+        infiniteSpire = const InfiniteSpireProgressSnapshot();
+      }
+
       final loaded = PlayerSaveSnapshot(
         playerId: playerId,
         character: PlayerCharacterSnapshot(
@@ -1277,6 +1322,7 @@ class DriftPlayerSaveRepository
             level: safeLevel,
             currentExp: safeExp,
             gold: safeGold,
+            ascensionPhase: playerRow.ascensionPhase,
           ),
           specializationId: specId,
           skillLevels: skillLevels,
@@ -1307,6 +1353,7 @@ class DriftPlayerSaveRepository
         ),
         gachaPityStates: Map.unmodifiable(gachaPityStates),
         unlockedSpecializations: Set.unmodifiable(unlockedSpecializations),
+        infiniteSpireProgress: infiniteSpire,
       );
       _recordSavedBaseline(loaded, [
         ...loaded.character.equipped.values,

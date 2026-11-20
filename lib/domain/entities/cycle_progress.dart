@@ -36,12 +36,18 @@ class CycleProgress {
     );
   }
 
+  /// Batas tingkat dunia puncak (Peak World Tier).
+  static const int kPeakWorldRank = 5;
+
   /// Rank siklus aktif saat ini (`>= 0`). Rank 0 berarti belum pernah ascension.
   final int ascensionRank;
 
   /// Rank siklus tertinggi yang pernah dicapai (`>= ascensionRank`).
   /// Memungkinkan pemain turun ke rank `0 .. highestAscensionRank` untuk farming.
   final int highestAscensionRank;
+
+  /// Apakah pemain sudah berada di tingkat dunia puncak (*Peak World Tier*).
+  bool get isPeakWorldTier => highestAscensionRank >= kPeakWorldRank;
 
   /// ID dungeon normal terakhir yang dipilih/diselesaikan pemain.
   final String? lastNormalDungeonId;

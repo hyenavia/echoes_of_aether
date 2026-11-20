@@ -27,6 +27,10 @@ class DungeonProgressionService {
     this.difficultyConfig = const DifficultyConfig(),
   ]);
 
+  /// Batas rank dunia puncak (*Peak World Tier*).
+  static const int kPeakWorldRank = 5;
+  static const int kMaxRank = 5;
+
   final DifficultyConfig difficultyConfig;
 
   /// Dungeon dianggap clear pada siklus saat ini jika `clearedInCycleRank`
@@ -99,6 +103,7 @@ class DungeonProgressionService {
       case DungeonKind.bossDaily:
       case DungeonKind.bossWeekly:
       case DungeonKind.bossSpire:
+      case DungeonKind.infiniteSpire:
         return false;
     }
   }

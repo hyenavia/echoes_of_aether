@@ -183,6 +183,7 @@ void main() {
           DungeonKind.bossDaily => 'bossDaily',
           DungeonKind.bossWeekly => 'bossWeekly',
           DungeonKind.bossSpire => 'bossSpire',
+          DungeonKind.infiniteSpire => 'infiniteSpire',
         };
         expect(label, isNotEmpty);
       }

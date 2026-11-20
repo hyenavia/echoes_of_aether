@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_tokens.dart';
-import '../../../app/theme/echoes_theme.dart';
+import '../../../theme/app_theme.dart';
 
 /// Definisi tab navigasi utama Living Aether Camp.
 @immutable
@@ -19,8 +19,8 @@ class EchoesNavItem {
   final Key? key;
 }
 
-/// Navigasi bawah terpadu berdesain RPG dengan aksen Antique Gold dan proteksi
-/// target sentuh minimal 44dp serta teks bebas overflow.
+/// Navigasi bawah bergaya Wood & Dark Metal RPG dengan aksen emas berornamen
+/// dan efek ikon menyala (glow) saat dipilih.
 class EchoesBottomNavigation extends StatelessWidget {
   const EchoesBottomNavigation({
     super.key,
@@ -35,21 +35,43 @@ class EchoesBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ext = EchoesTheme.of(context);
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        border: Border(
+        // Gradien kayu/metal gelap fantasi
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF261D17), // Rich dark bronze-wood
+            Color(0xFF18120E), // Dark iron wood
+            Color(0xFF0F0B09), // Deep shadow base
+          ],
+        ),
+        border: const Border(
           top: BorderSide(
-            color: ext.gold.withValues(alpha: 0.35),
-            width: AppBorders.thin,
+            color: Color(0xFFD4AF37), // Golden metallic trim
+            width: 2.0,
           ),
         ),
+        boxShadow: [
+          // Shadow ke atas layar
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.8),
+            offset: const Offset(0, -3),
+            blurRadius: 10,
+          ),
+          // Glow emas halus dari trim atas
+          BoxShadow(
+            color: AppTheme.gold.withValues(alpha: 0.15),
+            offset: const Offset(0, -1),
+            blurRadius: 4,
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 62,
+          height: 64,
           child: Row(
             children: [
               for (var i = 0; i < items.length; i++)
@@ -81,8 +103,9 @@ class _NavTabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ext = EchoesTheme.of(context);
-    final color = selected ? ext.gold : AppColors.textSecondary;
+    final activeColor = AppTheme.gold;
+    final inactiveColor = AppTheme.textMuted;
+    final color = selected ? activeColor : inactiveColor;
 
     return Semantics(
       button: true,
@@ -96,45 +119,102 @@ class _NavTabButton extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.xs,
-              vertical: AppSpacing.xs + 2,
+              vertical: 4,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Indikator permata emas di atas tab aktif
                 AnimatedContainer(
-                  duration: AppDurations.fast,
+                  duration: const Duration(milliseconds: 200),
+                  width: selected ? 16 : 0,
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: selected ? AppTheme.goldLight : Colors.transparent,
+                    borderRadius: BorderRadius.circular(1),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: AppTheme.gold.withValues(alpha: 0.8),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 3),
+
+                // Icon dengan glow saat aktif
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm + 2,
-                    vertical: 3,
+                    horizontal: 14,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: selected
-                        ? ext.gold.withValues(alpha: 0.16)
+                        ? AppTheme.gold.withValues(alpha: 0.16)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     border: selected
                         ? Border.all(
-                            color: ext.gold.withValues(alpha: 0.45),
-                            width: AppBorders.thin,
+                            color: AppTheme.gold.withValues(alpha: 0.6),
+                            width: 1.2,
                           )
+                        : null,
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: AppTheme.gold.withValues(alpha: 0.35),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ]
                         : null,
                   ),
                   child: Icon(
                     selected ? (item.activeIcon ?? item.icon) : item.icon,
                     size: 20,
                     color: color,
+                    shadows: selected
+                        ? [
+                            Shadow(
+                              color: AppTheme.gold.withValues(alpha: 0.8),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 2),
+
+                // Label Tab
                 Flexible(
                   child: Text(
                     item.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    style: TextStyle(
+                      fontFamily: selected
+                          ? AppTheme.fantasyFontFamily
+                          : AppTheme.statsFontFamily,
+                      fontFamilyFallback: selected
+                          ? AppTheme.fantasyFontFallback
+                          : AppTheme.statsFontFallback,
+                      fontSize: 10.5,
                       color: color,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      letterSpacing: 0.15,
+                      letterSpacing: selected ? 0.4 : 0.1,
+                      shadows: selected
+                          ? [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.9),
+                                offset: const Offset(0, 1),
+                                blurRadius: 2,
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
                 ),

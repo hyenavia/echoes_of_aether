@@ -15,7 +15,7 @@ void main() {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 10);
+      expect(db.schemaVersion, 11);
       await db.initialize();
 
       await db

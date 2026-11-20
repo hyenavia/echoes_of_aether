@@ -266,7 +266,8 @@ class OfflineDungeonRunner {
       final manualOnlyReason = switch (dungeonDef.kind) {
         DungeonKind.bossDaily ||
         DungeonKind.bossWeekly ||
-        DungeonKind.bossSpire =>
+        DungeonKind.bossSpire ||
+        DungeonKind.infiniteSpire =>
           'Boss Event / Spire ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
         DungeonKind.ascension =>
           'Ascension Dungeon ("${request.dungeonId}") hanya dapat dimainkan secara manual.',
@@ -290,7 +291,8 @@ class OfflineDungeonRunner {
       final autoFarmReason = switch (dungeonDef.kind) {
         DungeonKind.bossDaily ||
         DungeonKind.bossWeekly ||
-        DungeonKind.bossSpire =>
+        DungeonKind.bossSpire ||
+        DungeonKind.infiniteSpire =>
           'Auto Farming menolak Boss Event / Spire ("${request.dungeonId}"); hanya dungeon normal yang didukung.',
         DungeonKind.ascension =>
           'Auto Farming hanya mendukung dungeon normal ("${request.dungeonId}").',

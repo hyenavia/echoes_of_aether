@@ -103,8 +103,7 @@ class GachaActiveBannerInfo {
   final int nextResetMs;
   final GachaPityState pityState;
 
-  int remainingSeconds(int nowMs) =>
-      math.max(0, (nextResetMs - nowMs) ~/ 1000);
+  int remainingSeconds(int nowMs) => math.max(0, (nextResetMs - nowMs) ~/ 1000);
 }
 
 /// Service domain murni untuk mengelola seluruh ekosistem Gacha:
@@ -167,10 +166,12 @@ class GachaService {
     final tz = _resolveOffset(nowMs, offset: offset);
     final cycleIndex = getCycleIndex(nowMs, offset: offset);
     final nextIndex = cycleIndex + 1;
-    final epochUtc = periodService.config.tryParseEpochMondayUtc() ??
+    final epochUtc =
+        periodService.config.tryParseEpochMondayUtc() ??
         DateTime.utc(2026, 11, 16);
-    final nextCycleMondayUtc =
-        epochUtc.add(Duration(days: nextIndex * gachaConfig.cycleDays));
+    final nextCycleMondayUtc = epochUtc.add(
+      Duration(days: nextIndex * gachaConfig.cycleDays),
+    );
     final nextWallUtc = DateTime.utc(
       nextCycleMondayUtc.year,
       nextCycleMondayUtc.month,
@@ -201,14 +202,16 @@ class GachaService {
 
     final cycleIndex = getCycleIndex(nowMs, offset: offset);
     final poolLen = banner.featuredPool.length;
-    final featuredIndex =
-        poolLen > 0 ? ((cycleIndex % poolLen) + poolLen) % poolLen : 0;
-    final featuredId =
-        poolLen > 0 ? banner.featuredPool[featuredIndex] : '';
-    final standardPool =
-        banner.standardPool.where((id) => id != featuredId).toList();
+    final featuredIndex = poolLen > 0
+        ? ((cycleIndex % poolLen) + poolLen) % poolLen
+        : 0;
+    final featuredId = poolLen > 0 ? banner.featuredPool[featuredIndex] : '';
+    final standardPool = banner.standardPool
+        .where((id) => id != featuredId)
+        .toList();
     final nextReset = getNextResetMs(nowMs, offset: offset);
-    final pity = pityStates?[bannerType.idString] ??
+    final pity =
+        pityStates?[bannerType.idString] ??
         GachaPityState(bannerType: bannerType.idString);
 
     return GachaActiveBannerInfo(
@@ -301,7 +304,8 @@ class GachaService {
 
     // Periksa ruang tas jika tarikan berpotensi menghasilkan item perlengkapan
     final bagLevel = bagExpansionService.getLevel(snapshot.currencies);
-    final bagCapacity = BagExpansionService.baseCapacity +
+    final bagCapacity =
+        BagExpansionService.baseCapacity +
         (BagExpansionService.slotsPerLevel * bagLevel);
     final currentEquipCount = snapshot.inventory.equipment.length;
     if (currentEquipCount + count > bagCapacity) {
@@ -331,8 +335,9 @@ class GachaService {
     final newEquipment = <EquipmentInstance>[];
     final newClasses = <String>{};
     final updatedStacks = Map<String, int>.from(snapshot.inventory.stacks);
-    final updatedEquipment =
-        List<EquipmentInstance>.from(snapshot.inventory.equipment);
+    final updatedEquipment = List<EquipmentInstance>.from(
+      snapshot.inventory.equipment,
+    );
     var eqCounter = snapshot.inventory.equipmentCounter;
 
     for (var i = 0; i < count; i++) {
@@ -474,8 +479,9 @@ class GachaService {
       pullCount: currentPullCount,
       isGuaranteed: isGuaranteed,
     );
-    final newPityStates =
-        Map<String, GachaPityState>.from(snapshot.gachaPityStates);
+    final newPityStates = Map<String, GachaPityState>.from(
+      snapshot.gachaPityStates,
+    );
     newPityStates[bannerType.idString] = newPityState;
 
     final updatedSnapshot = snapshot.copyWith(
@@ -537,7 +543,8 @@ class GachaService {
     }
 
     final bagLevel = bagExpansionService.getLevel(snapshot.currencies);
-    final capacity = BagExpansionService.baseCapacity +
+    final capacity =
+        BagExpansionService.baseCapacity +
         (BagExpansionService.slotsPerLevel * bagLevel);
     if (snapshot.inventory.equipment.length >= capacity) {
       return SanctuaryExchangeResult(
@@ -558,9 +565,9 @@ class GachaService {
       definition: item,
       random: random,
     );
-    final newEquipment =
-        List<EquipmentInstance>.from(snapshot.inventory.equipment)
-          ..add(grantedEq);
+    final newEquipment = List<EquipmentInstance>.from(
+      snapshot.inventory.equipment,
+    )..add(grantedEq);
 
     final updatedSnapshot = snapshot.copyWith(
       currencies: newCurrencies,
@@ -621,8 +628,8 @@ class GachaService {
     final remainingPrism = currentPrism - cost;
     final newCurrencies = Map<String, int>.from(snapshot.currencies);
     newCurrencies[exchange.currencyId] = remainingPrism;
-    final newUnlockedSpecs =
-        Set<String>.from(snapshot.unlockedSpecializations)..add(classId);
+    final newUnlockedSpecs = Set<String>.from(snapshot.unlockedSpecializations)
+      ..add(classId);
 
     final updatedSnapshot = snapshot.copyWith(
       currencies: newCurrencies,

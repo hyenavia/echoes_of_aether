@@ -1,7 +1,8 @@
+import 'dart:math' as math;
+
 import '../entities/cycle_progress.dart';
 import '../entities/dungeon_definition.dart';
 import '../entities/player_save_snapshot.dart';
-import 'difficulty_service.dart';
 import 'dungeon_progression_service.dart';
 import 'reward_processor.dart';
 
@@ -15,6 +16,8 @@ class AscensionResult {
     required this.cycleProgress,
     required this.dungeonProgresses,
     required this.claimedEventIds,
+    this.isPeakWorldTier = false,
+    this.isAetherAscendant = false,
   });
 
   /// `true` jika `ascension:{runId}` sudah pernah diklaim sebelumnya sehingga
@@ -30,6 +33,13 @@ class AscensionResult {
   final Map<String, DungeonProgressSnapshot> dungeonProgresses;
   final Set<String> claimedEventIds;
 
+  /// Menandakan apakah siklus sudah menyentuh tingkat dunia puncak (Rank 5).
+  final bool isPeakWorldTier;
+
+  /// Menandakan apakah pemain baru saja menamatkan Ascension Dungeon pada Rank 5
+  /// dan dianugerahi gelar *Aether Ascendant*.
+  final bool isAetherAscendant;
+
   bool get rankIncremented => !alreadyCompleted && newRank > previousRank;
 }
 
@@ -39,12 +49,17 @@ class AscensionResult {
 class AscensionService {
   const AscensionService({
     this.progressionService = const DungeonProgressionService(),
+    this.maxRank = kPeakWorldRank,
   });
 
-  /// Batas atas aman untuk rank agar aritmatika rank tinggi tetap stabil.
-  static const int kMaxAscensionRank = DifficultyService.kMaxScaledValue;
+  /// Batas rank dunia puncak (*Peak World Tier*).
+  static const int kPeakWorldRank = 5;
+
+  /// Batas atas aman untuk rank (Peak World Tier).
+  static const int kMaxAscensionRank = kPeakWorldRank;
 
   final DungeonProgressionService progressionService;
+  final int maxRank;
 
   /// Membuat event ID idempoten kanonik untuk penyelesaian Ascension.
   static String ascensionEventId(String runId) => 'ascension:${runId.trim()}';
@@ -167,27 +182,38 @@ class AscensionService {
       );
     }
 
-    final nextRank = sanitizedPreviousRank >= kMaxAscensionRank
-        ? kMaxAscensionRank
-        : sanitizedPreviousRank + 1;
+    final isAtOrAbovePeak = sanitizedPreviousRank >= maxRank;
+    final nextRank = isAtOrAbovePeak ? maxRank : sanitizedPreviousRank + 1;
 
-    final resetProgresses = <String, DungeonProgressSnapshot>{
-      for (final entry in dungeonProgresses.entries)
-        entry.key: DungeonProgressSnapshot(
-          currentDungeonId: entry.value.currentDungeonId,
-          currentRoomId: entry.value.currentRoomId,
-          currentRoomIndex: entry.value.currentRoomIndex,
-          highestClearedRoomIndex: entry.value.highestClearedRoomIndex,
-          clearsCount: entry.value.clearsCount,
-          clearedInCycleRank: -1,
-          rewardState: entry.value.rewardState,
-        ),
-    };
+    // Saat menamatkan Ascension Dungeon pada Rank 5 (Peak World Tier):
+    // Dunia tidak di-reset lagi. Seluruh dungeon tetap terbuka permanen pada tingkat kesulitan Rank 5.
+    final Map<String, DungeonProgressSnapshot> nextProgresses;
+    final String? nextLastNormalDungeonId;
+
+    if (isAtOrAbovePeak) {
+      nextProgresses = dungeonProgresses;
+      nextLastNormalDungeonId =
+          cycleProgress.lastNormalDungeonId ?? normals.last.id;
+    } else {
+      nextProgresses = <String, DungeonProgressSnapshot>{
+        for (final entry in dungeonProgresses.entries)
+          entry.key: DungeonProgressSnapshot(
+            currentDungeonId: entry.value.currentDungeonId,
+            currentRoomId: entry.value.currentRoomId,
+            currentRoomIndex: entry.value.currentRoomIndex,
+            highestClearedRoomIndex: entry.value.highestClearedRoomIndex,
+            clearsCount: entry.value.clearsCount,
+            clearedInCycleRank: -1,
+            rewardState: entry.value.rewardState,
+          ),
+      };
+      nextLastNormalDungeonId = firstNormalDungeon.id;
+    }
 
     final nextCycle = CycleProgress(
       ascensionRank: nextRank,
-      highestAscensionRank: nextRank,
-      lastNormalDungeonId: firstNormalDungeon.id,
+      highestAscensionRank: math.max(sanitizedHighestRank, nextRank),
+      lastNormalDungeonId: nextLastNormalDungeonId,
     );
 
     return AscensionResult(
@@ -197,9 +223,11 @@ class AscensionService {
       newRank: nextRank,
       cycleProgress: nextCycle,
       dungeonProgresses: Map<String, DungeonProgressSnapshot>.unmodifiable(
-        resetProgresses,
+        nextProgresses,
       ),
       claimedEventIds: Set<String>.unmodifiable(combinedClaimed),
+      isPeakWorldTier: nextRank >= kPeakWorldRank,
+      isAetherAscendant: isAtOrAbovePeak && !alreadyClaimed,
     );
   }
 

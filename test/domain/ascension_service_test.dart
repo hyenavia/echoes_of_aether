@@ -492,14 +492,33 @@ void main() {
       expect(afterSnapshot.equipment.first.id, 'eq_2');
     });
 
-    test('handles large ascension rank (1000 -> 1001) and upper bound safely without overflow', () {
+    test('handles peak world rank (Rank 5 Peak) and upper bound safely without overflow', () {
       final dungeons = _fiveNormalCatalog();
       final progresses = {
         for (final d in dungeons.where((d) => d.isNormal))
-          d.id: _progress(d.id, clearsCount: 1001, clearedInCycleRank: 1000),
+          d.id: _progress(d.id, clearsCount: 5, clearedInCycleRank: 5),
       };
 
-      final r1001 = ascensionService.complete(
+      final capped = ascensionService.complete(
+        runId: 'peak_rank_run',
+        dungeons: dungeons,
+        cycleProgress: const CycleProgress(
+          ascensionRank: AscensionService.kPeakWorldRank,
+          lastNormalDungeonId: 'aether_sanctum',
+        ),
+        dungeonProgresses: progresses,
+      );
+
+      expect(capped.previousRank, 5);
+      expect(capped.newRank, 5);
+      expect(capped.cycleProgress.ascensionRank, 5);
+      expect(capped.cycleProgress.ascensionRank.isNegative, isFalse);
+      expect(capped.isPeakWorldTier, isTrue);
+      expect(capped.isAetherAscendant, isTrue);
+
+      // Dengan custom maxRank lebih tinggi (mis. simulasi legacy tanpa cap):
+      const customService = AscensionService(maxRank: 1000000);
+      final r1001 = customService.complete(
         runId: 'high_rank_run',
         dungeons: dungeons,
         cycleProgress: const CycleProgress(
@@ -508,26 +527,9 @@ void main() {
         ),
         dungeonProgresses: progresses,
       );
-
       expect(r1001.previousRank, 1000);
       expect(r1001.newRank, 1001);
       expect(r1001.cycleProgress.ascensionRank, 1001);
-      expect(r1001.cycleProgress.ascensionRank.isNegative, isFalse);
-
-      final capped = ascensionService.complete(
-        runId: 'max_rank_run',
-        dungeons: dungeons,
-        cycleProgress: const CycleProgress(
-          ascensionRank: AscensionService.kMaxAscensionRank,
-          lastNormalDungeonId: 'aether_sanctum',
-        ),
-        dungeonProgresses: progresses,
-      );
-      expect(
-        capped.cycleProgress.ascensionRank,
-        AscensionService.kMaxAscensionRank,
-      );
-      expect(capped.cycleProgress.ascensionRank.isNegative, isFalse);
     });
   });
 

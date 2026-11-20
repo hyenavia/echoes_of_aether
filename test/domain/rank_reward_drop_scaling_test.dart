@@ -65,15 +65,21 @@ String _readAsset(String name) => File('assets/data/$name').readAsStringSync();
 GameConfig _loadRealConfig({
   CombatStats? baseStatsOverride,
   int? expBaseOverride,
+  int? maxLevelOverride,
 }) {
   const parser = GameConfigParser();
   final settings = _readAsset('game_config.json');
   final difficulty = parser.parseDifficulty(settings);
   final baseProg = parser.parseProgression(settings);
-  final progression = (baseStatsOverride == null && expBaseOverride == null)
+  final progression =
+      (baseStatsOverride == null &&
+          expBaseOverride == null &&
+          maxLevelOverride == null)
       ? baseProg
       : ProgressionConfig(
-          maxLevel: baseProg.maxLevel,
+          maxLevel:
+              maxLevelOverride ??
+              (baseStatsOverride != null ? 1000 : baseProg.maxLevel),
           expCurve: expBaseOverride != null
               ? ExpCurveConfig.polynomial(
                   base: expBaseOverride.toDouble(),
@@ -1401,7 +1407,7 @@ void main() {
     );
 
     testWidgets(
-      'Flame EchoesGame Online pada Rank 5 (Ascension Sanctum): profil Rank run terjaga saat Ascension tamat ke Rank 6',
+      'Flame EchoesGame Online pada Rank 5 (Ascension Sanctum): profil Rank run terjaga saat Ascension tamat di Rank 5 (Peak World Tier)',
       (tester) async {
         final strongConfig = _loadRealConfig(
           baseStatsOverride: const CombatStats(
@@ -1509,7 +1515,7 @@ void main() {
             .widget<GameWidget<EchoesGame>>(find.byType(GameWidget<EchoesGame>))
             .game!;
 
-        expect(find.text('Ascension Rank 5 → Rank 6'), findsOneWidget);
+        expect(find.text('Ascension Rank 5'), findsOneWidget);
         expect(
           find.textContaining(
             '+${NumberFormatter.format(expectedAscClearExp)} EXP',

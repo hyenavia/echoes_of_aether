@@ -63,7 +63,10 @@ void main() {
           cycleRank: rank,
           onlineSeedCount: 5,
         );
-        expect(rows.length, 5);
+        final expectedDungeonCount = sim.config.dungeons.values
+            .where((d) => d.isNormal && !d.isAscension)
+            .length;
+        expect(rows.length, expectedDungeonCount);
         for (final r in rows) {
           expect(r.onlineGoldPerHour.isFinite, isTrue);
           expect(r.onlineGoldPerHour, greaterThan(0));

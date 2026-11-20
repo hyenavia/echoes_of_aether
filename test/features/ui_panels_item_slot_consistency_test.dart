@@ -153,12 +153,13 @@ void main() {
         );
 
         expect(find.byType(ItemSlot), findsNWidgets(ItemRarity.values.length));
-      expect(find.text('x5'), findsOneWidget);
+        expect(find.text('x5'), findsOneWidget);
 
-      await tester.tap(find.byType(ItemSlot).first);
-      expect(slotTapped, isTrue);
-      expect(tester.takeException(), isNull);
-    });
+        await tester.tap(find.byType(ItemSlot).first);
+        expect(slotTapped, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('Slot terkunci menampilkan gembok dan tanpa glow', (
       tester,

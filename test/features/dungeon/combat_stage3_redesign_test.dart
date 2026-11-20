@@ -209,10 +209,9 @@ void main() {
 
       expect(find.text('Dungeon Selesai!'), findsOneWidget);
       expect(find.text('HADIAH PENYELESAIAN'), findsOneWidget);
-      expect(
-        find.textContaining('+1.2K EXP • +640 Gold • Naik 1 Level!'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('+1.2K EXP'), findsOneWidget);
+      expect(find.textContaining('+640 Gold'), findsOneWidget);
+      expect(find.textContaining('Naik Level!'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.ensureVisible(find.text('Run baru'));

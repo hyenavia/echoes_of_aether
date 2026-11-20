@@ -30,7 +30,9 @@ void main() {
 
     test('Rank 0 memenuhi target win rate pada level rekomendasi, -10, dan +10 untuk 5 dungeon', () {
       final dungeons =
-          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+          sim.config.dungeons.values
+              .where((d) => d.isNormal && d.order <= 5)
+              .toList()
             ..sort((a, b) => a.order.compareTo(b.order));
       expect(dungeons, hasLength(5));
 
@@ -175,6 +177,13 @@ void main() {
 
     test('8-jam Mode B Auto Farming seluruh dungeon (1..5) terbatas, tanpa lonjakan, dan tanpa death loop pada recLevel', () {
       final results = sim.simulate8HourAutoFarmingAll(
+        dungeonIds: const {
+          'forgotten_forest',
+          'crystal_cavern',
+          'ancient_crypt',
+          'ashen_wasteland',
+          'aether_sanctum',
+        },
         startLevelResolver: (d, rank) => switch (d.id) {
           'ashen_wasteland' => 30,
           'aether_sanctum' => 48,
@@ -317,7 +326,7 @@ void main() {
     test('rank 0, 1, 5, 10, 50, 1000 seluruh dungeon bebas overflow/NaN/Infinity termasuk clear reward dan drop roll bonus', () {
       const testRanks = [0, 1, 5, 10, 50, 1000];
       final safety = sim.checkRankSafety(ranks: testRanks);
-      expect(safety, hasLength(36)); // 6 dungeon x 6 rank
+      expect(safety, hasLength(42)); // 7 dungeon x 6 rank
 
       for (final s in safety) {
         expect(
@@ -383,7 +392,9 @@ void main() {
             cycleRank: rank,
             seedCount: 20,
           );
-          if (id != 'aether_sanctum' && id != 'ascension_sanctum') {
+          if (id != 'aether_sanctum' &&
+              id != 'ascension_sanctum' &&
+              id != 'abyssal_rift') {
             expect(
               m.winRate,
               greaterThanOrEqualTo(0.85),
@@ -405,7 +416,9 @@ void main() {
             cycleRank: rank,
             seedCount: 10,
           );
-          if (id != 'aether_sanctum' && id != 'ascension_sanctum') {
+          if (id != 'aether_sanctum' &&
+              id != 'ascension_sanctum' &&
+              id != 'abyssal_rift') {
             expect(
               cal.calibratedMinLevel,
               lessThanOrEqualTo(cal.formulaRecommendedLevel),
@@ -449,7 +462,16 @@ void main() {
       // Rank 0, 50, 1000 mencakup seluruh 5 dungeon normal; Rank 1, 5, 10 mencakup
       // dungeon terendah (forgotten_forest) dan tertinggi (aether_sanctum).
       for (final rank in [0, 50, 1000]) {
-        final runs = sim.simulate8HourAutoFarmingAll(cycleRank: rank);
+        final runs = sim.simulate8HourAutoFarmingAll(
+          cycleRank: rank,
+          dungeonIds: const {
+            'forgotten_forest',
+            'crystal_cavern',
+            'ancient_crypt',
+            'ashen_wasteland',
+            'aether_sanctum',
+          },
+        );
         expect(runs, hasLength(5));
         for (final f in runs) {
           expect(
@@ -507,6 +529,13 @@ void main() {
       for (final entry in <int, int>{50: 2500, 1000: 50000}.entries) {
         final runs = sim.simulate8HourAutoFarmingAll(
           cycleRank: entry.key,
+          dungeonIds: const {
+            'forgotten_forest',
+            'crystal_cavern',
+            'ancient_crypt',
+            'ashen_wasteland',
+            'aether_sanctum',
+          },
           startLevelResolver: (_, _) => entry.value,
         );
         expect(runs, hasLength(5));
@@ -533,7 +562,9 @@ void main() {
   group('M12 Stage 6 — Boss Events Balance & Quest Reward Verification', () {
     test('Rank 0 seluruh pool Daily & Weekly Boss memenuhi target win rate (-10, Rec, +10) di Dungeon 1..5', () {
       final normals =
-          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+          sim.config.dungeons.values
+              .where((d) => d.isNormal && d.order <= 5)
+              .toList()
             ..sort((a, b) => a.order.compareTo(b.order));
       final bossEvents = sim.config.bossEvents!;
 
@@ -619,7 +650,9 @@ void main() {
 
     test('Rank 1, 5, 10, 50 Daily & Weekly Boss di Dungeon 1..5 memenuhi target Rec/+10 tanpa overflow/NaN', () {
       final normals =
-          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+          sim.config.dungeons.values
+              .where((d) => d.isNormal && d.order <= 5)
+              .toList()
             ..sort((a, b) => a.order.compareTo(b.order));
       final dungeonProg = DungeonProgressionService(sim.config.difficulty);
 
@@ -705,7 +738,9 @@ void main() {
   group('M12 Stage 6 — Boss Events Balance & Quest Reward Verification', () {
     test('Rank 0 seluruh pool Daily & Weekly Boss memenuhi target win rate (-10, Rec, +10) di Dungeon 1..5', () {
       final normals =
-          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+          sim.config.dungeons.values
+              .where((d) => d.isNormal && d.order <= 5)
+              .toList()
             ..sort((a, b) => a.order.compareTo(b.order));
       final bossEvents = sim.config.bossEvents!;
 
@@ -791,7 +826,9 @@ void main() {
 
     test('Rank 1, 5, 10, 50 Daily & Weekly Boss di Dungeon 1..5 memenuhi target Rec/+10 tanpa overflow/NaN', () {
       final normals =
-          sim.config.dungeons.values.where((d) => d.isNormal).toList()
+          sim.config.dungeons.values
+              .where((d) => d.isNormal && d.order <= 5)
+              .toList()
             ..sort((a, b) => a.order.compareTo(b.order));
       final dungeonProg = DungeonProgressionService(sim.config.difficulty);
 

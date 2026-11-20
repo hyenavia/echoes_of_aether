@@ -12,7 +12,7 @@ void main() {
     test('membaca assets/data/game_config.json yang dikirim bersama game', () {
       final source = File('assets/data/game_config.json').readAsStringSync();
       final c = parser.parseProgression(source);
-      expect(c.maxLevel, isNull);
+      expect(c.maxLevel, 90);
       expect(c.baseStats.maxHp, 100);
       expect(c.expToNext(1), 60);
       expect(c.statsAt(2).maxHp, 115);
@@ -29,19 +29,19 @@ void main() {
       final baseSource = File('assets/data/game_config.json')
           .readAsStringSync();
       // Omit max_level
-      final withoutMax = baseSource.replaceAll('"max_level": null,', '');
+      final withoutMax = baseSource.replaceAll('"max_level": 90,', '');
       expect(parser.parseProgression(withoutMax).maxLevel, isNull);
 
       // Explicit integer max_level
       final withMax = baseSource.replaceAll(
-        '"max_level": null,',
+        '"max_level": 90,',
         '"max_level": 50,',
       );
       expect(parser.parseProgression(withMax).maxLevel, 50);
 
       // Invalid max_level < 1
       final withZero = baseSource.replaceAll(
-        '"max_level": null,',
+        '"max_level": 90,',
         '"max_level": 0,',
       );
       expect(

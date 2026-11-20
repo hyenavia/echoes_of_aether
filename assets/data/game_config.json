@@ -9,7 +9,7 @@
     "cooldown_seconds": 90.0
   },
   "progression": {
-    "max_level": null,
+    "max_level": 90,
     "exp": { "type": "polynomial", "base": 60, "exponent": 1.8 },
     "base_stats": {
       "hp": 100,
@@ -147,5 +147,169 @@
     "auto_sync_min_interval_minutes": 5,
     "reject_backoff_minutes": 60,
     "server_time_tolerance_minutes": 5
+  },
+  "hero_ascension": {
+    "max_phase": 6,
+    "phases": [
+      {
+        "phase": 0,
+        "level_cap": 20,
+        "required_player_level": 1,
+        "costs": {
+          "gold": 0,
+          "items": {},
+          "currencies": {}
+        },
+        "stat_boosts": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "crit_rate": 0.0,
+          "attack_speed": 0.0,
+          "crit_damage": 0.0,
+          "skill_haste": 0.0
+        },
+        "has_golden_aura": false
+      },
+      {
+        "phase": 1,
+        "level_cap": 40,
+        "required_player_level": 20,
+        "costs": {
+          "gold": 500,
+          "items": {
+            "boss_remnant": 3
+          },
+          "currencies": {}
+        },
+        "stat_boosts": {
+          "hp": 50,
+          "atk": 8,
+          "def": 3,
+          "crit_rate": 0.0,
+          "attack_speed": 0.0,
+          "crit_damage": 0.0,
+          "skill_haste": 0.0
+        },
+        "has_golden_aura": false
+      },
+      {
+        "phase": 2,
+        "level_cap": 50,
+        "required_player_level": 40,
+        "costs": {
+          "gold": 1500,
+          "items": {
+            "boss_remnant": 4,
+            "aether_scrap": 10
+          },
+          "currencies": {}
+        },
+        "stat_boosts": {
+          "hp": 75,
+          "atk": 12,
+          "def": 5,
+          "crit_rate": 0.02,
+          "attack_speed": 0.0,
+          "crit_damage": 0.0,
+          "skill_haste": 0.0
+        },
+        "has_golden_aura": false
+      },
+      {
+        "phase": 3,
+        "level_cap": 60,
+        "required_player_level": 50,
+        "costs": {
+          "gold": 3000,
+          "items": {
+            "boss_remnant": 5,
+            "aether_scrap": 20
+          },
+          "currencies": {}
+        },
+        "stat_boosts": {
+          "hp": 100,
+          "atk": 15,
+          "def": 6,
+          "crit_rate": 0.0,
+          "attack_speed": 0.03,
+          "crit_damage": 0.0,
+          "skill_haste": 0.0
+        },
+        "has_golden_aura": false
+      },
+      {
+        "phase": 4,
+        "level_cap": 70,
+        "required_player_level": 60,
+        "costs": {
+          "gold": 5000,
+          "items": {
+            "boss_remnant": 5,
+            "aether_scrap": 30
+          },
+          "currencies": {}
+        },
+        "stat_boosts": {
+          "hp": 150,
+          "atk": 20,
+          "def": 8,
+          "crit_rate": 0.0,
+          "attack_speed": 0.0,
+          "crit_damage": 0.05,
+          "skill_haste": 0.0
+        },
+        "has_golden_aura": false
+      },
+      {
+        "phase": 5,
+        "level_cap": 80,
+        "required_player_level": 70,
+        "costs": {
+          "gold": 8000,
+          "items": {
+            "abyssal_remnant": 5,
+            "aether_scrap": 40
+          },
+          "currencies": {}
+        },
+        "stat_boosts": {
+          "hp": 200,
+          "atk": 25,
+          "def": 10,
+          "crit_rate": 0.0,
+          "attack_speed": 0.0,
+          "crit_damage": 0.0,
+          "skill_haste": 0.05
+        },
+        "has_golden_aura": false
+      },
+      {
+        "phase": 6,
+        "level_cap": 90,
+        "required_player_level": 80,
+        "costs": {
+          "gold": 15000,
+          "items": {
+            "void_essence": 5,
+            "aether_scrap": 50
+          },
+          "currencies": {
+            "aether_shard": 100
+          }
+        },
+        "stat_boosts": {
+          "hp": 300,
+          "atk": 35,
+          "def": 15,
+          "crit_rate": 0.0,
+          "attack_speed": 0.0,
+          "crit_damage": 0.0,
+          "skill_haste": 0.0
+        },
+        "has_golden_aura": true
+      }
+    ]
   }
 }

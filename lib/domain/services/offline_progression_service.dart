@@ -506,7 +506,8 @@ class OfflineProgressionService {
           : switch (dungeonDef.kind) {
               DungeonKind.bossDaily ||
               DungeonKind.bossWeekly ||
-              DungeonKind.bossSpire =>
+              DungeonKind.bossSpire ||
+              DungeonKind.infiniteSpire =>
                 'Auto Farming ditolak: Boss Event / Spire ("$targetDungeonId") hanya dimainkan manual.',
               DungeonKind.ascension =>
                 'Auto Farming ditolak: Ascension Dungeon ("$targetDungeonId") hanya dimainkan manual.',

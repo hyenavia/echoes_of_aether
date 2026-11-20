@@ -130,13 +130,15 @@ void main() {
         await tester.pumpAndSettle();
         loadWatch.stop();
 
-        expect(tester.takeException(), isNull);
+        final err = tester.takeException();
+        expect(err, isNull);
         expect(loadWatch.elapsedMilliseconds, lessThan(5000));
 
         for (final tabLabel in const ['Hero', 'Bag', 'Shop', 'Adventure']) {
           await tester.tap(find.text(tabLabel));
           await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
+          final tabErr = tester.takeException();
+          expect(tabErr, isNull);
         }
       }
       await tester.binding.setSurfaceSize(null);

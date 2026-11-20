@@ -339,9 +339,12 @@ class DungeonConfigParser {
       case 'boss_spire':
       case 'bossSpire':
         return DungeonKind.bossSpire;
+      case 'infinite_spire':
+      case 'infiniteSpire':
+        return DungeonKind.infiniteSpire;
       default:
         throw ConfigException(
-          'dungeons.json: $where tidak dikenal "$raw" (valid: normal, ascension, boss_spire).',
+          'dungeons.json: $where tidak dikenal "$raw" (valid: normal, ascension, boss_spire, infinite_spire).',
         );
     }
   }

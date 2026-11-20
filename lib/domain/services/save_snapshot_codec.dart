@@ -7,6 +7,7 @@ import '../entities/equipment.dart';
 import '../entities/event_shop_purchase.dart';
 import '../entities/gacha_config.dart';
 import '../entities/game_config.dart';
+import '../entities/infinite_spire.dart';
 import '../entities/item_definition.dart';
 import '../entities/offline_activity.dart';
 import '../entities/periodic_quest_state.dart';
@@ -165,6 +166,8 @@ class SaveSnapshotCodec {
         'currentHp': snapshot.character.currentHp,
         'equipped': equippedMap,
         'progress': _sortedMap({
+          if (snapshot.character.progress.ascensionPhase > 0)
+            'ascensionPhase': snapshot.character.progress.ascensionPhase,
           'currentExp': snapshot.character.progress.currentExp,
           'gold': snapshot.character.progress.gold,
           'level': snapshot.character.progress.level,
@@ -220,6 +223,15 @@ class SaveSnapshotCodec {
             'pullCount': p.value.pullCount,
           }),
       }),
+      if (snapshot.infiniteSpireProgress.highestFloorCleared > 0 ||
+          snapshot.infiniteSpireProgress.claimedFloorRewards.isNotEmpty)
+        'infiniteSpireProgress': _sortedMap({
+          'claimedFloorRewards':
+              snapshot.infiniteSpireProgress.claimedFloorRewards.toList()
+                ..sort(),
+          'highestFloorCleared':
+              snapshot.infiniteSpireProgress.highestFloorCleared,
+        }),
       'unlockedSpecializations': snapshot.unlockedSpecializations.toList()
         ..sort(),
       'session': _sortedMap({
@@ -275,6 +287,7 @@ class SaveSnapshotCodec {
       'dungeonProgresses',
       'eventShopPurchases',
       'gachaPityStates',
+      'infiniteSpireProgress',
       'inventory',
       'periodicQuestStates',
       'playerId',
@@ -373,6 +386,49 @@ class SaveSnapshotCodec {
       config: config,
     );
 
+    final InfiniteSpireProgressSnapshot infiniteSpire;
+    final rawSpire = root['infiniteSpireProgress'];
+    if (rawSpire != null) {
+      final spireMap = _requireMap(
+        root,
+        'infiniteSpireProgress',
+        path: 'infiniteSpireProgress',
+      );
+      _rejectUnknownKeys(spireMap, const {
+        'claimedFloorRewards',
+        'highestFloorCleared',
+      }, 'infiniteSpireProgress');
+      final highestFloor = _requireInt(
+        spireMap,
+        'highestFloorCleared',
+        path: 'infiniteSpireProgress.highestFloorCleared',
+        min: 0,
+      );
+      final rawClaimed = _requireList(
+        spireMap,
+        'claimedFloorRewards',
+        path: 'infiniteSpireProgress.claimedFloorRewards',
+      );
+      final Set<int> claimed = {};
+      for (var i = 0; i < rawClaimed.length; i++) {
+        final fl = rawClaimed[i];
+        if (fl is! int || fl < 1) {
+          throw SaveCodecException(
+            SaveCodecErrorCode.invalidFieldType,
+            'infiniteSpireProgress.claimedFloorRewards[$i] harus berupa integer >= 1 (nilai: $fl).',
+            path: 'infiniteSpireProgress.claimedFloorRewards[$i]',
+          );
+        }
+        claimed.add(fl);
+      }
+      infiniteSpire = InfiniteSpireProgressSnapshot(
+        highestFloorCleared: highestFloor,
+        claimedFloorRewards: claimed,
+      );
+    } else {
+      infiniteSpire = const InfiniteSpireProgressSnapshot();
+    }
+
     return PlayerSaveSnapshot(
       playerId: playerId,
       character: character,
@@ -391,6 +447,7 @@ class SaveSnapshotCodec {
       periodicQuestStates: periodicQuestStates,
       gachaPityStates: gachaPityStates,
       unlockedSpecializations: unlockedSpecializations,
+      infiniteSpireProgress: infiniteSpire,
     );
   }
 
@@ -456,6 +513,7 @@ class SaveSnapshotCodec {
       path: 'character.progress',
     );
     _rejectUnknownKeys(progressMap, const {
+      'ascensionPhase',
       'currentExp',
       'gold',
       'level',
@@ -479,6 +537,15 @@ class SaveSnapshotCodec {
       path: 'character.progress.gold',
       min: 0,
     );
+    final rawAscension = progressMap['ascensionPhase'];
+    final ascensionPhase = (rawAscension != null)
+        ? _requireInt(
+            progressMap,
+            'ascensionPhase',
+            path: 'character.progress.ascensionPhase',
+            min: 0,
+          )
+        : 0;
 
     final specializationId = _optionalNonEmptyString(
       map,
@@ -558,6 +625,7 @@ class SaveSnapshotCodec {
         level: level,
         currentExp: currentExp,
         gold: gold,
+        ascensionPhase: ascensionPhase,
       ),
       specializationId: specializationId,
       skillLevels: Map.unmodifiable(skillLevels),

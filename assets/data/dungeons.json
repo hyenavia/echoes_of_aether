@@ -70,6 +70,77 @@
       "#...##............##...#",
       "#......................#",
       "########################"
+    ],
+    "abyssal_entrance_map": [
+      "####################",
+      "#..................#",
+      "#...##........##...#",
+      "#...#..........#...#",
+      "#..................#",
+      "#..................#",
+      "#..................#",
+      "#...#..........#...#",
+      "#...##........##...#",
+      "#..................#",
+      "####################"
+    ],
+    "abyssal_chasm_map": [
+      "######################",
+      "#....................#",
+      "#...####......####...#",
+      "#...#............#...#",
+      "#....................#",
+      "#..##............##..#",
+      "#....................#",
+      "#...#............#...#",
+      "#...####......####...#",
+      "#....................#",
+      "######################"
+    ],
+    "abyssal_depths_map": [
+      "######################",
+      "#....................#",
+      "#..##............##..#",
+      "#...#............#...#",
+      "#....................#",
+      "#.......######.......#",
+      "#....................#",
+      "#.......######.......#",
+      "#....................#",
+      "#...#............#...#",
+      "#..##............##..#",
+      "#....................#",
+      "######################"
+    ],
+    "abyssal_sanctum_map": [
+      "######################",
+      "#....................#",
+      "#..###..........###..#",
+      "#..#..............#..#",
+      "#....................#",
+      "#......##....##......#",
+      "#....................#",
+      "#......##....##......#",
+      "#....................#",
+      "#..#..............#..#",
+      "#..###..........###..#",
+      "#....................#",
+      "######################"
+    ],
+    "abyssal_core_map": [
+      "########################",
+      "#......................#",
+      "#...###..........###...#",
+      "#...#..............#...#",
+      "#......................#",
+      "#........##..##........#",
+      "#......................#",
+      "#........##..##........#",
+      "#......................#",
+      "#...#..............#...#",
+      "#...###..........###...#",
+      "#......................#",
+      "########################"
     ]
   },
   "dungeons": [
@@ -2002,10 +2073,284 @@
       ]
     },
     {
+      "id": "abyssal_rift",
+      "name": "The Abyssal Rift",
+      "biome": "abyssal_rift",
+      "kind": "normal",
+      "order": 6,
+      "recommended_level": 65,
+      "unlock_requires_dungeon_id": "aether_sanctum",
+      "start_room_id": "ar_chasm_entrance",
+      "difficulty_scale": 4.5,
+      "completion_reward": {
+        "exp_reward": 450,
+        "gold_reward": 220,
+        "loot_table_id": "abyssal_clear_loot"
+      },
+      "rooms": [
+        {
+          "id": "ar_chasm_entrance",
+          "name": "Chasm Entrance",
+          "type": "normal",
+          "map_ref": "abyssal_entrance_map",
+          "entry_position": {
+            "x": 1,
+            "y": 5
+          },
+          "exit_position": {
+            "x": 18,
+            "y": 5
+          },
+          "spawns": [
+            {
+              "id": "ar_spawn_crawler_1",
+              "monster_id": "abyssal_crawler",
+              "position": {
+                "x": 9,
+                "y": 4
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g1",
+              "required": true
+            },
+            {
+              "id": "ar_spawn_crawler_2",
+              "monster_id": "abyssal_crawler",
+              "position": {
+                "x": 10,
+                "y": 6
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g1",
+              "required": true
+            },
+            {
+              "id": "ar_spawn_crawler_3",
+              "monster_id": "abyssal_crawler",
+              "position": {
+                "x": 14,
+                "y": 5
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g1",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies",
+            "required_spawn_group": "ar_g1"
+          },
+          "reward": {
+            "exp_reward": 60,
+            "gold_reward": 25,
+            "loot_table_id": "abyssal_normal_loot"
+          },
+          "next_room_ids": [
+            "ar_void_corridor"
+          ]
+        },
+        {
+          "id": "ar_void_corridor",
+          "name": "Void Corridor",
+          "type": "normal",
+          "map_ref": "abyssal_chasm_map",
+          "entry_position": {
+            "x": 1,
+            "y": 5
+          },
+          "exit_position": {
+            "x": 20,
+            "y": 5
+          },
+          "spawns": [
+            {
+              "id": "ar_spawn_crawler_4",
+              "monster_id": "abyssal_crawler",
+              "position": {
+                "x": 6,
+                "y": 4
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g2",
+              "required": true
+            },
+            {
+              "id": "ar_spawn_weaver_1",
+              "monster_id": "void_weaver",
+              "position": {
+                "x": 11,
+                "y": 5
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g2",
+              "required": true
+            },
+            {
+              "id": "ar_spawn_weaver_2",
+              "monster_id": "void_weaver",
+              "position": {
+                "x": 15,
+                "y": 6
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g2",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies",
+            "required_spawn_group": "ar_g2"
+          },
+          "reward": {
+            "exp_reward": 75,
+            "gold_reward": 32,
+            "loot_table_id": "abyssal_normal_loot"
+          },
+          "next_room_ids": [
+            "ar_shadow_depths"
+          ]
+        },
+        {
+          "id": "ar_shadow_depths",
+          "name": "Shadow Depths",
+          "type": "normal",
+          "map_ref": "abyssal_depths_map",
+          "entry_position": {
+            "x": 1,
+            "y": 6
+          },
+          "exit_position": {
+            "x": 20,
+            "y": 6
+          },
+          "spawns": [
+            {
+              "id": "ar_spawn_weaver_3",
+              "monster_id": "void_weaver",
+              "position": {
+                "x": 5,
+                "y": 4
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g3",
+              "required": true
+            },
+            {
+              "id": "ar_spawn_weaver_4",
+              "monster_id": "void_weaver",
+              "position": {
+                "x": 16,
+                "y": 8
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g3",
+              "required": true
+            },
+            {
+              "id": "ar_spawn_crawler_5",
+              "monster_id": "abyssal_crawler",
+              "position": {
+                "x": 11,
+                "y": 4
+              },
+              "quantity": 1,
+              "spawn_group": "ar_g3",
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_required_enemies",
+            "required_spawn_group": "ar_g3"
+          },
+          "reward": {
+            "exp_reward": 85,
+            "gold_reward": 38,
+            "loot_table_id": "abyssal_normal_loot"
+          },
+          "next_room_ids": [
+            "ar_abyssal_sanctum"
+          ]
+        },
+        {
+          "id": "ar_abyssal_sanctum",
+          "name": "Abyssal Sanctum",
+          "type": "elite",
+          "map_ref": "abyssal_sanctum_map",
+          "entry_position": {
+            "x": 1,
+            "y": 6
+          },
+          "exit_position": {
+            "x": 20,
+            "y": 6
+          },
+          "spawns": [
+            {
+              "id": "ar_spawn_stalker_elite",
+              "monster_id": "shadow_stalker",
+              "position": {
+                "x": 11,
+                "y": 4
+              },
+              "quantity": 1,
+              "spawn_group": "ar_elite",
+              "is_elite": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_elite",
+            "required_spawn_group": "ar_elite"
+          },
+          "reward": {
+            "exp_reward": 150,
+            "gold_reward": 65,
+            "loot_table_id": "abyssal_elite_loot"
+          },
+          "next_room_ids": [
+            "ar_abyssal_core"
+          ]
+        },
+        {
+          "id": "ar_abyssal_core",
+          "name": "Abyssal Core",
+          "type": "boss",
+          "map_ref": "abyssal_core_map",
+          "entry_position": {
+            "x": 1,
+            "y": 6
+          },
+          "exit_position": {
+            "x": 22,
+            "y": 6
+          },
+          "spawns": [
+            {
+              "id": "ar_spawn_archon_boss",
+              "monster_id": "abyssal_archon",
+              "position": {
+                "x": 17,
+                "y": 6
+              },
+              "quantity": 1,
+              "spawn_group": "ar_boss",
+              "is_boss": true,
+              "required": true
+            }
+          ],
+          "completion_condition": {
+            "type": "defeat_boss",
+            "required_spawn_group": "ar_boss"
+          },
+          "next_room_ids": []
+        }
+      ]
+    },
+    {
       "id": "ascension_sanctum",
       "name": "Ascension: Aether Sanctum",
       "kind": "ascension",
-      "order": 6,
+      "order": 7,
       "base_dungeon_id": "aether_sanctum",
       "unlock_requires_dungeon_id": "aether_sanctum",
       "recommended_level": 49,

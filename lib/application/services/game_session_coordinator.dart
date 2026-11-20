@@ -11,6 +11,7 @@ import '../../domain/entities/equipment.dart';
 import '../../domain/entities/event_shop_purchase.dart';
 import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
+import '../../domain/entities/infinite_spire.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/periodic_quest_state.dart';
@@ -33,6 +34,8 @@ import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_manager.dart';
 import '../../domain/services/equipment_factory.dart';
 import '../../domain/services/game_clock.dart';
+import '../../domain/services/hero_ascension_service.dart';
+import '../../domain/services/infinite_spire_service.dart';
 import '../../domain/services/offline_equipment_cleanup_service.dart';
 import '../../domain/services/offline_progression_service.dart';
 import '../../domain/services/period_service.dart';
@@ -62,6 +65,7 @@ class LoadedGameSession {
     this.periodicQuestStates = const [],
     this.gachaPityStates = const {},
     this.unlockedSpecializations = const {},
+    this.infiniteSpireProgress = const InfiniteSpireProgressSnapshot(),
   });
 
   final PlayerCharacter character;
@@ -86,6 +90,7 @@ class LoadedGameSession {
   final List<PeriodicQuestState> periodicQuestStates;
   final Map<String, GachaPityState> gachaPityStates;
   final Set<String> unlockedSpecializations;
+  final InfiniteSpireProgressSnapshot infiniteSpireProgress;
 
   bool get hasRecoverableDungeonSession =>
       activeDungeonSession?.isRecoverable ?? false;
@@ -449,6 +454,7 @@ class GameSessionCoordinator {
       statsCalculator: DerivedStatsCalculator(
         pctCaps: config.equipment.pctCaps,
       ),
+      heroAscensionConfig: config.heroAscension,
     );
     final inventory = Inventory(definitions: config.items);
 
@@ -517,6 +523,7 @@ class GameSessionCoordinator {
         isFirstLaunch: loadError == null,
         loadError: loadError,
         clockState: _clockState,
+        infiniteSpireProgress: const InfiniteSpireProgressSnapshot(),
       );
     }
 
@@ -692,6 +699,7 @@ class GameSessionCoordinator {
             eventShopPurchases: loaded.eventShopPurchases,
             currencies: loaded.currencies,
             clockState: _clockState,
+            infiniteSpireProgress: loaded.infiniteSpireProgress,
           ),
         );
 
@@ -815,6 +823,7 @@ class GameSessionCoordinator {
                 periodicQuestStates: loaded.periodicQuestStates,
                 gachaPityStates: loaded.gachaPityStates,
                 unlockedSpecializations: loaded.unlockedSpecializations,
+                infiniteSpireProgress: loaded.infiniteSpireProgress,
               ),
             );
           }
@@ -878,6 +887,7 @@ class GameSessionCoordinator {
             eventShopPurchases: loaded.eventShopPurchases,
             currencies: loaded.currencies,
             clockState: _clockState,
+            infiniteSpireProgress: loaded.infiniteSpireProgress,
           ),
         );
       }
@@ -911,6 +921,7 @@ class GameSessionCoordinator {
       periodicQuestStates: loaded.periodicQuestStates,
       gachaPityStates: loaded.gachaPityStates,
       unlockedSpecializations: loaded.unlockedSpecializations,
+      infiniteSpireProgress: loaded.infiniteSpireProgress,
     );
   }
 
@@ -1106,6 +1117,7 @@ class GameSessionCoordinator {
     List<EventShopPurchaseRecord> eventShopPurchases = const [],
     Map<String, GachaPityState> gachaPityStates = const {},
     Set<String> unlockedSpecializations = const {},
+    InfiniteSpireProgressSnapshot? infiniteSpireProgress,
     Set<String> extraClaimedEventIds = const {},
   }) {
     final now = math.max(0, _nowMs());
@@ -1135,7 +1147,8 @@ class GameSessionCoordinator {
             id.startsWith('room_clear:') ||
             id.startsWith('ascension:') ||
             id.startsWith('bossquest:') ||
-            id.startsWith('boss_spire:'))
+            id.startsWith('boss_spire:') ||
+            id.startsWith('infinite_spire:'))
           id,
       if (currencyService != null) ...currencyService.claimedIds,
       ...extraClaimedEventIds,
@@ -1177,6 +1190,8 @@ class GameSessionCoordinator {
         eventShopPurchases: eventShopPurchases,
         gachaPityStates: gachaPityStates,
         unlockedSpecializations: unlockedSpecializations,
+        infiniteSpireProgress:
+            infiniteSpireProgress ?? const InfiniteSpireProgressSnapshot(),
       ),
     );
   }
@@ -1640,6 +1655,245 @@ class GameSessionCoordinator {
       rethrow;
     }
   }
+
+  /// Memulai sesi combat untuk lantai The Infinite Spire (100 Lantai).
+  Future<PreparedInfiniteSpireRun> startInfiniteSpireRun({
+    required int floorNumber,
+    required DungeonManager dungeonManager,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    CurrencyService? currencyService,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+    String? runId,
+    InfiniteSpireProgressSnapshot? infiniteSpireProgress,
+  }) async {
+    final prepared = prepareInfiniteSpireRun(floorNumber: floorNumber);
+    dungeonManager.startRuntimeDungeon(
+      prepared.dungeon,
+      cycleRank: cycleProgress.ascensionRank,
+      runId: runId,
+    );
+    await saveFromRuntime(
+      character: character,
+      inventory: inventory,
+      dungeon: dungeon,
+      dungeonProgresses: dungeonProgresses,
+      cycleProgress: cycleProgress,
+      rewardProcessor: rewardProcessor,
+      autoSkillEnabled: autoSkillEnabled,
+      lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+      currentHp: currentHp,
+      skillCooldownTicks: skillCooldownTicks,
+      activeDungeonSession: dungeonManager.toActiveSessionSnapshot(),
+      offlineActivity: offlineActivity,
+      consecutiveDefeats: consecutiveDefeats,
+      lastFailedDungeonId: lastFailedDungeonId,
+      currencyService: currencyService,
+      infiniteSpireProgress: infiniteSpireProgress,
+    );
+    return prepared;
+  }
+
+  /// Menyiapkan definisi dungeon dan data lantai untuk run The Infinite Spire.
+  PreparedInfiniteSpireRun prepareInfiniteSpireRun({required int floorNumber}) {
+    final spireConfig = config.infiniteSpire;
+    if (spireConfig == null) {
+      throw StateError('Konfigurasi infinite_spire belum dimuat.');
+    }
+    final floor = spireConfig.floor(floorNumber);
+    if (floor == null) {
+      throw ArgumentError.value(
+        floorNumber,
+        'floorNumber',
+        'Lantai $floorNumber tidak terdaftar di The Infinite Spire.',
+      );
+    }
+    final layout = InfiniteSpireService.resolveArenaLayout(config);
+    if (layout == null || layout.isEmpty) {
+      throw StateError('Layout arena The Infinite Spire tidak ditemukan.');
+    }
+    final spireService = InfiniteSpireService(spireConfig);
+    final dungeon = spireService.buildFloorDungeon(
+      floorNumber: floorNumber,
+      arenaLayout: layout,
+    );
+    return PreparedInfiniteSpireRun(floor: floor, dungeon: dungeon);
+  }
+
+  /// Memproses kemenangan di lantai The Infinite Spire secara atomik dan idempoten.
+  Future<InfiniteSpireSettlementResult> settleInfiniteSpireVictory({
+    required int floorNumber,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required CurrencyService currencyService,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    required InfiniteSpireProgressSnapshot infiniteSpireProgress,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    ActiveDungeonSessionSnapshot? activeDungeonSession,
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+  }) async {
+    final spireConfig = config.infiniteSpire;
+    if (spireConfig == null) {
+      throw StateError('Konfigurasi infinite_spire belum dimuat.');
+    }
+
+    final prevCharSnap = character.toSnapshot();
+    final prevBalances = currencyService.toSnapshot();
+    final prevCurrencyClaims = currencyService.claimedIds;
+    final prevInventory = inventory.toSnapshot();
+
+    final spireService = InfiniteSpireService(spireConfig);
+    final result = spireService.settleFloorVictory(
+      floorNumber: floorNumber,
+      character: character,
+      inventory: inventory,
+      currencyService: currencyService,
+      progress: infiniteSpireProgress,
+    );
+
+    try {
+      await saveFromRuntime(
+        character: character,
+        inventory: inventory,
+        dungeon: dungeon,
+        dungeonProgresses: dungeonProgresses,
+        cycleProgress: cycleProgress,
+        rewardProcessor: rewardProcessor,
+        autoSkillEnabled: autoSkillEnabled,
+        lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+        currentHp: currentHp,
+        skillCooldownTicks: skillCooldownTicks,
+        activeDungeonSession: activeDungeonSession,
+        offlineActivity: offlineActivity,
+        consecutiveDefeats: consecutiveDefeats,
+        lastFailedDungeonId: lastFailedDungeonId,
+        currencyService: currencyService,
+        infiniteSpireProgress: result.updatedProgress,
+        extraClaimedEventIds: {result.claimId},
+      );
+      rewardProcessor.markClaimed(result.claimId);
+      return result;
+    } catch (_) {
+      character.restoreSnapshot(prevCharSnap);
+      inventory.restore(prevInventory);
+      currencyService.restoreState(
+        balances: prevBalances,
+        claimedIds: prevCurrencyClaims,
+      );
+      rethrow;
+    }
+  }
+
+  /// Mengeksekusi terobosan Hero Ascension secara atomik, memutasi player runtime,
+  /// dan menyimpannya secara persisten ke database dengan perlindungan rollback in-memory.
+  Future<HeroAscensionResult> executeHeroAscension({
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required CurrencyService currencyService,
+    required DungeonProgressSnapshot dungeon,
+    required Map<String, DungeonProgressSnapshot> dungeonProgresses,
+    required CycleProgress cycleProgress,
+    required RewardProcessor rewardProcessor,
+    required bool autoSkillEnabled,
+    required int lastOfflineClaimAtMs,
+    int? currentHp,
+    Map<String, int> skillCooldownTicks = const {},
+    ActiveDungeonSessionSnapshot? activeDungeonSession,
+    OfflineActivitySnapshot? offlineActivity,
+    Map<String, int> consecutiveDefeats = const {},
+    String? lastFailedDungeonId,
+    InfiniteSpireProgressSnapshot? infiniteSpireProgress,
+  }) async {
+    final prevCharSnap = character.toSnapshot();
+    final prevBalances = currencyService.toSnapshot();
+    final prevCurrencyClaims = currencyService.claimedIds;
+    final prevInventory = inventory.toSnapshot();
+
+    final service = HeroAscensionService(config.heroAscension);
+    final invStacks = <String, int>{};
+    for (final stack in inventory.snapshot()) {
+      invStacks[stack.definition.id] =
+          (invStacks[stack.definition.id] ?? 0) + stack.quantity;
+    }
+
+    final result = service.ascendHero(
+      progress: character.progress,
+      inventoryStacks: invStacks,
+      currencies: currencyService.balances,
+    );
+
+    if (!result.succeeded || result.phaseDefinition == null) {
+      return result;
+    }
+
+    final cost = result.phaseDefinition!.cost;
+    if (cost.gold > 0) {
+      character.spendGold(cost.gold);
+    }
+    for (final entry in cost.items.entries) {
+      inventory.remove(entry.key, entry.value);
+    }
+    for (final entry in cost.currencies.entries) {
+      currencyService.spend(entry.key, entry.value);
+    }
+    character.updateAscensionPhase(result.newPhase);
+
+    try {
+      await saveFromRuntime(
+        character: character,
+        inventory: inventory,
+        dungeon: dungeon,
+        dungeonProgresses: dungeonProgresses,
+        cycleProgress: cycleProgress,
+        rewardProcessor: rewardProcessor,
+        autoSkillEnabled: autoSkillEnabled,
+        lastOfflineClaimAtMs: lastOfflineClaimAtMs,
+        currentHp: currentHp,
+        skillCooldownTicks: skillCooldownTicks,
+        activeDungeonSession: activeDungeonSession,
+        offlineActivity: offlineActivity,
+        consecutiveDefeats: consecutiveDefeats,
+        lastFailedDungeonId: lastFailedDungeonId,
+        currencyService: currencyService,
+        infiniteSpireProgress: infiniteSpireProgress,
+      );
+      return result;
+    } catch (_) {
+      character.restoreSnapshot(prevCharSnap);
+      inventory.restore(prevInventory);
+      currencyService.restoreState(
+        balances: prevBalances,
+        claimedIds: prevCurrencyClaims,
+      );
+      rethrow;
+    }
+  }
+}
+
+/// Paket data siap-pakai untuk memulai satu run di The Infinite Spire.
+class PreparedInfiniteSpireRun {
+  const PreparedInfiniteSpireRun({required this.floor, required this.dungeon});
+
+  final InfiniteSpireFloorDefinition floor;
+  final DungeonDefinition dungeon;
 }
 
 /// Paket data siap-pakai untuk memulai satu run di Menara Bos (Boss Spire).

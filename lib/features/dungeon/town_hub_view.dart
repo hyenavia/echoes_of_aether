@@ -24,9 +24,12 @@ import '../../domain/services/blacksmith_service.dart';
 import '../../domain/services/difficulty_service.dart';
 import '../../domain/services/dungeon_progression_service.dart';
 import '../../domain/services/event_shop_service.dart';
+import '../../domain/services/hero_ascension_service.dart';
 import '../../domain/services/mystery_box_service.dart';
 import '../../domain/services/shop_service.dart';
 import '../../game/hud/inventory_views.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/widgets.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'altar_overlay.dart';
 import 'blacksmith_overlay.dart';
@@ -95,6 +98,10 @@ class TownHubView extends StatefulWidget {
     this.onUpgradeAltarBlessing,
     this.onOpenGacha,
     this.onOpenMysteryBox,
+    this.onOpenInfiniteSpire,
+    this.onAscendHero,
+    this.inventoryQuantitiesProvider,
+    this.currenciesProvider,
     this.bagLevelProvider,
     this.onExpandBag,
   });
@@ -158,6 +165,10 @@ class TownHubView extends StatefulWidget {
   final VoidCallback? onOpenGacha;
   final Future<MysteryBoxOpenResult> Function(MysteryBoxTier tier, int count)?
   onOpenMysteryBox;
+  final VoidCallback? onOpenInfiniteSpire;
+  final Future<HeroAscensionResult> Function()? onAscendHero;
+  final Map<String, int> Function()? inventoryQuantitiesProvider;
+  final Map<String, int> Function()? currenciesProvider;
   final int Function()? bagLevelProvider;
   final Future<bool> Function()? onExpandBag;
 
@@ -252,128 +263,160 @@ class _TownHubViewState extends State<TownHubView> {
       lastFailedDungeonId: widget.lastFailedDungeonId,
     );
 
-    return Column(
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1040),
-            child: ValueListenableBuilder<CharacterSnapshot>(
-              valueListenable: widget.views.characterView,
-              builder: (context, charSnap, _) => RepaintBoundary(
-                child: TownTopBar(
-                  level: charSnap.level,
-                  currentExp: widget.character.currentExp,
-                  expToNext: widget.character.expToNext,
-                  gold: widget.character.gold,
-                  aetherShard: widget.aetherShard,
-                  ascensionRank: widget.cycleProgress.ascensionRank,
-                  specializationName: widget.character.specialization?.name,
-                  maxHp: widget.character.stats.maxHp,
-                ),
+        // Background tekstur bertema dungeon/camp di belakang layar
+        Positioned.fill(
+          child: Image.asset(
+            'assets/ui/dungeon_floor_crystal.png',
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            opacity: const AlwaysStoppedAnimation(0.20),
+          ),
+        ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.background.withValues(alpha: 0.94),
+                  AppTheme.backgroundSecondary.withValues(alpha: 0.88),
+                  AppTheme.background.withValues(alpha: 0.96),
+                ],
               ),
             ),
           ),
         ),
-        Expanded(
-          child: RepaintBoundary(
-            child: switch (_selectedTab) {
-              TownTab.adventure => _buildAdventureBody(
-                context,
-                theme,
-                dungeon: dungeon,
-                catalog: catalog,
-                progressMap: progressMap,
-                progression: progression,
-                totalRooms: totalRooms,
-                clearedCount: clearedCount,
-                selectedRecLevel: selectedRecLevel,
-                selectedReqLevel: selectedReqLevel,
-                selectedUnlockedNoLevel: selectedUnlockedNoLevel,
-                deathLoopSuggestion: deathLoopSuggestion,
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1040),
+                child: ValueListenableBuilder<CharacterSnapshot>(
+                  valueListenable: widget.views.characterView,
+                  builder: (context, charSnap, _) => RepaintBoundary(
+                    child: TownTopBar(
+                      level: charSnap.level,
+                      currentExp: widget.character.currentExp,
+                      expToNext: widget.character.expToNext,
+                      gold: widget.character.gold,
+                      aetherShard: widget.aetherShard,
+                      ascensionRank: widget.cycleProgress.ascensionRank,
+                      specializationName: widget.character.specialization?.name,
+                      maxHp: widget.character.stats.maxHp,
+                    ),
+                  ),
+                ),
               ),
-              TownTab.hero => _buildHeroTabBody(context),
-              TownTab.bag => _buildBagTabBody(context),
-              TownTab.shop =>
-                (widget.shopCatalog != null &&
-                        widget.shopService != null &&
-                        widget.shopContext != null &&
-                        widget.onShopBuy != null &&
-                        widget.onShopSellEquipment != null &&
-                        widget.onShopSellMaterialBulk != null)
-                    ? ShopOverlay(
-                        catalog: widget.shopCatalog!,
-                        items: widget.items,
-                        dungeons: widget.availableDungeons,
-                        shopService: widget.shopService!,
-                        playerContext: widget.shopContext!,
-                        playerGold: widget.character.gold,
-                        views: widget.views,
-                        onBuy: widget.onShopBuy!,
-                        onSellEquipment: widget.onShopSellEquipment!,
-                        onSellMaterialBulk: widget.onShopSellMaterialBulk!,
-                        onSellBatch: widget.onShopSellBatch,
-                        eventShopData: widget.eventShopData,
-                        onBuyEventItem: widget.onEventShopBuy,
-                        onOpenMysteryBox: widget.onOpenMysteryBox,
-                        onClose: () => _selectTab(TownTab.adventure),
-                      )
-                    : const Center(
-                        child: PanelFrame(child: Text('Toko belum tersedia.')),
-                      ),
-              TownTab.settings =>
-                (widget.settings != null && widget.onSettingsChanged != null)
-                    ? SettingsOverlay(
-                        settings: widget.settings!,
-                        onChanged: widget.onSettingsChanged!,
-                        onTestSfx: widget.onTestSfx,
-                        onRequestNotificationPermission:
-                            widget.onRequestNotificationPermission,
-                        onTestNotification: widget.onTestNotification,
-                        cloudSyncSection: widget.cloudSyncSection,
-                        onClose: () => _selectTab(TownTab.adventure),
-                      )
-                    : const Center(
-                        child: PanelFrame(
-                          child: Text('Pengaturan belum tersedia.'),
-                        ),
-                      ),
-            },
-          ),
-        ),
-        RepaintBoundary(
-          child: EchoesBottomNavigation(
-            key: const Key('town_bottom_nav'),
-            currentIndex: _selectedTab.index,
-            onSelected: (index) => _selectTab(TownTab.values[index]),
-            items: const [
-              EchoesNavItem(
-                label: 'Adventure',
-                icon: Icons.explore_outlined,
-                activeIcon: Icons.explore,
+            ),
+            Expanded(
+              child: RepaintBoundary(
+                child: switch (_selectedTab) {
+                  TownTab.adventure => _buildAdventureBody(
+                    context,
+                    theme,
+                    dungeon: dungeon,
+                    catalog: catalog,
+                    progressMap: progressMap,
+                    progression: progression,
+                    totalRooms: totalRooms,
+                    clearedCount: clearedCount,
+                    selectedRecLevel: selectedRecLevel,
+                    selectedReqLevel: selectedReqLevel,
+                    selectedUnlockedNoLevel: selectedUnlockedNoLevel,
+                    deathLoopSuggestion: deathLoopSuggestion,
+                  ),
+                  TownTab.hero => _buildHeroTabBody(context),
+                  TownTab.bag => _buildBagTabBody(context),
+                  TownTab.shop =>
+                    (widget.shopCatalog != null &&
+                            widget.shopService != null &&
+                            widget.shopContext != null &&
+                            widget.onShopBuy != null &&
+                            widget.onShopSellEquipment != null &&
+                            widget.onShopSellMaterialBulk != null)
+                        ? ShopOverlay(
+                            catalog: widget.shopCatalog!,
+                            items: widget.items,
+                            dungeons: widget.availableDungeons,
+                            shopService: widget.shopService!,
+                            playerContext: widget.shopContext!,
+                            playerGold: widget.character.gold,
+                            views: widget.views,
+                            onBuy: widget.onShopBuy!,
+                            onSellEquipment: widget.onShopSellEquipment!,
+                            onSellMaterialBulk: widget.onShopSellMaterialBulk!,
+                            onSellBatch: widget.onShopSellBatch,
+                            eventShopData: widget.eventShopData,
+                            onBuyEventItem: widget.onEventShopBuy,
+                            onOpenMysteryBox: widget.onOpenMysteryBox,
+                            onClose: () => _selectTab(TownTab.adventure),
+                          )
+                        : const Center(
+                            child: PanelFrame(
+                              child: Text('Toko belum tersedia.'),
+                            ),
+                          ),
+                  TownTab.settings =>
+                    (widget.settings != null &&
+                            widget.onSettingsChanged != null)
+                        ? SettingsOverlay(
+                            settings: widget.settings!,
+                            onChanged: widget.onSettingsChanged!,
+                            onTestSfx: widget.onTestSfx,
+                            onRequestNotificationPermission:
+                                widget.onRequestNotificationPermission,
+                            onTestNotification: widget.onTestNotification,
+                            cloudSyncSection: widget.cloudSyncSection,
+                            onClose: () => _selectTab(TownTab.adventure),
+                          )
+                        : const Center(
+                            child: PanelFrame(
+                              child: Text('Pengaturan belum tersedia.'),
+                            ),
+                          ),
+                },
               ),
-              EchoesNavItem(
-                label: 'Hero',
-                icon: Icons.person_outline,
-                activeIcon: Icons.person,
+            ),
+            RepaintBoundary(
+              child: EchoesBottomNavigation(
+                key: const Key('town_bottom_nav'),
+                currentIndex: _selectedTab.index,
+                onSelected: (index) => _selectTab(TownTab.values[index]),
+                items: const [
+                  EchoesNavItem(
+                    label: 'Adventure',
+                    icon: Icons.explore_outlined,
+                    activeIcon: Icons.explore,
+                  ),
+                  EchoesNavItem(
+                    label: 'Hero',
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person,
+                  ),
+                  EchoesNavItem(
+                    label: 'Bag',
+                    icon: Icons.inventory_2_outlined,
+                    activeIcon: Icons.inventory_2,
+                  ),
+                  EchoesNavItem(
+                    label: 'Shop',
+                    icon: Icons.storefront_outlined,
+                    activeIcon: Icons.storefront,
+                  ),
+                  EchoesNavItem(
+                    label: 'Settings',
+                    icon: Icons.settings_outlined,
+                    activeIcon: Icons.settings,
+                  ),
+                ],
               ),
-              EchoesNavItem(
-                label: 'Bag',
-                icon: Icons.inventory_2_outlined,
-                activeIcon: Icons.inventory_2,
-              ),
-              EchoesNavItem(
-                label: 'Shop',
-                icon: Icons.storefront_outlined,
-                activeIcon: Icons.storefront,
-              ),
-              EchoesNavItem(
-                label: 'Settings',
-                icon: Icons.settings_outlined,
-                activeIcon: Icons.settings,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -430,6 +473,9 @@ class _TownHubViewState extends State<TownHubView> {
               onToggleFavorite: widget.onToggleFavorite,
               onOpenEquipmentBag: () => _openBagSubTab(0),
               onOpenBlacksmith: (id) => _openBagSubTab(2, equipmentId: id),
+              onAscendHero: widget.onAscendHero,
+              inventoryQuantitiesProvider: widget.inventoryQuantitiesProvider,
+              currenciesProvider: widget.currenciesProvider,
               sectionMode: CharacterSectionMode.profileAndGear,
               embedded: true,
               onClose: () => _selectTab(TownTab.adventure),
@@ -438,6 +484,9 @@ class _TownHubViewState extends State<TownHubView> {
               snapshot: widget.views.characterView,
               onChooseSpecialization: widget.onChooseSpecialization,
               onUpgradeSkill: widget.onUpgradeSkill,
+              onAscendHero: widget.onAscendHero,
+              inventoryQuantitiesProvider: widget.inventoryQuantitiesProvider,
+              currenciesProvider: widget.currenciesProvider,
               sectionMode: CharacterSectionMode.classAndSkills,
               embedded: true,
               onClose: () => _selectTab(TownTab.adventure),
@@ -812,14 +861,24 @@ class _TownHubViewState extends State<TownHubView> {
               spritePath: 'assets/sprite/fc255.png',
               onTap: widget.onOpenGacha!,
             ),
+          if (widget.onOpenInfiniteSpire != null)
+            (
+              key: const Key('quick_access_infinite_spire'),
+              label: 'Spire',
+              subtitle: '100 Lantai',
+              icon: Icons.stairs_outlined,
+              spritePath: 'assets/sprite/fc145.png',
+              onTap: widget.onOpenInfiniteSpire!,
+            ),
         ];
 
     if (actions.isEmpty) return const SizedBox.shrink();
 
-    return PanelFrame(
+    return GamePanel(
+      style: GamePanelStyle.goldOrnate,
       padding: const EdgeInsets.all(AppSpacing.xs + 2),
-      backgroundColor: AppColors.surfaceDark,
-      borderColor: AppColors.panelBorder,
+      showGlow: true,
+      glowColor: AppTheme.gold,
       child: Row(
         children: [
           for (var i = 0; i < actions.length; i++) ...[
@@ -1096,23 +1155,36 @@ class _TownHubViewState extends State<TownHubView> {
     final highest = widget.cycleProgress.highestAscensionRank;
     final canDecrease = current > 0 && widget.onSwitchCycleRank != null;
     final canIncrease = current < highest && widget.onSwitchCycleRank != null;
-    final ext = EchoesTheme.of(context);
-    return PanelFrame(
+    return GamePanel(
       key: const Key('cycle_rank_switcher'),
+      style: GamePanelStyle.goldOrnate,
+      showGlow: true,
+      glowColor: AppTheme.arcanePurple,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
-      borderColor: ext.rank,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              const Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: AppTheme.arcanePurple,
+              ),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Siklus Rank $current / $highest',
-                  style: theme.textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.headingFantasy(
+                    fontSize: 14,
+                    color: AppTheme.gold,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
               IconButton(
@@ -1122,6 +1194,7 @@ class _TownHubViewState extends State<TownHubView> {
                     ? () => widget.onSwitchCycleRank!(current - 1)
                     : null,
                 icon: const Icon(Icons.chevron_left),
+                color: canDecrease ? AppTheme.gold : AppTheme.locked,
               ),
               IconButton(
                 key: const Key('cycle_rank_increase_button'),
@@ -1130,14 +1203,17 @@ class _TownHubViewState extends State<TownHubView> {
                     ? () => widget.onSwitchCycleRank!(current + 1)
                     : null,
                 icon: const Icon(Icons.chevron_right),
+                color: canIncrease ? AppTheme.gold : AppTheme.locked,
               ),
             ],
           ),
-          if (current < highest)
+          if (current < highest) ...[
+            const SizedBox(height: 4),
             Text(
               'Mode farming rank bawah — rank tertinggi ($highest) tetap tersimpan.',
-              style: theme.textTheme.bodySmall?.copyWith(color: ext.rank),
+              style: AppTheme.body(fontSize: 11, color: AppTheme.arcaneLight),
             ),
+          ],
         ],
       ),
     );
@@ -1613,74 +1689,67 @@ class _QuickAccessButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Semantics(
       button: true,
       label: label,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 52),
-        child: Material(
-          color: AppColors.deepTeal.withValues(alpha: 0.72),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            side: BorderSide(
-              color: AppColors.panelBorder.withValues(alpha: 0.8),
-              width: AppBorders.thin,
-            ),
+        child: GamePanel(
+          style: GamePanelStyle.darkStone,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 4,
           ),
-          clipBehavior: Clip.antiAlias,
+          showGlow: true,
+          glowColor: AppTheme.gold,
           child: InkWell(
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm + 2,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (spritePath != null)
-                    Image.asset(
-                      spritePath!,
-                      width: 24,
-                      height: 24,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.none,
-                      errorBuilder: (_, _, _) =>
-                          Icon(icon, size: 20, color: AppColors.antiqueGold),
-                    )
-                  else
-                    Icon(icon, size: 20, color: AppColors.antiqueGold),
-                  const SizedBox(width: AppSpacing.sm),
-                  Flexible(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+            borderRadius: BorderRadius.circular(4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (spritePath != null)
+                  Image.asset(
+                    spritePath!,
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.none,
+                    errorBuilder: (_, _, _) =>
+                        Icon(icon, size: 20, color: AppTheme.gold),
+                  )
+                else
+                  Icon(icon, size: 20, color: AppTheme.gold),
+                const SizedBox(width: AppSpacing.sm),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.headingFantasy(
+                          fontSize: 13,
+                          color: AppTheme.goldLight,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      if (subtitle != null)
                         Text(
-                          label,
+                          subtitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w700,
+                          style: AppTheme.body(
+                            fontSize: 9.5,
+                            color: AppTheme.textSecondary,
                           ),
                         ),
-                        if (subtitle != null)
-                          Text(
-                            subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 10,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

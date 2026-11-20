@@ -693,78 +693,81 @@ void main() {
     },
   );
 
-  test('penjualan equipment favorit ditolak pada sellEquipment dan sellBatch', () {
-    final config = _loadRealConfig();
-    final character = _createCharacter(config, gold: 100);
-    final inventory = Inventory(definitions: config.items);
-    final service = ShopService(
-      catalog: config.shop,
-      items: config.items,
-      equipmentFactory: EquipmentFactory(config.equipment),
-    );
+  test(
+    'penjualan equipment favorit ditolak pada sellEquipment dan sellBatch',
+    () {
+      final config = _loadRealConfig();
+      final character = _createCharacter(config, gold: 100);
+      final inventory = Inventory(definitions: config.items);
+      final service = ShopService(
+        catalog: config.shop,
+        items: config.items,
+        equipmentFactory: EquipmentFactory(config.equipment),
+      );
 
-    final factory = EquipmentFactory(config.equipment);
-    final swordDef = config.items['rusty_sword']!;
-    final capDef = config.items['leather_cap']!;
+      final factory = EquipmentFactory(config.equipment);
+      final swordDef = config.items['rusty_sword']!;
+      final capDef = config.items['leather_cap']!;
 
-    final favSword = factory
-        .create(
-          instanceId: 'fav_sword_1',
-          definition: swordDef,
-          random: math.Random(1),
-        )
-        .copyWith(isFavorite: true);
-    final normalCap = factory.create(
-      instanceId: 'normal_cap_1',
-      definition: capDef,
-      random: math.Random(2),
-    );
+      final favSword = factory
+          .create(
+            instanceId: 'fav_sword_1',
+            definition: swordDef,
+            random: math.Random(1),
+          )
+          .copyWith(isFavorite: true);
+      final normalCap = factory.create(
+        instanceId: 'normal_cap_1',
+        definition: capDef,
+        random: math.Random(2),
+      );
 
-    inventory.addEquipment(favSword);
-    inventory.addEquipment(normalCap);
+      inventory.addEquipment(favSword);
+      inventory.addEquipment(normalCap);
 
-    // 1. sellEquipment menolak item favorit
-    final singleRes = service.sellEquipment(
-      instanceId: favSword.id,
-      character: character,
-      inventory: inventory,
-      actionId: 'sell-fav-single',
-    );
-    expect(singleRes, isA<ShopSellNotSellable>());
-    expect(
-      (singleRes as ShopSellNotSellable).reason,
-      'Equipment favorit tidak dapat dijual.',
-    );
-    expect(inventory.equipmentById(favSword.id), isNotNull);
-    expect(character.gold, 100);
+      // 1. sellEquipment menolak item favorit
+      final singleRes = service.sellEquipment(
+        instanceId: favSword.id,
+        character: character,
+        inventory: inventory,
+        actionId: 'sell-fav-single',
+      );
+      expect(singleRes, isA<ShopSellNotSellable>());
+      expect(
+        (singleRes as ShopSellNotSellable).reason,
+        'Equipment favorit tidak dapat dijual.',
+      );
+      expect(inventory.equipmentById(favSword.id), isNotNull);
+      expect(character.gold, 100);
 
-    // 2. sellBatch menolak bila ada item favorit di dalam list
-    final batchRes = service.sellBatch(
-      equipmentInstanceIds: [normalCap.id, favSword.id],
-      materialQuantities: const {},
-      character: character,
-      inventory: inventory,
-      actionId: 'sell-batch-with-fav',
-    );
-    expect(batchRes, isA<ShopSellNotSellable>());
-    expect(
-      (batchRes as ShopSellNotSellable).reason,
-      'Equipment favorit tidak dapat dijual.',
-    );
-    // Transaksi atomik: normalCap juga tidak terjual karena batch dibatalkan
-    expect(inventory.equipmentById(normalCap.id), isNotNull);
-    expect(inventory.equipmentById(favSword.id), isNotNull);
-    expect(character.gold, 100);
+      // 2. sellBatch menolak bila ada item favorit di dalam list
+      final batchRes = service.sellBatch(
+        equipmentInstanceIds: [normalCap.id, favSword.id],
+        materialQuantities: const {},
+        character: character,
+        inventory: inventory,
+        actionId: 'sell-batch-with-fav',
+      );
+      expect(batchRes, isA<ShopSellNotSellable>());
+      expect(
+        (batchRes as ShopSellNotSellable).reason,
+        'Equipment favorit tidak dapat dijual.',
+      );
+      // Transaksi atomik: normalCap juga tidak terjual karena batch dibatalkan
+      expect(inventory.equipmentById(normalCap.id), isNotNull);
+      expect(inventory.equipmentById(favSword.id), isNotNull);
+      expect(character.gold, 100);
 
-    // 3. Normal equipment tanpa favorit berhasil dijual
-    final okRes = service.sellEquipment(
-      instanceId: normalCap.id,
-      character: character,
-      inventory: inventory,
-      actionId: 'sell-normal-ok',
-    );
-    expect(okRes, isA<ShopSellSuccess>());
-    expect(inventory.equipmentById(normalCap.id), isNull);
-    expect(character.gold, greaterThan(100));
-  });
+      // 3. Normal equipment tanpa favorit berhasil dijual
+      final okRes = service.sellEquipment(
+        instanceId: normalCap.id,
+        character: character,
+        inventory: inventory,
+        actionId: 'sell-normal-ok',
+      );
+      expect(okRes, isA<ShopSellSuccess>());
+      expect(inventory.equipmentById(normalCap.id), isNull);
+      expect(character.gold, greaterThan(100));
+    },
+  );
 }

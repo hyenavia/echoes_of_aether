@@ -75,6 +75,7 @@ void main() {
         'ancient_crypt',
         'ashen_wasteland',
         'aether_sanctum',
+        'abyssal_rift',
       ]);
       final ascensionDungeons = dungeons.where((d) => d.isAscension).toList();
       expect(ascensionDungeons.map((d) => d.id).toList(), [
@@ -125,6 +126,13 @@ void main() {
               scale: 5.0625,
               recLevel: 35,
               unlockReq: 'ashen_wasteland',
+              roomsCount: 5,
+            ),
+            'abyssal_rift': (
+              order: 6,
+              scale: 4.5,
+              recLevel: 65,
+              unlockReq: 'aether_sanctum',
               roomsCount: 5,
             ),
           };

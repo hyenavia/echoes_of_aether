@@ -19,6 +19,8 @@ abstract final class ItemSpriteRegistry {
     'ancient_fragment': 'assets/sprite/fc254.png',
     'aether_scrap': 'assets/sprite/fc255.png',
     'boss_remnant': 'assets/sprite/fc194.png',
+    'abyssal_remnant': 'assets/sprite/fc194.png',
+    'void_essence': 'assets/sprite/fc254.png',
     'aether_sigil': 'assets/sprite/fc600.png',
 
     // Weapons
@@ -36,6 +38,10 @@ abstract final class ItemSpriteRegistry {
     'celestial_blade': 'assets/sprite/fc1528.png',
     'event_dawn_blade': 'assets/sprite/fc1527.png',
     'event_eclipse_blade': 'assets/sprite/fc1456.png',
+    'abyssal_blade': 'assets/sprite/fc1456.png',
+    'abyssal_bow': 'assets/sprite/fc1100.png',
+    'abyssal_staff': 'assets/sprite/fc295.png',
+    'void_cleaver': 'assets/sprite/fc1528.png',
 
     // Mythical Signature Weapons
     'dawns_aegis_blade': 'assets/sprite/fc1529.png',
@@ -53,6 +59,8 @@ abstract final class ItemSpriteRegistry {
     'celestial_crown': 'assets/sprite/fc2171.png',
     'event_warden_helm': 'assets/sprite/fc2054.png',
     'event_crown_of_dusk': 'assets/sprite/fc2169.png',
+    'abyssal_cowl': 'assets/sprite/fc2054.png',
+    'void_crown': 'assets/sprite/fc2169.png',
 
     // Body Armor
     'padded_vest': 'assets/sprite/fc2019.png',
@@ -62,6 +70,7 @@ abstract final class ItemSpriteRegistry {
     'celestial_plate': 'assets/sprite/fc2164.png',
     'event_aegis_mail': 'assets/sprite/fc2050.png',
     'event_bulwark_plate': 'assets/sprite/fc2174.png',
+    'void_carapace': 'assets/sprite/fc2164.png',
 
     // Accessories
     'copper_ring': 'assets/sprite/fc117.png',
@@ -72,6 +81,7 @@ abstract final class ItemSpriteRegistry {
     'aether_ring': 'assets/sprite/fc2185.png',
     'event_ember_ring': 'assets/sprite/fc2186.png',
     'event_aether_pendant': 'assets/sprite/fc2177.png',
+    'abyssal_eye': 'assets/sprite/fc2185.png',
   };
 
   /// Pemetaan hub icon & resource -> asset path

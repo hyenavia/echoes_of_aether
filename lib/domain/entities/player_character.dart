@@ -5,6 +5,7 @@ import '../services/progression_service.dart';
 import 'combat_stats.dart';
 import 'equipment.dart';
 import 'equipment_loadout.dart';
+import 'hero_ascension.dart';
 import 'item_definition.dart';
 import 'player_progress.dart';
 import 'player_save_snapshot.dart';
@@ -48,10 +49,11 @@ class PlayerCharacter {
     this.skillCatalog = const {},
     this.specializationConfig = const SpecializationConfig(),
     this.statsCalculator = const DerivedStatsCalculator(),
+    this.heroAscensionConfig = const HeroAscensionConfig(),
     Map<String, ItemDefinition> itemCatalog = const {},
     String? initialSpecializationId,
     Map<String, int> skillLevels = const {},
-  }) : _service = ProgressionService(config),
+  }) : _service = ProgressionService(config, heroAscensionConfig),
        _progress = progress ?? const PlayerProgress(),
        loadout = loadout ?? EquipmentLoadout(),
        _itemCatalog = itemCatalog, // ignore: prefer_initializing_formals
@@ -62,6 +64,7 @@ class PlayerCharacter {
        };
 
   final ProgressionConfig config;
+  final HeroAscensionConfig heroAscensionConfig;
   final ProgressionService _service;
   final EquipmentLoadout loadout;
   Map<String, ItemDefinition> _itemCatalog;
@@ -252,20 +255,39 @@ class PlayerCharacter {
 
   // ---- Stat ----
 
+  int get ascensionPhase => _progress.ascensionPhase;
+
+  ProgressionService get progressionService => _service;
+
+  bool get isAscendReady => _service.isAscendReady(_progress);
+
+  int get effectiveLevelCap =>
+      _service.effectiveLevelCap(_progress.ascensionPhase);
+
+  EquipmentStats get ascensionBonus =>
+      heroAscensionConfig.cumulativeStatBoostForPhase(_progress.ascensionPhase);
+
   /// Stat tempur saat ini (single source of truth melalui
   /// [DerivedStatsCalculator]):
   /// Base Stats (level) + Equipment Modifiers + Altar Modifiers
-  /// + Specialization Modifiers + Passive Skill Modifiers
+  /// + Ascension Modifiers + Specialization Modifiers + Passive Skill Modifiers
   /// (beserta affinity specialization).
   CombatStats get stats => statsCalculator.calculate(
     baseStats: config.statsAt(level),
     equipmentBonus: loadout.totalBonus,
     altarBonus: _altarBonus,
+    ascensionBonus: ascensionBonus,
     specialization: specialization,
     passiveSkills: passiveSkills,
     skillLevelOf: skillLevel,
     activeResonanceClassId: activeResonanceClassId,
   );
+
+  /// Memperbarui fase Ascension pemain dan memicu pembaruan build stats.
+  void updateAscensionPhase(int newPhase) {
+    _progress = _progress.copyWith(ascensionPhase: math.max(0, newPhase));
+    buildRevision++;
+  }
 
   /// Menambahkan reward dan mengembalikan jumlah level yang naik.
   int receiveReward({int exp = 0, int gold = 0}) {
@@ -316,6 +338,7 @@ class PlayerCharacter {
       level: clampedLevel,
       currentExp: safeExp,
       gold: safeGold,
+      ascensionPhase: snapshot.progress.ascensionPhase,
     );
 
     final specId = snapshot.specializationId;

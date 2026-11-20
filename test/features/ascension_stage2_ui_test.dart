@@ -280,7 +280,7 @@ void main() {
 
         // Sebelum D5 selesai: Ascension tetap terlihat dengan Rekomendasi Lv 49, namun terkunci
         // (tombol pilih & masuk belum aktif).
-        expect(find.text('6. Ascension: Aether Sanctum'), findsOneWidget);
+        expect(find.text('7. Ascension: Aether Sanctum'), findsOneWidget);
         expect(
           find.byKey(const Key('dungeon_select_ascension_sanctum')),
           findsNothing,

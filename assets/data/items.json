@@ -73,6 +73,22 @@
       "sell_value": 25
     },
     {
+      "id": "abyssal_remnant",
+      "name": "Abyssal Remnant",
+      "category": "material",
+      "rarity": "rare",
+      "max_stack": 999,
+      "sell_value": 50
+    },
+    {
+      "id": "void_essence",
+      "name": "Void Essence",
+      "category": "material",
+      "rarity": "epic",
+      "max_stack": 999,
+      "sell_value": 100
+    },
+    {
       "id": "rusty_sword",
       "name": "Rusty Sword",
       "category": "equipment",
@@ -763,6 +779,135 @@
           "atk": 32,
           "attack_speed": 0.18,
           "atk_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "abyssal_blade",
+      "name": "Abyssal Blade",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 120,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "stats": {
+          "atk": 24,
+          "crit_rate": 0.06,
+          "crit_damage": 0.22
+        }
+      }
+    },
+    {
+      "id": "abyssal_bow",
+      "name": "Abyssal Bow",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 120,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "bow",
+        "stats": {
+          "atk": 23,
+          "attack_speed": 0.14,
+          "crit_rate": 0.05
+        }
+      }
+    },
+    {
+      "id": "abyssal_staff",
+      "name": "Abyssal Staff",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 120,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "staff",
+        "stats": {
+          "atk": 22,
+          "crit_rate": 0.06,
+          "skill_haste": 0.06,
+          "spell_vamp": 0.06
+        }
+      }
+    },
+    {
+      "id": "abyssal_cowl",
+      "name": "Abyssal Cowl",
+      "category": "equipment",
+      "rarity": "epic",
+      "sell_value": 100,
+      "equipment": {
+        "slot": "head",
+        "stats": {
+          "def": 6,
+          "hp": 60,
+          "crit_rate": 0.03
+        }
+      }
+    },
+    {
+      "id": "void_cleaver",
+      "name": "Void Cleaver",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 300,
+      "equipment": {
+        "slot": "weapon",
+        "weapon_type": "sword",
+        "stats": {
+          "atk": 30,
+          "crit_rate": 0.08,
+          "crit_damage": 0.25,
+          "lifesteal": 0.06
+        }
+      }
+    },
+    {
+      "id": "void_carapace",
+      "name": "Void Carapace",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 300,
+      "equipment": {
+        "slot": "body",
+        "stats": {
+          "def": 11,
+          "hp": 110,
+          "lifesteal": 0.04
+        }
+      }
+    },
+    {
+      "id": "void_crown",
+      "name": "Void Crown",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 300,
+      "equipment": {
+        "slot": "head",
+        "stats": {
+          "def": 8,
+          "hp": 80,
+          "crit_rate": 0.04,
+          "skill_haste": 0.06
+        }
+      }
+    },
+    {
+      "id": "abyssal_eye",
+      "name": "Abyssal Eye",
+      "category": "equipment",
+      "rarity": "legendary",
+      "sell_value": 300,
+      "equipment": {
+        "slot": "accessory",
+        "stats": {
+          "atk": 8,
+          "def": 5,
+          "hp": 95,
+          "crit_rate": 0.07,
+          "skill_haste": 0.08
         }
       }
     }

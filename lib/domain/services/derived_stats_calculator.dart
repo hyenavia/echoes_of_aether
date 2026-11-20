@@ -73,12 +73,13 @@ class DerivedStatsCalculator {
     required CombatStats baseStats,
     EquipmentStats equipmentBonus = EquipmentStats.zero,
     EquipmentStats altarBonus = EquipmentStats.zero,
+    EquipmentStats ascensionBonus = EquipmentStats.zero,
     SpecializationDefinition? specialization,
     Iterable<SkillDefinition> passiveSkills = const [],
     int Function(String skillId)? skillLevelOf,
     String? activeResonanceClassId,
   }) {
-    var totalBonus = equipmentBonus + altarBonus;
+    var totalBonus = equipmentBonus + altarBonus + ascensionBonus;
     for (final skill in passiveSkills) {
       if (!skill.isPassive) continue;
       final level = skillLevelOf?.call(skill.id) ?? 1;

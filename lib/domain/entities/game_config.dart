@@ -11,6 +11,8 @@ import 'equipment_config.dart';
 import 'event_shop_config.dart';
 import 'farming_config.dart';
 import 'gacha_config.dart';
+import 'hero_ascension.dart';
+import 'infinite_spire.dart';
 import 'item_definition.dart';
 import 'loot_table.dart';
 import 'notification_config.dart';
@@ -49,6 +51,8 @@ class GameConfig {
     this.eventShop,
     this.cloud = const CloudConfig(),
     this.gacha,
+    this.heroAscension = const HeroAscensionConfig(),
+    this.infiniteSpire,
   });
 
   final Map<String, EnemyDefinition> monsters;
@@ -75,4 +79,6 @@ class GameConfig {
   final EventShopCatalog? eventShop;
   final CloudConfig cloud;
   final GachaConfig? gacha;
+  final HeroAscensionConfig heroAscension;
+  final InfiniteSpireConfig? infiniteSpire;
 }

@@ -9,6 +9,7 @@ import '../../domain/entities/difficulty_config.dart';
 import '../../domain/entities/dungeon_reward.dart';
 import '../../domain/entities/equipment_config.dart';
 import '../../domain/entities/farming_config.dart';
+import '../../domain/entities/hero_ascension.dart';
 import '../../domain/entities/notification_config.dart';
 import '../../domain/entities/progression_config.dart';
 import '../../domain/entities/revive_config.dart';
@@ -935,6 +936,200 @@ class GameConfigParser {
       autoSyncMinIntervalMinutes: autoSyncMinIntervalMinutes,
       rejectBackoffMinutes: rejectBackoffMinutes,
       serverTimeToleranceMinutes: serverTimeToleranceMinutes,
+    );
+  }
+
+  HeroAscensionConfig parseHeroAscension(String source) {
+    final root = _decodeRoot(source);
+    final raw = root['hero_ascension'];
+    if (raw == null) {
+      return const HeroAscensionConfig();
+    }
+    if (raw is! Map<String, dynamic>) {
+      throw const ConfigException(
+        '$_file: "hero_ascension" harus berupa object.',
+      );
+    }
+    const allowedRootKeys = {'max_phase', 'phases'};
+    _rejectUnknownKeys(raw, allowedRootKeys, 'hero_ascension');
+
+    final maxPhase = raw.containsKey('max_phase')
+        ? _int(raw, 'hero_ascension', 'max_phase', min: 1)
+        : 6;
+
+    final phasesRaw = raw['phases'];
+    if (phasesRaw is! List) {
+      throw const ConfigException(
+        '$_file: hero_ascension."phases" harus berupa array.',
+      );
+    }
+
+    final phases = <HeroAscensionPhaseDefinition>[];
+    for (var i = 0; i < phasesRaw.length; i++) {
+      final p = phasesRaw[i];
+      final where = 'hero_ascension.phases[$i]';
+      if (p is! Map<String, dynamic>) {
+        throw ConfigException('$_file: $where harus berupa object.');
+      }
+      const allowedPhaseKeys = {
+        'phase',
+        'level_cap',
+        'required_player_level',
+        'costs',
+        'stat_boosts',
+        'has_golden_aura',
+      };
+      _rejectUnknownKeys(p, allowedPhaseKeys, where);
+
+      final phaseNum = _int(p, where, 'phase', min: 0);
+      final levelCap = _int(p, where, 'level_cap', min: 1);
+      final requiredPlayerLevel = p.containsKey('required_player_level')
+          ? _int(p, where, 'required_player_level', min: 1)
+          : 1;
+      final hasGoldenAura = p['has_golden_aura'] as bool? ?? false;
+
+      // costs
+      final costsRaw = p['costs'];
+      final int costGold;
+      final Map<String, int> costItems = {};
+      final Map<String, int> costCurrencies = {};
+
+      if (costsRaw != null) {
+        if (costsRaw is! Map<String, dynamic>) {
+          throw ConfigException('$_file: $where."costs" harus berupa object.');
+        }
+        _rejectUnknownKeys(costsRaw, {
+          'gold',
+          'items',
+          'currencies',
+        }, '$where.costs');
+        costGold = costsRaw.containsKey('gold')
+            ? _int(costsRaw, '$where.costs', 'gold', min: 0)
+            : 0;
+
+        final itemsMap = costsRaw['items'];
+        if (itemsMap != null) {
+          if (itemsMap is! Map) {
+            throw ConfigException(
+              '$_file: $where.costs."items" harus berupa object.',
+            );
+          }
+          for (final entry in itemsMap.entries) {
+            final val = entry.value;
+            if (val is! num || val < 0) {
+              throw ConfigException(
+                '$_file: $where.costs.items."${entry.key}" harus >= 0.',
+              );
+            }
+            costItems[entry.key.toString()] = val.toInt();
+          }
+        }
+
+        final currMap = costsRaw['currencies'];
+        if (currMap != null) {
+          if (currMap is! Map) {
+            throw ConfigException(
+              '$_file: $where.costs."currencies" harus berupa object.',
+            );
+          }
+          for (final entry in currMap.entries) {
+            final val = entry.value;
+            if (val is! num || val < 0) {
+              throw ConfigException(
+                '$_file: $where.costs.currencies."${entry.key}" harus >= 0.',
+              );
+            }
+            costCurrencies[entry.key.toString()] = val.toInt();
+          }
+        }
+      } else {
+        costGold = 0;
+      }
+
+      // stat_boosts
+      final statsRaw = p['stat_boosts'];
+      final int boostHp;
+      final int boostAtk;
+      final int boostDef;
+      final double boostCritRate;
+      final double boostAttackSpeed;
+      final double boostCritDamage;
+      final double boostSkillHaste;
+
+      if (statsRaw != null) {
+        if (statsRaw is! Map<String, dynamic>) {
+          throw ConfigException(
+            '$_file: $where."stat_boosts" harus berupa object.',
+          );
+        }
+        const allowedStatKeys = {
+          'hp',
+          'atk',
+          'def',
+          'crit_rate',
+          'attack_speed',
+          'crit_damage',
+          'skill_haste',
+        };
+        _rejectUnknownKeys(statsRaw, allowedStatKeys, '$where.stat_boosts');
+        boostHp = statsRaw.containsKey('hp')
+            ? _int(statsRaw, '$where.stat_boosts', 'hp', min: 0)
+            : 0;
+        boostAtk = statsRaw.containsKey('atk')
+            ? _int(statsRaw, '$where.stat_boosts', 'atk', min: 0)
+            : 0;
+        boostDef = statsRaw.containsKey('def')
+            ? _int(statsRaw, '$where.stat_boosts', 'def', min: 0)
+            : 0;
+        boostCritRate = statsRaw.containsKey('crit_rate')
+            ? _number(statsRaw, '$where.stat_boosts', 'crit_rate', min: 0)
+            : 0.0;
+        boostAttackSpeed = statsRaw.containsKey('attack_speed')
+            ? _number(statsRaw, '$where.stat_boosts', 'attack_speed', min: 0)
+            : 0.0;
+        boostCritDamage = statsRaw.containsKey('crit_damage')
+            ? _number(statsRaw, '$where.stat_boosts', 'crit_damage', min: 0)
+            : 0.0;
+        boostSkillHaste = statsRaw.containsKey('skill_haste')
+            ? _number(statsRaw, '$where.stat_boosts', 'skill_haste', min: 0)
+            : 0.0;
+      } else {
+        boostHp = 0;
+        boostAtk = 0;
+        boostDef = 0;
+        boostCritRate = 0.0;
+        boostAttackSpeed = 0.0;
+        boostCritDamage = 0.0;
+        boostSkillHaste = 0.0;
+      }
+
+      phases.add(
+        HeroAscensionPhaseDefinition(
+          phase: phaseNum,
+          levelCap: levelCap,
+          requiredPlayerLevel: requiredPlayerLevel,
+          cost: HeroAscensionCost(
+            gold: costGold,
+            items: Map.unmodifiable(costItems),
+            currencies: Map.unmodifiable(costCurrencies),
+          ),
+          statBoost: HeroAscensionStatBoost(
+            hp: boostHp,
+            atk: boostAtk,
+            def: boostDef,
+            critRate: boostCritRate,
+            attackSpeed: boostAttackSpeed,
+            critDamage: boostCritDamage,
+            skillHaste: boostSkillHaste,
+          ),
+          hasGoldenAura: hasGoldenAura,
+        ),
+      );
+    }
+
+    return HeroAscensionConfig(
+      maxPhase: maxPhase,
+      phases: List.unmodifiable(phases),
     );
   }
 

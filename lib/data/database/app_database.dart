@@ -23,6 +23,7 @@ class Players extends Table {
   TextColumn get baseStatsJson => text()();
   IntColumn get equipmentCounter => integer().withDefault(const Constant(0))();
   IntColumn get lastSavedAtMs => integer()();
+  IntColumn get ascensionPhase => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -32,6 +33,7 @@ class Players extends Table {
     'CHECK (level >= 1)',
     'CHECK (current_exp >= 0)',
     'CHECK (gold >= 0)',
+    'CHECK (ascension_phase >= 0)',
   ];
 }
 
@@ -286,6 +288,26 @@ class UnlockedSpecializations extends Table {
   Set<Column> get primaryKey => {specializationId};
 }
 
+/// Progres tantangan The Infinite Spire per pemain (M16 Stage 1, schema v11).
+@DataClassName('InfiniteSpireProgressRow')
+class InfiniteSpireProgresses extends Table {
+  @override
+  String get tableName => 'infinite_spire_progress';
+
+  TextColumn get playerId =>
+      text().references(Players, #id, onDelete: KeyAction.cascade)();
+  IntColumn get highestFloorCleared =>
+      integer().withDefault(const Constant(0))();
+  TextColumn get claimedRewardsBlob =>
+      text().withDefault(const Constant('[]'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {playerId};
+
+  @override
+  List<String> get customConstraints => ['CHECK (highest_floor_cleared >= 0)'];
+}
+
 @DriftDatabase(
   tables: [
     GameSettings,
@@ -307,6 +329,7 @@ class UnlockedSpecializations extends Table {
     LocalSaveBackups,
     GachaPityStates,
     UnlockedSpecializations,
+    InfiniteSpireProgresses,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -314,7 +337,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? _openDefaultConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -398,6 +421,89 @@ class AppDatabase extends _$AppDatabase {
             "INSERT OR IGNORE INTO unlocked_specializations (specialization_id, unlocked_at_ms) "
             "VALUES ('vanguard', 0), ('arcanist', 0), ('ranger', 0)",
           );
+        }
+        if (from < 11) {
+          if (from >= 2) {
+            await m.addColumn(players, players.ascensionPhase);
+          }
+          await m.createTable(infiniteSpireProgresses);
+
+          // 1. Pemetaan otomatis level eksisting ke fase Ascension A0..A6:
+          //    Lv 1-20 -> A0, Lv 21-40 -> A1, Lv 41-50 -> A2,
+          //    Lv 51-60 -> A3, Lv 61-70 -> A4, Lv 71-80 -> A5, Lv 81+ -> A6.
+          await customStatement('''
+            UPDATE players
+            SET ascension_phase = CASE
+              WHEN level <= 20 THEN 0
+              WHEN level <= 40 THEN 1
+              WHEN level <= 50 THEN 2
+              WHEN level <= 60 THEN 3
+              WHEN level <= 70 THEN 4
+              WHEN level <= 80 THEN 5
+              ELSE 6
+            END
+          ''');
+
+          // 2. Kompensasi Aether Legacy Gift untuk pemain dengan level > 90:
+          //    Bonus Gold = (Old Level - 90) * 5.000
+          //    Bonus Aether Shard = (Old Level - 90) * 20
+          //    Bonus Soul Prism = (Old Level - 90) ~/ 10
+          //    Dan set level = 90
+          final overleveledPlayers = await customSelect(
+            'SELECT id, level, gold FROM players WHERE level > 90',
+          ).get();
+
+          for (final row in overleveledPlayers) {
+            final pId = row.read<String>('id');
+            final oldLevel = row.read<int>('level');
+            final currentGold = row.read<int>('gold');
+            final diff = oldLevel - 90;
+
+            final bonusGold = diff * 5000;
+            final bonusShard = diff * 20;
+            final bonusSoulPrism = diff ~/ 10;
+
+            await customStatement(
+              'UPDATE players SET level = 90, gold = ? WHERE id = ?',
+              [currentGold + bonusGold, pId],
+            );
+
+            if (bonusShard > 0) {
+              await customStatement(
+                '''
+                INSERT INTO currencies (player_id, currency_id, amount)
+                VALUES (?, 'aether_shard', ?)
+                ON CONFLICT(player_id, currency_id)
+                DO UPDATE SET amount = amount + ?
+              ''',
+                [pId, bonusShard, bonusShard],
+              );
+            }
+
+            if (bonusSoulPrism > 0) {
+              await customStatement(
+                '''
+                INSERT INTO currencies (player_id, currency_id, amount)
+                VALUES (?, 'soul_prism', ?)
+                ON CONFLICT(player_id, currency_id)
+                DO UPDATE SET amount = amount + ?
+              ''',
+                [pId, bonusSoulPrism, bonusSoulPrism],
+              );
+            }
+          }
+
+          // 3. Clamp cycle_rank > 5 ke 5 (Peak World Tier)
+          await customStatement('''
+            UPDATE cycle_progresses
+            SET ascension_rank = 5
+            WHERE ascension_rank > 5
+          ''');
+          await customStatement('''
+            UPDATE cycle_progresses
+            SET highest_ascension_rank = 5
+            WHERE highest_ascension_rank > 5
+          ''');
         }
       });
     },

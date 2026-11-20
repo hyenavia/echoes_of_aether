@@ -10,6 +10,7 @@ import '../models/event_shop_config_parser.dart';
 import '../models/gacha_config_parser.dart';
 import '../models/game_config_parser.dart';
 import '../models/game_config_validator.dart';
+import '../models/infinite_spire_config_parser.dart';
 import '../models/item_config_parser.dart';
 import '../models/loot_config_parser.dart';
 import '../models/monster_config_parser.dart';
@@ -77,6 +78,10 @@ class AssetGameConfigRepository implements GameConfigRepository {
         await _read('event_shop.json'),
       ),
       gacha: const GachaConfigParser().parse(await _read('gacha_banners.json')),
+      heroAscension: parser.parseHeroAscension(settings),
+      infiniteSpire: const InfiniteSpireConfigParser().parse(
+        await _read('infinite_spire.json'),
+      ),
     );
     const GameConfigValidator().validate(config);
     return config;

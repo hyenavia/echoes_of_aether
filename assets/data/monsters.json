@@ -401,6 +401,68 @@
       "exp_reward": 240,
       "gold_reward": 110,
       "loot_table_id": "sanctum_boss_loot"
+    },
+    {
+      "id": "abyssal_crawler",
+      "name": "Abyssal Crawler",
+      "level": 60,
+      "sprite_ref": "aether_slime",
+      "sprite_tint": "#7B1FA2",
+      "stats": { "hp": 110, "atk": 16, "def": 4 },
+      "attack_range": 1.0,
+      "move_speed": 1.4,
+      "attack_speed": 1.0,
+      "detection_range": 8.0,
+      "exp_reward": 45,
+      "gold_reward": 18,
+      "loot_table_id": "abyssal_normal_loot"
+    },
+    {
+      "id": "void_weaver",
+      "name": "Void Weaver",
+      "level": 62,
+      "sprite_ref": "forest_wolf",
+      "sprite_tint": "#BA68C8",
+      "stats": { "hp": 130, "atk": 22, "def": 4 },
+      "attack_range": 1.2,
+      "move_speed": 2.0,
+      "attack_speed": 1.1,
+      "detection_range": 9.0,
+      "exp_reward": 55,
+      "gold_reward": 22,
+      "loot_table_id": "abyssal_normal_loot"
+    },
+    {
+      "id": "shadow_stalker",
+      "name": "Shadow Stalker",
+      "level": 65,
+      "is_elite": true,
+      "sprite_ref": "corrupted_guardian",
+      "sprite_tint": "#4A148C",
+      "stats": { "hp": 320, "atk": 26, "def": 8 },
+      "attack_range": 1.2,
+      "move_speed": 1.7,
+      "attack_speed": 0.95,
+      "detection_range": 9.0,
+      "exp_reward": 110,
+      "gold_reward": 45,
+      "loot_table_id": "abyssal_elite_loot"
+    },
+    {
+      "id": "abyssal_archon",
+      "name": "Abyssal Archon",
+      "level": 68,
+      "is_boss": true,
+      "sprite_ref": "ancient_heart_guardian",
+      "sprite_tint": "#9C27B0",
+      "stats": { "hp": 2800, "atk": 35, "def": 10 },
+      "attack_range": 1.5,
+      "move_speed": 1.4,
+      "attack_speed": 1.0,
+      "detection_range": 10.0,
+      "exp_reward": 350,
+      "gold_reward": 160,
+      "loot_table_id": "abyssal_boss_loot"
     }
   ]
 }

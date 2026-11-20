@@ -1,0 +1,2147 @@
+{
+  "spire_id": "infinite_spire",
+  "name": "The Infinite Spire",
+  "total_floors": 100,
+  "floors": [
+    {
+      "floor": 1,
+      "name": "Lantai 1: Trials of Aether",
+      "recommended_level": 20,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 60,
+        "gold": 150,
+        "items": {
+          "aether_scrap": 2
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 2,
+      "name": "Lantai 2: Trials of Aether",
+      "recommended_level": 21,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 120,
+        "gold": 300,
+        "items": {
+          "aether_scrap": 2
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 3,
+      "name": "Lantai 3: Trials of Aether",
+      "recommended_level": 21,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 180,
+        "gold": 450,
+        "items": {
+          "aether_scrap": 2
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 4,
+      "name": "Lantai 4: Trials of Aether",
+      "recommended_level": 22,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 240,
+        "gold": 600,
+        "items": {
+          "aether_scrap": 2
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 5,
+      "name": "Lantai 5: Trials of Aether",
+      "recommended_level": 23,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 300,
+        "gold": 750,
+        "items": {
+          "aether_scrap": 3
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 6,
+      "name": "Lantai 6: Trials of Aether",
+      "recommended_level": 24,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 360,
+        "gold": 900,
+        "items": {
+          "aether_scrap": 3
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 7,
+      "name": "Lantai 7: Trials of Aether",
+      "recommended_level": 24,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 420,
+        "gold": 1050,
+        "items": {
+          "aether_scrap": 3
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 8,
+      "name": "Lantai 8: Trials of Aether",
+      "recommended_level": 25,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 480,
+        "gold": 1200,
+        "items": {
+          "aether_scrap": 3
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 9,
+      "name": "Lantai 9: Trials of Aether",
+      "recommended_level": 26,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 540,
+        "gold": 1350,
+        "items": {
+          "aether_scrap": 3
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 10,
+      "name": "Lantai 10: Corrupted Guardian (Floor 10)",
+      "recommended_level": 26,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "boss_id": "corrupted_guardian",
+      "boss_name": "Corrupted Guardian (Floor 10)",
+      "affix_description": "Thorns 10%",
+      "first_clear_reward": {
+        "exp": 600,
+        "gold": 1500,
+        "items": {
+          "aether_scrap": 4,
+          "boss_remnant": 1
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 11,
+      "name": "Lantai 11: Trials of Aether",
+      "recommended_level": 27,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 660,
+        "gold": 1650,
+        "items": {
+          "aether_scrap": 4
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 12,
+      "name": "Lantai 12: Trials of Aether",
+      "recommended_level": 28,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 720,
+        "gold": 1800,
+        "items": {
+          "aether_scrap": 4
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 13,
+      "name": "Lantai 13: Trials of Aether",
+      "recommended_level": 28,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 780,
+        "gold": 1950,
+        "items": {
+          "aether_scrap": 4
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 14,
+      "name": "Lantai 14: Trials of Aether",
+      "recommended_level": 29,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 840,
+        "gold": 2100,
+        "items": {
+          "aether_scrap": 4
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 15,
+      "name": "Lantai 15: Trials of Aether",
+      "recommended_level": 30,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 900,
+        "gold": 2250,
+        "items": {
+          "aether_scrap": 5
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 16,
+      "name": "Lantai 16: Trials of Aether",
+      "recommended_level": 31,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 960,
+        "gold": 2400,
+        "items": {
+          "aether_scrap": 5
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 17,
+      "name": "Lantai 17: Trials of Aether",
+      "recommended_level": 31,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 1020,
+        "gold": 2550,
+        "items": {
+          "aether_scrap": 5
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 18,
+      "name": "Lantai 18: Trials of Aether",
+      "recommended_level": 32,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 1080,
+        "gold": 2700,
+        "items": {
+          "aether_scrap": 5
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 19,
+      "name": "Lantai 19: Trials of Aether",
+      "recommended_level": 33,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "forest_slime",
+        "forest_goblin",
+        "forest_wolf"
+      ],
+      "first_clear_reward": {
+        "exp": 1140,
+        "gold": 2850,
+        "items": {
+          "aether_scrap": 5
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 20,
+      "name": "Lantai 20: Prism Colossus (Floor 20)",
+      "recommended_level": 33,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker"
+      ],
+      "boss_id": "prism_colossus",
+      "boss_name": "Prism Colossus (Floor 20)",
+      "affix_description": "Crystal Barrier",
+      "first_clear_reward": {
+        "exp": 1200,
+        "gold": 3000,
+        "items": {
+          "aether_scrap": 6,
+          "boss_remnant": 1
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 21,
+      "name": "Lantai 21: Trials of Aether",
+      "recommended_level": 34,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1260,
+        "gold": 3150,
+        "items": {
+          "aether_scrap": 6
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 22,
+      "name": "Lantai 22: Trials of Aether",
+      "recommended_level": 35,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1320,
+        "gold": 3300,
+        "items": {
+          "aether_scrap": 6
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 23,
+      "name": "Lantai 23: Trials of Aether",
+      "recommended_level": 36,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1380,
+        "gold": 3450,
+        "items": {
+          "aether_scrap": 6
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 24,
+      "name": "Lantai 24: Trials of Aether",
+      "recommended_level": 36,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1440,
+        "gold": 3600,
+        "items": {
+          "aether_scrap": 6
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 25,
+      "name": "Lantai 25: Trials of Aether",
+      "recommended_level": 37,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1500,
+        "gold": 3750,
+        "items": {
+          "aether_scrap": 7
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 26,
+      "name": "Lantai 26: Trials of Aether",
+      "recommended_level": 38,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1560,
+        "gold": 3900,
+        "items": {
+          "aether_scrap": 7
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 27,
+      "name": "Lantai 27: Trials of Aether",
+      "recommended_level": 38,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1620,
+        "gold": 4050,
+        "items": {
+          "aether_scrap": 7
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 28,
+      "name": "Lantai 28: Trials of Aether",
+      "recommended_level": 39,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1680,
+        "gold": 4200,
+        "items": {
+          "aether_scrap": 7
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 29,
+      "name": "Lantai 29: Trials of Aether",
+      "recommended_level": 40,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1740,
+        "gold": 4350,
+        "items": {
+          "aether_scrap": 7
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 30,
+      "name": "Lantai 30: Crypt Lord (Floor 30)",
+      "recommended_level": 41,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "boss_id": "crypt_lord",
+      "boss_name": "Crypt Lord (Floor 30)",
+      "affix_description": "Lifesteal 10%",
+      "first_clear_reward": {
+        "exp": 1800,
+        "gold": 4500,
+        "items": {
+          "aether_scrap": 8,
+          "boss_remnant": 1
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 31,
+      "name": "Lantai 31: Trials of Aether",
+      "recommended_level": 41,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1860,
+        "gold": 4650,
+        "items": {
+          "aether_scrap": 8
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 32,
+      "name": "Lantai 32: Trials of Aether",
+      "recommended_level": 42,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1920,
+        "gold": 4800,
+        "items": {
+          "aether_scrap": 8
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 33,
+      "name": "Lantai 33: Trials of Aether",
+      "recommended_level": 43,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 1980,
+        "gold": 4950,
+        "items": {
+          "aether_scrap": 8
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 34,
+      "name": "Lantai 34: Trials of Aether",
+      "recommended_level": 43,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 2040,
+        "gold": 5100,
+        "items": {
+          "aether_scrap": 8
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 35,
+      "name": "Lantai 35: Trials of Aether",
+      "recommended_level": 44,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 2100,
+        "gold": 5250,
+        "items": {
+          "aether_scrap": 9
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 36,
+      "name": "Lantai 36: Trials of Aether",
+      "recommended_level": 45,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 2160,
+        "gold": 5400,
+        "items": {
+          "aether_scrap": 9
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 37,
+      "name": "Lantai 37: Trials of Aether",
+      "recommended_level": 45,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 2220,
+        "gold": 5550,
+        "items": {
+          "aether_scrap": 9
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 38,
+      "name": "Lantai 38: Trials of Aether",
+      "recommended_level": 46,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 2280,
+        "gold": 5700,
+        "items": {
+          "aether_scrap": 9
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 39,
+      "name": "Lantai 39: Trials of Aether",
+      "recommended_level": 47,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crystal_slime",
+        "cavern_stalker",
+        "quartz_golem"
+      ],
+      "first_clear_reward": {
+        "exp": 2340,
+        "gold": 5850,
+        "items": {
+          "aether_scrap": 9
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 40,
+      "name": "Lantai 40: Ash Tyrant (Floor 40)",
+      "recommended_level": 48,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "ember_prowler",
+        "slag_colossus"
+      ],
+      "boss_id": "ash_tyrant",
+      "boss_name": "Ash Tyrant (Floor 40)",
+      "affix_description": "Blazing Aura",
+      "first_clear_reward": {
+        "exp": 2400,
+        "gold": 6000,
+        "items": {
+          "aether_scrap": 10,
+          "boss_remnant": 2
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 41,
+      "name": "Lantai 41: Trials of Aether",
+      "recommended_level": 48,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2460,
+        "gold": 6150,
+        "items": {
+          "aether_scrap": 10
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 42,
+      "name": "Lantai 42: Trials of Aether",
+      "recommended_level": 49,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2520,
+        "gold": 6300,
+        "items": {
+          "aether_scrap": 10
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 43,
+      "name": "Lantai 43: Trials of Aether",
+      "recommended_level": 50,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2580,
+        "gold": 6450,
+        "items": {
+          "aether_scrap": 10
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 44,
+      "name": "Lantai 44: Trials of Aether",
+      "recommended_level": 50,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2640,
+        "gold": 6600,
+        "items": {
+          "aether_scrap": 10
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 45,
+      "name": "Lantai 45: Trials of Aether",
+      "recommended_level": 51,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2700,
+        "gold": 6750,
+        "items": {
+          "aether_scrap": 11
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 46,
+      "name": "Lantai 46: Trials of Aether",
+      "recommended_level": 52,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2760,
+        "gold": 6900,
+        "items": {
+          "aether_scrap": 11
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 47,
+      "name": "Lantai 47: Trials of Aether",
+      "recommended_level": 53,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2820,
+        "gold": 7050,
+        "items": {
+          "aether_scrap": 11
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 48,
+      "name": "Lantai 48: Trials of Aether",
+      "recommended_level": 53,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2880,
+        "gold": 7200,
+        "items": {
+          "aether_scrap": 11
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 49,
+      "name": "Lantai 49: Trials of Aether",
+      "recommended_level": 54,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 2940,
+        "gold": 7350,
+        "items": {
+          "aether_scrap": 11
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 50,
+      "name": "Lantai 50: Aether Sovereign (Floor 50)",
+      "recommended_level": 55,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "sanctum_warden"
+      ],
+      "boss_id": "aether_sovereign",
+      "boss_name": "Aether Sovereign (Floor 50)",
+      "affix_description": "Temporal Haste",
+      "first_clear_reward": {
+        "exp": 3000,
+        "gold": 7500,
+        "items": {
+          "aether_scrap": 12,
+          "boss_remnant": 2
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 51,
+      "name": "Lantai 51: Trials of Aether",
+      "recommended_level": 55,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3060,
+        "gold": 7650,
+        "items": {
+          "aether_scrap": 12
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 52,
+      "name": "Lantai 52: Trials of Aether",
+      "recommended_level": 56,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3120,
+        "gold": 7800,
+        "items": {
+          "aether_scrap": 12
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 53,
+      "name": "Lantai 53: Trials of Aether",
+      "recommended_level": 57,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3180,
+        "gold": 7950,
+        "items": {
+          "aether_scrap": 12
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 54,
+      "name": "Lantai 54: Trials of Aether",
+      "recommended_level": 57,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3240,
+        "gold": 8100,
+        "items": {
+          "aether_scrap": 12
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 55,
+      "name": "Lantai 55: Trials of Aether",
+      "recommended_level": 58,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3300,
+        "gold": 8250,
+        "items": {
+          "aether_scrap": 13
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 56,
+      "name": "Lantai 56: Trials of Aether",
+      "recommended_level": 59,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3360,
+        "gold": 8400,
+        "items": {
+          "aether_scrap": 13
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 57,
+      "name": "Lantai 57: Trials of Aether",
+      "recommended_level": 60,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3420,
+        "gold": 8550,
+        "items": {
+          "aether_scrap": 13
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 58,
+      "name": "Lantai 58: Trials of Aether",
+      "recommended_level": 60,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3480,
+        "gold": 8700,
+        "items": {
+          "aether_scrap": 13
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 59,
+      "name": "Lantai 59: Trials of Aether",
+      "recommended_level": 61,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "crypt_ooze",
+        "bone_hound",
+        "tomb_keeper"
+      ],
+      "first_clear_reward": {
+        "exp": 3540,
+        "gold": 8850,
+        "items": {
+          "aether_scrap": 13
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 60,
+      "name": "Lantai 60: Empowered Guardian (Floor 60)",
+      "recommended_level": 62,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "forest_wolf",
+        "corrupted_treant"
+      ],
+      "boss_id": "corrupted_guardian",
+      "boss_name": "Empowered Guardian (Floor 60)",
+      "affix_description": "Enraged Thorns 15%",
+      "first_clear_reward": {
+        "exp": 3600,
+        "gold": 9000,
+        "items": {
+          "aether_scrap": 14,
+          "boss_remnant": 2
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 61,
+      "name": "Lantai 61: Trials of Aether",
+      "recommended_level": 62,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 3660,
+        "gold": 9150,
+        "items": {
+          "aether_scrap": 14
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 62,
+      "name": "Lantai 62: Trials of Aether",
+      "recommended_level": 63,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 3720,
+        "gold": 9300,
+        "items": {
+          "aether_scrap": 14
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 63,
+      "name": "Lantai 63: Trials of Aether",
+      "recommended_level": 64,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 3780,
+        "gold": 9450,
+        "items": {
+          "aether_scrap": 14
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 64,
+      "name": "Lantai 64: Trials of Aether",
+      "recommended_level": 65,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 3840,
+        "gold": 9600,
+        "items": {
+          "aether_scrap": 14
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 65,
+      "name": "Lantai 65: Trials of Aether",
+      "recommended_level": 65,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 3900,
+        "gold": 9750,
+        "items": {
+          "aether_scrap": 15
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 66,
+      "name": "Lantai 66: Trials of Aether",
+      "recommended_level": 66,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 3960,
+        "gold": 9900,
+        "items": {
+          "aether_scrap": 15
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 67,
+      "name": "Lantai 67: Trials of Aether",
+      "recommended_level": 67,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4020,
+        "gold": 10050,
+        "items": {
+          "aether_scrap": 15
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 68,
+      "name": "Lantai 68: Trials of Aether",
+      "recommended_level": 67,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4080,
+        "gold": 10200,
+        "items": {
+          "aether_scrap": 15
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 69,
+      "name": "Lantai 69: Trials of Aether",
+      "recommended_level": 68,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4140,
+        "gold": 10350,
+        "items": {
+          "aether_scrap": 15
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 70,
+      "name": "Lantai 70: Empowered Colossus (Floor 70)",
+      "recommended_level": 69,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "quartz_golem",
+        "crystal_warden"
+      ],
+      "boss_id": "prism_colossus",
+      "boss_name": "Empowered Colossus (Floor 70)",
+      "affix_description": "Reinforced Barrier",
+      "first_clear_reward": {
+        "exp": 4200,
+        "gold": 10500,
+        "items": {
+          "aether_scrap": 16,
+          "boss_remnant": 2
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 71,
+      "name": "Lantai 71: Trials of Aether",
+      "recommended_level": 69,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4260,
+        "gold": 10650,
+        "items": {
+          "aether_scrap": 16
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 72,
+      "name": "Lantai 72: Trials of Aether",
+      "recommended_level": 70,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4320,
+        "gold": 10800,
+        "items": {
+          "aether_scrap": 16
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 73,
+      "name": "Lantai 73: Trials of Aether",
+      "recommended_level": 71,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4380,
+        "gold": 10950,
+        "items": {
+          "aether_scrap": 16
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 74,
+      "name": "Lantai 74: Trials of Aether",
+      "recommended_level": 72,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4440,
+        "gold": 11100,
+        "items": {
+          "aether_scrap": 16
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 75,
+      "name": "Lantai 75: Trials of Aether",
+      "recommended_level": 72,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4500,
+        "gold": 11250,
+        "items": {
+          "aether_scrap": 17
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 76,
+      "name": "Lantai 76: Trials of Aether",
+      "recommended_level": 73,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4560,
+        "gold": 11400,
+        "items": {
+          "aether_scrap": 17
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 77,
+      "name": "Lantai 77: Trials of Aether",
+      "recommended_level": 74,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4620,
+        "gold": 11550,
+        "items": {
+          "aether_scrap": 17
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 78,
+      "name": "Lantai 78: Trials of Aether",
+      "recommended_level": 74,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4680,
+        "gold": 11700,
+        "items": {
+          "aether_scrap": 17
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 79,
+      "name": "Lantai 79: Trials of Aether",
+      "recommended_level": 75,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "cinder_slime",
+        "ember_prowler",
+        "ashen_sentinel"
+      ],
+      "first_clear_reward": {
+        "exp": 4740,
+        "gold": 11850,
+        "items": {
+          "aether_scrap": 17
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 80,
+      "name": "Lantai 80: Empowered Crypt Lord (Floor 80)",
+      "recommended_level": 76,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "crypt_knight",
+        "tomb_keeper"
+      ],
+      "boss_id": "crypt_lord",
+      "boss_name": "Empowered Crypt Lord (Floor 80)",
+      "affix_description": "Greater Lifesteal 15%",
+      "first_clear_reward": {
+        "exp": 4800,
+        "gold": 12000,
+        "items": {
+          "aether_scrap": 18,
+          "boss_remnant": 3
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 81,
+      "name": "Lantai 81: Trials of Aether",
+      "recommended_level": 77,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 4860,
+        "gold": 12150,
+        "items": {
+          "aether_scrap": 18
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 82,
+      "name": "Lantai 82: Trials of Aether",
+      "recommended_level": 77,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 4920,
+        "gold": 12300,
+        "items": {
+          "aether_scrap": 18
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 83,
+      "name": "Lantai 83: Trials of Aether",
+      "recommended_level": 78,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 4980,
+        "gold": 12450,
+        "items": {
+          "aether_scrap": 18
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 84,
+      "name": "Lantai 84: Trials of Aether",
+      "recommended_level": 79,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5040,
+        "gold": 12600,
+        "items": {
+          "aether_scrap": 18
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 85,
+      "name": "Lantai 85: Trials of Aether",
+      "recommended_level": 79,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5100,
+        "gold": 12750,
+        "items": {
+          "aether_scrap": 19
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 86,
+      "name": "Lantai 86: Trials of Aether",
+      "recommended_level": 80,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5160,
+        "gold": 12900,
+        "items": {
+          "aether_scrap": 19
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 87,
+      "name": "Lantai 87: Trials of Aether",
+      "recommended_level": 81,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5220,
+        "gold": 13050,
+        "items": {
+          "aether_scrap": 19
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 88,
+      "name": "Lantai 88: Trials of Aether",
+      "recommended_level": 82,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5280,
+        "gold": 13200,
+        "items": {
+          "aether_scrap": 19
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 89,
+      "name": "Lantai 89: Trials of Aether",
+      "recommended_level": 82,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5340,
+        "gold": 13350,
+        "items": {
+          "aether_scrap": 19
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 90,
+      "name": "Lantai 90: Empowered Ash Tyrant (Floor 90)",
+      "recommended_level": 83,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "ashen_sentinel",
+        "slag_colossus"
+      ],
+      "boss_id": "ash_tyrant",
+      "boss_name": "Empowered Ash Tyrant (Floor 90)",
+      "affix_description": "Cataclysm Aura",
+      "first_clear_reward": {
+        "exp": 5400,
+        "gold": 13500,
+        "items": {
+          "aether_scrap": 20,
+          "boss_remnant": 3
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    },
+    {
+      "floor": 91,
+      "name": "Lantai 91: Trials of Aether",
+      "recommended_level": 84,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5460,
+        "gold": 13650,
+        "items": {
+          "aether_scrap": 20
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 92,
+      "name": "Lantai 92: Trials of Aether",
+      "recommended_level": 84,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5520,
+        "gold": 13800,
+        "items": {
+          "aether_scrap": 20
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 93,
+      "name": "Lantai 93: Trials of Aether",
+      "recommended_level": 85,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5580,
+        "gold": 13950,
+        "items": {
+          "aether_scrap": 20
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 94,
+      "name": "Lantai 94: Trials of Aether",
+      "recommended_level": 86,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5640,
+        "gold": 14100,
+        "items": {
+          "aether_scrap": 20
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 95,
+      "name": "Lantai 95: Trials of Aether",
+      "recommended_level": 86,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5700,
+        "gold": 14250,
+        "items": {
+          "aether_scrap": 21
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 96,
+      "name": "Lantai 96: Trials of Aether",
+      "recommended_level": 87,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5760,
+        "gold": 14400,
+        "items": {
+          "aether_scrap": 21
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 97,
+      "name": "Lantai 97: Trials of Aether",
+      "recommended_level": 88,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5820,
+        "gold": 14550,
+        "items": {
+          "aether_scrap": 21
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 98,
+      "name": "Lantai 98: Trials of Aether",
+      "recommended_level": 89,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5880,
+        "gold": 14700,
+        "items": {
+          "aether_scrap": 21
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 99,
+      "name": "Lantai 99: Trials of Aether",
+      "recommended_level": 89,
+      "is_boss_floor": false,
+      "enemy_ids": [
+        "sanctum_wisp",
+        "aether_stalker",
+        "sanctum_warden"
+      ],
+      "first_clear_reward": {
+        "exp": 5940,
+        "gold": 14850,
+        "items": {
+          "aether_scrap": 21
+        },
+        "currencies": {
+          "aether_shard": 5
+        }
+      }
+    },
+    {
+      "floor": 100,
+      "name": "Lantai 100: Apex Aether Sovereign (Floor 100)",
+      "recommended_level": 90,
+      "is_boss_floor": true,
+      "enemy_ids": [
+        "sanctum_guardian",
+        "sanctum_warden"
+      ],
+      "boss_id": "aether_sovereign",
+      "boss_name": "Apex Aether Sovereign (Floor 100)",
+      "affix_description": "Ascendant Domain",
+      "first_clear_reward": {
+        "exp": 6000,
+        "gold": 15000,
+        "items": {
+          "aether_scrap": 22,
+          "boss_remnant": 3
+        },
+        "currencies": {
+          "aether_shard": 25,
+          "soul_prism": 1
+        }
+      }
+    }
+  ]
+}

@@ -868,6 +868,146 @@
           "chance": 0.15
         }
       ]
+    },
+    {
+      "id": "abyssal_normal_loot",
+      "entries": [
+        {
+          "item_id": "void_essence",
+          "chance": 0.05
+        },
+        {
+          "item_id": "aether_scrap",
+          "chance": 0.2,
+          "min_quantity": 1,
+          "max_quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "abyssal_elite_loot",
+      "entries": [
+        {
+          "item_id": "void_essence",
+          "chance": 0.2,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "aether_scrap",
+          "chance": 0.4,
+          "min_quantity": 2,
+          "max_quantity": 4
+        },
+        {
+          "item_id": "abyssal_blade",
+          "chance": 0.08
+        },
+        {
+          "item_id": "abyssal_bow",
+          "chance": 0.08
+        },
+        {
+          "item_id": "abyssal_staff",
+          "chance": 0.08
+        },
+        {
+          "item_id": "abyssal_cowl",
+          "chance": 0.08
+        }
+      ]
+    },
+    {
+      "id": "abyssal_boss_loot",
+      "entries": [
+        {
+          "item_id": "abyssal_remnant",
+          "chance": 1.0,
+          "min_quantity": 1,
+          "max_quantity": 2
+        },
+        {
+          "item_id": "void_essence",
+          "chance": 0.2,
+          "min_quantity": 1,
+          "max_quantity": 1
+        },
+        {
+          "item_id": "aether_scrap",
+          "chance": 0.6,
+          "min_quantity": 3,
+          "max_quantity": 6
+        },
+        {
+          "item_id": "abyssal_blade",
+          "chance": 0.25
+        },
+        {
+          "item_id": "abyssal_bow",
+          "chance": 0.25
+        },
+        {
+          "item_id": "abyssal_staff",
+          "chance": 0.25
+        },
+        {
+          "item_id": "abyssal_cowl",
+          "chance": 0.25
+        },
+        {
+          "item_id": "void_cleaver",
+          "chance": 0.1
+        },
+        {
+          "item_id": "void_carapace",
+          "chance": 0.1
+        },
+        {
+          "item_id": "void_crown",
+          "chance": 0.1
+        },
+        {
+          "item_id": "abyssal_eye",
+          "chance": 0.1
+        }
+      ]
+    },
+    {
+      "id": "abyssal_clear_loot",
+      "entries": [
+        {
+          "item_id": "abyssal_remnant",
+          "chance": 1.0,
+          "min_quantity": 1,
+          "max_quantity": 1
+        },
+        {
+          "item_id": "void_essence",
+          "chance": 0.2,
+          "min_quantity": 1,
+          "max_quantity": 1
+        },
+        {
+          "item_id": "abyssal_cowl",
+          "chance": 0.2
+        },
+        {
+          "item_id": "abyssal_eye",
+          "chance": 0.1
+        },
+        {
+          "item_id": "void_cleaver",
+          "chance": 0.08
+        },
+        {
+          "item_id": "void_carapace",
+          "chance": 0.08
+        },
+        {
+          "item_id": "void_crown",
+          "chance": 0.08
+        }
+      ]
     }
   ]
 }

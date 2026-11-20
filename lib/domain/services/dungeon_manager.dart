@@ -275,6 +275,63 @@ class DungeonManager {
     return _session!;
   }
 
+  /// Memulai run dungeon dari [DungeonDefinition] runtime (misalnya The Infinite Spire arena).
+  DungeonSession startRuntimeDungeon(
+    DungeonDefinition dungeon, {
+    String? runId,
+    String? startRoomId,
+    int cycleRank = 0,
+    DifficultyProfile? difficultyProfileOverride,
+  }) {
+    if (hasActiveSession) {
+      throw StateError(
+        'Sesi dungeon "${_session!.dungeonId}" (${_session!.runId}) masih aktif.',
+      );
+    }
+
+    final initialRoomId = startRoomId ?? dungeon.startRoomId;
+    final initialRoom = dungeon.roomById(initialRoomId);
+    final initialIndex = dungeon.indexOfRoom(initialRoomId);
+    if (initialRoom == null || initialIndex < 0) {
+      throw ArgumentError.value(
+        initialRoomId,
+        'startRoomId',
+        'Room awal tidak valid untuk dungeon "${dungeon.id}".',
+      );
+    }
+
+    final resolvedRunId = (runId != null && runId.trim().isNotEmpty)
+        ? runId
+        : _runIdGenerator();
+
+    _activeDungeon = dungeon;
+    _activeRoom = null;
+    _activeGrid = null;
+    _preparedSpawns = const [];
+    _lastPlayerCell = null;
+    _lastEvaluation = null;
+    final effectiveRank = cycleRank < 0 ? 0 : cycleRank;
+    if (difficultyProfileOverride != null) {
+      _activeDifficultyProfile = difficultyProfileOverride;
+      encounterTracker?.setDifficultyProfile(difficultyProfileOverride);
+    } else {
+      _applyDifficultyForRun(dungeon, effectiveRank);
+    }
+    _session = DungeonSession(
+      runId: resolvedRunId,
+      dungeonId: dungeon.id,
+      currentRoomId: initialRoomId,
+      currentRoomIndex: initialIndex,
+      cycleRank: effectiveRank,
+      status: DungeonSessionStatus.notStarted,
+      roomLifecycle: RoomLifecycleState.notLoaded,
+    ).transitionSession(DungeonSessionStatus.inProgress);
+
+    _emit(DungeonStartedEvent(_session!, dungeon));
+    loadRoom(initialRoomId);
+    return _session!;
+  }
+
   /// Memulai run Boss Event (Daily/Weekly) dari [DungeonDefinition] runtime,
   /// mendaftarkan monster boss ke [encounterTracker], serta menerapkan
   /// [difficultyProfile] boss.

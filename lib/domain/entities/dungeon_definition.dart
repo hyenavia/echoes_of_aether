@@ -215,7 +215,14 @@ class RoomDefinition {
 }
 
 /// Jenis dungeon pada progresi.
-enum DungeonKind { normal, ascension, bossDaily, bossWeekly, bossSpire }
+enum DungeonKind {
+  normal,
+  ascension,
+  bossDaily,
+  bossWeekly,
+  bossSpire,
+  infiniteSpire,
+}
 
 /// Definisi statis satu dungeon lengkap (mis. Forgotten Forest).
 class DungeonDefinition {
@@ -269,6 +276,7 @@ class DungeonDefinition {
   bool get isBossEvent =>
       kind == DungeonKind.bossDaily || kind == DungeonKind.bossWeekly;
   bool get isBossSpire => kind == DungeonKind.bossSpire;
+  bool get isInfiniteSpire => kind == DungeonKind.infiniteSpire;
 
   RoomDefinition? roomById(String roomId) => rooms[roomId];
 

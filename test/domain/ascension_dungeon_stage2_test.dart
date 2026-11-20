@@ -89,7 +89,7 @@ void main() {
 
         expect(asc.kind, DungeonKind.ascension);
         expect(asc.isAscension, true);
-        expect(asc.order, 6);
+        expect(asc.order, 7);
         expect(asc.baseDungeonId, 'aether_sanctum');
         expect(asc.unlockRequiresDungeonId, 'aether_sanctum');
         expect(asc.recommendedLevel, 49);

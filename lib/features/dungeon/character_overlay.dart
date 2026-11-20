@@ -9,9 +9,11 @@ import '../../domain/entities/equipment.dart';
 import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/skill_definition.dart';
 import '../../domain/entities/specialization.dart';
+import '../../domain/services/hero_ascension_service.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'equipment_text.dart';
+import 'hero_ascension_dialog.dart';
 import 'skill_text.dart';
 
 /// Mode tampilan bagian pada [CharacterOverlay].
@@ -40,6 +42,9 @@ class CharacterOverlay extends StatelessWidget {
     this.onToggleFavorite,
     this.onOpenEquipmentBag,
     this.onOpenBlacksmith,
+    this.onAscendHero,
+    this.inventoryQuantitiesProvider,
+    this.currenciesProvider,
     this.sectionMode = CharacterSectionMode.all,
     this.embedded = false,
     required this.onClose,
@@ -54,6 +59,9 @@ class CharacterOverlay extends StatelessWidget {
   final void Function(String instanceId)? onToggleFavorite;
   final VoidCallback? onOpenEquipmentBag;
   final void Function(String instanceId)? onOpenBlacksmith;
+  final Future<HeroAscensionResult> Function()? onAscendHero;
+  final Map<String, int> Function()? inventoryQuantitiesProvider;
+  final Map<String, int> Function()? currenciesProvider;
   final CharacterSectionMode sectionMode;
   final bool embedded;
   final VoidCallback onClose;
@@ -135,7 +143,10 @@ class CharacterOverlay extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (showProfile) ...[
-                      _HeroProfileBanner(snapshot: s),
+                      _HeroProfileBanner(
+                        snapshot: s,
+                        onOpenAscension: () => _openAscensionDialog(context, s),
+                      ),
                       if (s.stats != null) ...[
                         const SectionHeader(
                           title: 'Stat Tempur',
@@ -244,6 +255,29 @@ class CharacterOverlay extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 440, maxHeight: 640),
           child: panel,
         ),
+      ),
+    );
+  }
+
+  void _openAscensionDialog(BuildContext context, CharacterSnapshot s) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => HeroAscensionDialog(
+        characterSnapshot: s,
+        items: items,
+        inventoryQuantities: inventoryQuantitiesProvider?.call() ?? const {},
+        currencies: currenciesProvider?.call() ?? const {},
+        onConfirmAscend: () async {
+          if (onAscendHero != null) {
+            return await onAscendHero!();
+          }
+          return const HeroAscensionResult(
+            succeeded: false,
+            previousPhase: 0,
+            newPhase: 0,
+            failureReason: HeroAscensionFailureReason.none,
+          );
+        },
       ),
     );
   }
@@ -526,9 +560,10 @@ class _AdaptiveOverlayTile extends StatelessWidget {
 }
 
 class _HeroProfileBanner extends StatelessWidget {
-  const _HeroProfileBanner({required this.snapshot});
+  const _HeroProfileBanner({required this.snapshot, this.onOpenAscension});
 
   final CharacterSnapshot snapshot;
+  final VoidCallback? onOpenAscension;
 
   @override
   Widget build(BuildContext context) {
@@ -637,6 +672,78 @@ class _HeroProfileBanner extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (snapshot.heroAscensionConfig.phases.isNotEmpty) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  InkWell(
+                    key: Key(
+                      snapshot.isAscendReady
+                          ? 'hero_ascend_button'
+                          : 'hero_ascension_badge',
+                    ),
+                    onTap: onOpenAscension,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs + 2,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            (snapshot.isAscendReady || snapshot.hasGoldenAura
+                                    ? ext.gold
+                                    : AppColors.surfaceDark)
+                                .withValues(
+                                  alpha: snapshot.isAscendReady ? 0.25 : 0.6,
+                                ),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(
+                          color:
+                              snapshot.isAscendReady || snapshot.hasGoldenAura
+                              ? ext.gold
+                              : ext.panelInnerBorder,
+                          width: snapshot.isAscendReady ? 1.5 : 1,
+                        ),
+                        boxShadow: snapshot.isAscendReady
+                            ? AppShadows.glow(ext.gold, alpha: 0.4)
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            snapshot.hasGoldenAura
+                                ? Icons.stars
+                                : (snapshot.isAscendReady
+                                      ? Icons.auto_awesome
+                                      : Icons.arrow_upward),
+                            size: 11,
+                            color:
+                                snapshot.isAscendReady || snapshot.hasGoldenAura
+                                ? ext.gold
+                                : AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            snapshot.hasGoldenAura
+                                ? 'A6 (MAX)'
+                                : snapshot.isAscendReady
+                                ? 'TEROBOSAN!'
+                                : 'Fase A${snapshot.ascensionPhase}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color:
+                                  snapshot.isAscendReady ||
+                                      snapshot.hasGoldenAura
+                                  ? ext.gold
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

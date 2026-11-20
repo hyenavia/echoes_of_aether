@@ -10,7 +10,7 @@ import '../assets/game_assets.dart';
 import 'artwork/biome_artwork.dart';
 import 'artwork/character_illustration.dart';
 import 'branding/aether_symbol_mark.dart';
-import 'panel_frame.dart';
+import '../../../widgets/game_panel.dart';
 
 /// Hero Showcase pada beranda Town/Camp (**Living Aether Camp**).
 ///
@@ -99,115 +99,124 @@ class _HeroShowcaseCardState extends State<HeroShowcaseCard>
         key: const Key('hero_showcase_card'),
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: PanelFrame(
-          showCornerOrnaments: true,
-          borderRadius: AppRadius.lg,
-          borderColor: accent.withValues(alpha: 0.75),
-          boxShadow: AppShadows.panel,
-          padding: EdgeInsets.zero,
-          child: CampBackdrop(
-            borderRadius: AppRadius.md,
-            child: Stack(
-              children: [
-                // Pencahayaan ambien terkonsentrasi di karakter + scrim keterbacaan
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          AppColors.midnightForest.withValues(alpha: 0.12),
-                          AppColors.midnightForest.withValues(alpha: 0.56),
-                          AppColors.midnightForest.withValues(alpha: 0.86),
-                        ],
+        child: GamePanel(
+          style: GamePanelStyle.goldOrnate,
+          showGlow: true,
+          glowColor: accent,
+          padding: const EdgeInsets.all(4),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: CampBackdrop(
+              borderRadius: AppRadius.md,
+              child: Stack(
+                children: [
+                  // Pencahayaan ambien terkonsentrasi di karakter + scrim keterbacaan
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            AppColors.midnightForest.withValues(alpha: 0.12),
+                            AppColors.midnightForest.withValues(alpha: 0.56),
+                            AppColors.midnightForest.withValues(alpha: 0.86),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: RepaintBoundary(
-                      child: AnimatedBuilder(
-                        animation: _anim,
-                        builder: (context, _) => CustomPaint(
-                          painter: _CampAmbientPainter(
-                            accent: accent,
-                            phase: _anim.value,
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _anim,
+                          builder: (context, _) => CustomPaint(
+                            painter: _CampAmbientPainter(
+                              accent: accent,
+                              phase: _anim.value,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                // Subtle Aether emblem watermark ornament in upper-right background
-                const Positioned(
-                  top: -12,
-                  right: -12,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.08,
-                      child: AetherSymbolMark(
-                        variant: AetherSymbolVariant.monoWhite,
-                        size: 96,
+                  // Subtle Aether emblem watermark ornament in upper-right background
+                  const Positioned(
+                    top: -12,
+                    right: -12,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.08,
+                        child: AetherSymbolMark(
+                          variant: AetherSymbolVariant.monoWhite,
+                          size: 96,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 310;
-                    final heroW = compact ? 88.0 : 114.0;
-                    final heroH = compact ? 108.0 : 138.0;
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 310;
+                      final heroW = compact ? 88.0 : 114.0;
+                      final heroH = compact ? 108.0 : 138.0;
 
-                    return Padding(
-                      padding: EdgeInsets.all(
-                        compact ? AppSpacing.sm : AppSpacing.sm + 2,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          RepaintBoundary(
-                            child: AnimatedBuilder(
-                              animation: _anim,
-                              builder: (context, child) {
-                                final bob =
-                                    math.sin(_anim.value * math.pi * 2) * 2.2;
-                                return Transform.translate(
-                                  offset: Offset(0, bob),
-                                  child: child,
-                                );
-                              },
-                              child: RepaintBoundary(
-                                child: CharacterIllustration(
-                                  specializationId: specId,
-                                  width: heroW,
-                                  height: heroH,
-                                  showPedestal: true,
-                                  showAura: true,
+                      return Padding(
+                        padding: EdgeInsets.all(
+                          compact ? AppSpacing.sm : AppSpacing.sm + 2,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            RepaintBoundary(
+                              child: AnimatedBuilder(
+                                animation: _anim,
+                                builder: (context, child) {
+                                  final floatY =
+                                      math.sin(_anim.value * math.pi * 2) * 5.0;
+                                  final breathScale =
+                                      1.0 +
+                                      (math.sin(_anim.value * math.pi * 2) *
+                                          0.02);
+                                  return Transform.translate(
+                                    offset: Offset(0, floatY),
+                                    child: Transform.scale(
+                                      scale: breathScale,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: RepaintBoundary(
+                                  child: CharacterIllustration(
+                                    specializationId: specId,
+                                    width: heroW,
+                                    height: heroH,
+                                    showPedestal: true,
+                                    showAura: true,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          SizedBox(
-                            width: compact ? AppSpacing.sm : AppSpacing.md,
-                          ),
-                          Expanded(
-                            child: _buildInfo(
-                              theme,
-                              ext,
-                              accent,
-                              className,
-                              visualSpec,
-                              combatPower,
+                            SizedBox(
+                              width: compact ? AppSpacing.sm : AppSpacing.md,
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
+                            Expanded(
+                              child: _buildInfo(
+                                theme,
+                                ext,
+                                accent,
+                                className,
+                                visualSpec,
+                                combatPower,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),

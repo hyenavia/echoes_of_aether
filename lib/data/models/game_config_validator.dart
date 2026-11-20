@@ -47,6 +47,8 @@ class GameConfigValidator {
     _validateShop(config);
     _validateEventShop(config);
     _validateGacha(config);
+    _validateHeroAscension(config);
+    _validateInfiniteSpire(config);
     for (final table in config.lootTables.values) {
       for (final entry in table.entries) {
         if (!config.items.containsKey(entry.itemId)) {
@@ -1613,6 +1615,82 @@ class GameConfigValidator {
         'gacha_banners.json: sanctuary_exchange.currency_id "${exchange.currencyId}" '
         'tidak terdaftar di game_config.json.',
       );
+    }
+  }
+
+  void _validateHeroAscension(GameConfig config) {
+    final asc = config.heroAscension;
+    if (asc.phases.isEmpty) return;
+
+    var lastCap = 0;
+    for (var i = 0; i < asc.phases.length; i++) {
+      final phase = asc.phases[i];
+      if (phase.phase != i) {
+        throw ConfigException(
+          'game_config.json: hero_ascension.phases[$i].phase harus $i (didapat ${phase.phase}).',
+        );
+      }
+      if (phase.levelCap <= lastCap) {
+        throw ConfigException(
+          'game_config.json: hero_ascension.phases[$i].level_cap harus > $lastCap (didapat ${phase.levelCap}).',
+        );
+      }
+      lastCap = phase.levelCap;
+
+      for (final itemId in phase.cost.items.keys) {
+        if (!config.items.containsKey(itemId)) {
+          throw ConfigException(
+            'game_config.json: hero_ascension.phases[$i] merujuk item "$itemId" yang tidak ada di items.json.',
+          );
+        }
+      }
+      for (final currId in phase.cost.currencies.keys) {
+        if (!config.currencies.containsKey(currId)) {
+          throw ConfigException(
+            'game_config.json: hero_ascension.phases[$i] merujuk currency "$currId" yang tidak ada di game_config.json.',
+          );
+        }
+      }
+    }
+  }
+
+  void _validateInfiniteSpire(GameConfig config) {
+    final spire = config.infiniteSpire;
+    if (spire == null) return;
+
+    if (spire.floors.isEmpty) {
+      throw const ConfigException(
+        'infinite_spire.json: floors tidak boleh kosong.',
+      );
+    }
+
+    for (final floor in spire.floors) {
+      for (final enemyId in floor.enemyIds) {
+        if (!config.monsters.containsKey(enemyId)) {
+          throw ConfigException(
+            'infinite_spire.json: lantai ${floor.floor} merujuk enemy "$enemyId" yang tidak ada di monsters.json.',
+          );
+        }
+      }
+      if (floor.bossId != null && !config.monsters.containsKey(floor.bossId)) {
+        throw ConfigException(
+          'infinite_spire.json: lantai ${floor.floor} merujuk boss_id "${floor.bossId}" yang tidak ada di monsters.json.',
+        );
+      }
+      for (final itemId in floor.reward.items.keys) {
+        if (!config.items.containsKey(itemId)) {
+          throw ConfigException(
+            'infinite_spire.json: lantai ${floor.floor} reward merujuk item "$itemId" yang tidak ada di items.json.',
+          );
+        }
+      }
+      for (final currId in floor.reward.currencies.keys) {
+        if (!config.currencies.containsKey(currId)) {
+          throw ConfigException(
+            'infinite_spire.json: lantai ${floor.floor} reward merujuk currency "$currId" yang tidak ada di game_config.json.',
+          );
+        }
+      }
     }
   }
 }

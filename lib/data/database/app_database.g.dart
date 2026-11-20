@@ -310,6 +310,18 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, Player> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ascensionPhaseMeta = const VerificationMeta(
+    'ascensionPhase',
+  );
+  @override
+  late final GeneratedColumn<int> ascensionPhase = GeneratedColumn<int>(
+    'ascension_phase',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -321,6 +333,7 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, Player> {
     baseStatsJson,
     equipmentCounter,
     lastSavedAtMs,
+    ascensionPhase,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -409,6 +422,15 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, Player> {
     } else if (isInserting) {
       context.missing(_lastSavedAtMsMeta);
     }
+    if (data.containsKey('ascension_phase')) {
+      context.handle(
+        _ascensionPhaseMeta,
+        ascensionPhase.isAcceptableOrUnknown(
+          data['ascension_phase']!,
+          _ascensionPhaseMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -454,6 +476,10 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, Player> {
         DriftSqlType.int,
         data['${effectivePrefix}last_saved_at_ms'],
       )!,
+      ascensionPhase: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ascension_phase'],
+      )!,
     );
   }
 
@@ -473,6 +499,7 @@ class Player extends DataClass implements Insertable<Player> {
   final String baseStatsJson;
   final int equipmentCounter;
   final int lastSavedAtMs;
+  final int ascensionPhase;
   const Player({
     required this.id,
     required this.level,
@@ -483,6 +510,7 @@ class Player extends DataClass implements Insertable<Player> {
     required this.baseStatsJson,
     required this.equipmentCounter,
     required this.lastSavedAtMs,
+    required this.ascensionPhase,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -502,6 +530,7 @@ class Player extends DataClass implements Insertable<Player> {
     map['base_stats_json'] = Variable<String>(baseStatsJson);
     map['equipment_counter'] = Variable<int>(equipmentCounter);
     map['last_saved_at_ms'] = Variable<int>(lastSavedAtMs);
+    map['ascension_phase'] = Variable<int>(ascensionPhase);
     return map;
   }
 
@@ -520,6 +549,7 @@ class Player extends DataClass implements Insertable<Player> {
       baseStatsJson: Value(baseStatsJson),
       equipmentCounter: Value(equipmentCounter),
       lastSavedAtMs: Value(lastSavedAtMs),
+      ascensionPhase: Value(ascensionPhase),
     );
   }
 
@@ -540,6 +570,7 @@ class Player extends DataClass implements Insertable<Player> {
       baseStatsJson: serializer.fromJson<String>(json['baseStatsJson']),
       equipmentCounter: serializer.fromJson<int>(json['equipmentCounter']),
       lastSavedAtMs: serializer.fromJson<int>(json['lastSavedAtMs']),
+      ascensionPhase: serializer.fromJson<int>(json['ascensionPhase']),
     );
   }
   @override
@@ -557,6 +588,7 @@ class Player extends DataClass implements Insertable<Player> {
       'baseStatsJson': serializer.toJson<String>(baseStatsJson),
       'equipmentCounter': serializer.toJson<int>(equipmentCounter),
       'lastSavedAtMs': serializer.toJson<int>(lastSavedAtMs),
+      'ascensionPhase': serializer.toJson<int>(ascensionPhase),
     };
   }
 
@@ -570,6 +602,7 @@ class Player extends DataClass implements Insertable<Player> {
     String? baseStatsJson,
     int? equipmentCounter,
     int? lastSavedAtMs,
+    int? ascensionPhase,
   }) => Player(
     id: id ?? this.id,
     level: level ?? this.level,
@@ -582,6 +615,7 @@ class Player extends DataClass implements Insertable<Player> {
     baseStatsJson: baseStatsJson ?? this.baseStatsJson,
     equipmentCounter: equipmentCounter ?? this.equipmentCounter,
     lastSavedAtMs: lastSavedAtMs ?? this.lastSavedAtMs,
+    ascensionPhase: ascensionPhase ?? this.ascensionPhase,
   );
   Player copyWithCompanion(PlayersCompanion data) {
     return Player(
@@ -604,6 +638,9 @@ class Player extends DataClass implements Insertable<Player> {
       lastSavedAtMs: data.lastSavedAtMs.present
           ? data.lastSavedAtMs.value
           : this.lastSavedAtMs,
+      ascensionPhase: data.ascensionPhase.present
+          ? data.ascensionPhase.value
+          : this.ascensionPhase,
     );
   }
 
@@ -618,7 +655,8 @@ class Player extends DataClass implements Insertable<Player> {
           ..write('activeSpecializationId: $activeSpecializationId, ')
           ..write('baseStatsJson: $baseStatsJson, ')
           ..write('equipmentCounter: $equipmentCounter, ')
-          ..write('lastSavedAtMs: $lastSavedAtMs')
+          ..write('lastSavedAtMs: $lastSavedAtMs, ')
+          ..write('ascensionPhase: $ascensionPhase')
           ..write(')'))
         .toString();
   }
@@ -634,6 +672,7 @@ class Player extends DataClass implements Insertable<Player> {
     baseStatsJson,
     equipmentCounter,
     lastSavedAtMs,
+    ascensionPhase,
   );
   @override
   bool operator ==(Object other) =>
@@ -647,7 +686,8 @@ class Player extends DataClass implements Insertable<Player> {
           other.activeSpecializationId == this.activeSpecializationId &&
           other.baseStatsJson == this.baseStatsJson &&
           other.equipmentCounter == this.equipmentCounter &&
-          other.lastSavedAtMs == this.lastSavedAtMs);
+          other.lastSavedAtMs == this.lastSavedAtMs &&
+          other.ascensionPhase == this.ascensionPhase);
 }
 
 class PlayersCompanion extends UpdateCompanion<Player> {
@@ -660,6 +700,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
   final Value<String> baseStatsJson;
   final Value<int> equipmentCounter;
   final Value<int> lastSavedAtMs;
+  final Value<int> ascensionPhase;
   final Value<int> rowid;
   const PlayersCompanion({
     this.id = const Value.absent(),
@@ -671,6 +712,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
     this.baseStatsJson = const Value.absent(),
     this.equipmentCounter = const Value.absent(),
     this.lastSavedAtMs = const Value.absent(),
+    this.ascensionPhase = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PlayersCompanion.insert({
@@ -683,6 +725,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
     required String baseStatsJson,
     this.equipmentCounter = const Value.absent(),
     required int lastSavedAtMs,
+    this.ascensionPhase = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        level = Value(level),
@@ -700,6 +743,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
     Expression<String>? baseStatsJson,
     Expression<int>? equipmentCounter,
     Expression<int>? lastSavedAtMs,
+    Expression<int>? ascensionPhase,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -713,6 +757,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
       if (baseStatsJson != null) 'base_stats_json': baseStatsJson,
       if (equipmentCounter != null) 'equipment_counter': equipmentCounter,
       if (lastSavedAtMs != null) 'last_saved_at_ms': lastSavedAtMs,
+      if (ascensionPhase != null) 'ascension_phase': ascensionPhase,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -727,6 +772,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
     Value<String>? baseStatsJson,
     Value<int>? equipmentCounter,
     Value<int>? lastSavedAtMs,
+    Value<int>? ascensionPhase,
     Value<int>? rowid,
   }) {
     return PlayersCompanion(
@@ -740,6 +786,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
       baseStatsJson: baseStatsJson ?? this.baseStatsJson,
       equipmentCounter: equipmentCounter ?? this.equipmentCounter,
       lastSavedAtMs: lastSavedAtMs ?? this.lastSavedAtMs,
+      ascensionPhase: ascensionPhase ?? this.ascensionPhase,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -776,6 +823,9 @@ class PlayersCompanion extends UpdateCompanion<Player> {
     if (lastSavedAtMs.present) {
       map['last_saved_at_ms'] = Variable<int>(lastSavedAtMs.value);
     }
+    if (ascensionPhase.present) {
+      map['ascension_phase'] = Variable<int>(ascensionPhase.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -794,6 +844,7 @@ class PlayersCompanion extends UpdateCompanion<Player> {
           ..write('baseStatsJson: $baseStatsJson, ')
           ..write('equipmentCounter: $equipmentCounter, ')
           ..write('lastSavedAtMs: $lastSavedAtMs, ')
+          ..write('ascensionPhase: $ascensionPhase, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7090,6 +7141,301 @@ class UnlockedSpecializationsCompanion
   }
 }
 
+class $InfiniteSpireProgressesTable extends InfiniteSpireProgresses
+    with TableInfo<$InfiniteSpireProgressesTable, InfiniteSpireProgressRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InfiniteSpireProgressesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<String> playerId = GeneratedColumn<String>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES players (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _highestFloorClearedMeta =
+      const VerificationMeta('highestFloorCleared');
+  @override
+  late final GeneratedColumn<int> highestFloorCleared = GeneratedColumn<int>(
+    'highest_floor_cleared',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _claimedRewardsBlobMeta =
+      const VerificationMeta('claimedRewardsBlob');
+  @override
+  late final GeneratedColumn<String> claimedRewardsBlob =
+      GeneratedColumn<String>(
+        'claimed_rewards_blob',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    playerId,
+    highestFloorCleared,
+    claimedRewardsBlob,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'infinite_spire_progress';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InfiniteSpireProgressRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('highest_floor_cleared')) {
+      context.handle(
+        _highestFloorClearedMeta,
+        highestFloorCleared.isAcceptableOrUnknown(
+          data['highest_floor_cleared']!,
+          _highestFloorClearedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('claimed_rewards_blob')) {
+      context.handle(
+        _claimedRewardsBlobMeta,
+        claimedRewardsBlob.isAcceptableOrUnknown(
+          data['claimed_rewards_blob']!,
+          _claimedRewardsBlobMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {playerId};
+  @override
+  InfiniteSpireProgressRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InfiniteSpireProgressRow(
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}player_id'],
+      )!,
+      highestFloorCleared: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}highest_floor_cleared'],
+      )!,
+      claimedRewardsBlob: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}claimed_rewards_blob'],
+      )!,
+    );
+  }
+
+  @override
+  $InfiniteSpireProgressesTable createAlias(String alias) {
+    return $InfiniteSpireProgressesTable(attachedDatabase, alias);
+  }
+}
+
+class InfiniteSpireProgressRow extends DataClass
+    implements Insertable<InfiniteSpireProgressRow> {
+  final String playerId;
+  final int highestFloorCleared;
+  final String claimedRewardsBlob;
+  const InfiniteSpireProgressRow({
+    required this.playerId,
+    required this.highestFloorCleared,
+    required this.claimedRewardsBlob,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['player_id'] = Variable<String>(playerId);
+    map['highest_floor_cleared'] = Variable<int>(highestFloorCleared);
+    map['claimed_rewards_blob'] = Variable<String>(claimedRewardsBlob);
+    return map;
+  }
+
+  InfiniteSpireProgressesCompanion toCompanion(bool nullToAbsent) {
+    return InfiniteSpireProgressesCompanion(
+      playerId: Value(playerId),
+      highestFloorCleared: Value(highestFloorCleared),
+      claimedRewardsBlob: Value(claimedRewardsBlob),
+    );
+  }
+
+  factory InfiniteSpireProgressRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InfiniteSpireProgressRow(
+      playerId: serializer.fromJson<String>(json['playerId']),
+      highestFloorCleared: serializer.fromJson<int>(
+        json['highestFloorCleared'],
+      ),
+      claimedRewardsBlob: serializer.fromJson<String>(
+        json['claimedRewardsBlob'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'playerId': serializer.toJson<String>(playerId),
+      'highestFloorCleared': serializer.toJson<int>(highestFloorCleared),
+      'claimedRewardsBlob': serializer.toJson<String>(claimedRewardsBlob),
+    };
+  }
+
+  InfiniteSpireProgressRow copyWith({
+    String? playerId,
+    int? highestFloorCleared,
+    String? claimedRewardsBlob,
+  }) => InfiniteSpireProgressRow(
+    playerId: playerId ?? this.playerId,
+    highestFloorCleared: highestFloorCleared ?? this.highestFloorCleared,
+    claimedRewardsBlob: claimedRewardsBlob ?? this.claimedRewardsBlob,
+  );
+  InfiniteSpireProgressRow copyWithCompanion(
+    InfiniteSpireProgressesCompanion data,
+  ) {
+    return InfiniteSpireProgressRow(
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      highestFloorCleared: data.highestFloorCleared.present
+          ? data.highestFloorCleared.value
+          : this.highestFloorCleared,
+      claimedRewardsBlob: data.claimedRewardsBlob.present
+          ? data.claimedRewardsBlob.value
+          : this.claimedRewardsBlob,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InfiniteSpireProgressRow(')
+          ..write('playerId: $playerId, ')
+          ..write('highestFloorCleared: $highestFloorCleared, ')
+          ..write('claimedRewardsBlob: $claimedRewardsBlob')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(playerId, highestFloorCleared, claimedRewardsBlob);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InfiniteSpireProgressRow &&
+          other.playerId == this.playerId &&
+          other.highestFloorCleared == this.highestFloorCleared &&
+          other.claimedRewardsBlob == this.claimedRewardsBlob);
+}
+
+class InfiniteSpireProgressesCompanion
+    extends UpdateCompanion<InfiniteSpireProgressRow> {
+  final Value<String> playerId;
+  final Value<int> highestFloorCleared;
+  final Value<String> claimedRewardsBlob;
+  final Value<int> rowid;
+  const InfiniteSpireProgressesCompanion({
+    this.playerId = const Value.absent(),
+    this.highestFloorCleared = const Value.absent(),
+    this.claimedRewardsBlob = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InfiniteSpireProgressesCompanion.insert({
+    required String playerId,
+    this.highestFloorCleared = const Value.absent(),
+    this.claimedRewardsBlob = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : playerId = Value(playerId);
+  static Insertable<InfiniteSpireProgressRow> custom({
+    Expression<String>? playerId,
+    Expression<int>? highestFloorCleared,
+    Expression<String>? claimedRewardsBlob,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (playerId != null) 'player_id': playerId,
+      if (highestFloorCleared != null)
+        'highest_floor_cleared': highestFloorCleared,
+      if (claimedRewardsBlob != null)
+        'claimed_rewards_blob': claimedRewardsBlob,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InfiniteSpireProgressesCompanion copyWith({
+    Value<String>? playerId,
+    Value<int>? highestFloorCleared,
+    Value<String>? claimedRewardsBlob,
+    Value<int>? rowid,
+  }) {
+    return InfiniteSpireProgressesCompanion(
+      playerId: playerId ?? this.playerId,
+      highestFloorCleared: highestFloorCleared ?? this.highestFloorCleared,
+      claimedRewardsBlob: claimedRewardsBlob ?? this.claimedRewardsBlob,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (playerId.present) {
+      map['player_id'] = Variable<String>(playerId.value);
+    }
+    if (highestFloorCleared.present) {
+      map['highest_floor_cleared'] = Variable<int>(highestFloorCleared.value);
+    }
+    if (claimedRewardsBlob.present) {
+      map['claimed_rewards_blob'] = Variable<String>(claimedRewardsBlob.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InfiniteSpireProgressesCompanion(')
+          ..write('playerId: $playerId, ')
+          ..write('highestFloorCleared: $highestFloorCleared, ')
+          ..write('claimedRewardsBlob: $claimedRewardsBlob, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7129,6 +7475,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $UnlockedSpecializationsTable unlockedSpecializations =
       $UnlockedSpecializationsTable(this);
+  late final $InfiniteSpireProgressesTable infiniteSpireProgresses =
+      $InfiniteSpireProgressesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7153,6 +7501,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     localSaveBackups,
     gachaPityStates,
     unlockedSpecializations,
+    infiniteSpireProgresses,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -7246,6 +7595,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('event_shop_purchases', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'players',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('infinite_spire_progress', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -7407,6 +7763,7 @@ typedef $$PlayersTableCreateCompanionBuilder = PlayersCompanion Function({
   required String baseStatsJson,
   Value<int> equipmentCounter,
   required int lastSavedAtMs,
+  Value<int> ascensionPhase,
   Value<int> rowid,
 });
 typedef $$PlayersTableUpdateCompanionBuilder = PlayersCompanion Function({
@@ -7419,6 +7776,7 @@ typedef $$PlayersTableUpdateCompanionBuilder = PlayersCompanion Function({
   Value<String> baseStatsJson,
   Value<int> equipmentCounter,
   Value<int> lastSavedAtMs,
+  Value<int> ascensionPhase,
   Value<int> rowid,
 });
 
@@ -7686,6 +8044,31 @@ final class $$PlayersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $InfiniteSpireProgressesTable,
+    List<InfiniteSpireProgressRow>
+  >
+  _infiniteSpireProgressesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.infiniteSpireProgresses,
+        aliasName: 'players__id__infinite_spire_progress__player_id',
+      );
+
+  $$InfiniteSpireProgressesTableProcessedTableManager
+  get infiniteSpireProgressesRefs {
+    final manager = $$InfiniteSpireProgressesTableTableManager(
+      $_db,
+      $_db.infiniteSpireProgresses,
+    ).filter((f) => f.playerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _infiniteSpireProgressesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PlayersTableFilterComposer
@@ -7739,6 +8122,11 @@ class $$PlayersTableFilterComposer
 
   ColumnFilters<int> get lastSavedAtMs => $composableBuilder(
     column: $table.lastSavedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ascensionPhase => $composableBuilder(
+    column: $table.ascensionPhase,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8066,6 +8454,32 @@ class $$PlayersTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> infiniteSpireProgressesRefs(
+    Expression<bool> Function($$InfiniteSpireProgressesTableFilterComposer f) f,
+  ) {
+    final $$InfiniteSpireProgressesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.infiniteSpireProgresses,
+          getReferencedColumn: (t) => t.playerId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$InfiniteSpireProgressesTableFilterComposer(
+                $db: $db,
+                $table: $db.infiniteSpireProgresses,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$PlayersTableOrderingComposer
@@ -8121,6 +8535,11 @@ class $$PlayersTableOrderingComposer
     column: $table.lastSavedAtMs,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get ascensionPhase => $composableBuilder(
+    column: $table.ascensionPhase,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PlayersTableAnnotationComposer
@@ -8166,6 +8585,11 @@ class $$PlayersTableAnnotationComposer
 
   GeneratedColumn<int> get lastSavedAtMs => $composableBuilder(
     column: $table.lastSavedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get ascensionPhase => $composableBuilder(
+    column: $table.ascensionPhase,
     builder: (column) => column,
   );
 
@@ -8497,6 +8921,33 @@ class $$PlayersTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> infiniteSpireProgressesRefs<T extends Object>(
+    Expression<T> Function($$InfiniteSpireProgressesTableAnnotationComposer a)
+    f,
+  ) {
+    final $$InfiniteSpireProgressesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.infiniteSpireProgresses,
+          getReferencedColumn: (t) => t.playerId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$InfiniteSpireProgressesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.infiniteSpireProgresses,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$PlayersTableTableManager
@@ -8526,6 +8977,7 @@ class $$PlayersTableTableManager
             bool currenciesRefs,
             bool periodicQuestStatesRefs,
             bool eventShopPurchasesRefs,
+            bool infiniteSpireProgressesRefs,
           })
         > {
   $$PlayersTableTableManager(_$AppDatabase db, $PlayersTable table)
@@ -8550,6 +9002,7 @@ class $$PlayersTableTableManager
                 Value<String> baseStatsJson = const Value.absent(),
                 Value<int> equipmentCounter = const Value.absent(),
                 Value<int> lastSavedAtMs = const Value.absent(),
+                Value<int> ascensionPhase = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PlayersCompanion(
                 id: id,
@@ -8561,6 +9014,7 @@ class $$PlayersTableTableManager
                 baseStatsJson: baseStatsJson,
                 equipmentCounter: equipmentCounter,
                 lastSavedAtMs: lastSavedAtMs,
+                ascensionPhase: ascensionPhase,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8574,6 +9028,7 @@ class $$PlayersTableTableManager
                 required String baseStatsJson,
                 Value<int> equipmentCounter = const Value.absent(),
                 required int lastSavedAtMs,
+                Value<int> ascensionPhase = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PlayersCompanion.insert(
                 id: id,
@@ -8585,6 +9040,7 @@ class $$PlayersTableTableManager
                 baseStatsJson: baseStatsJson,
                 equipmentCounter: equipmentCounter,
                 lastSavedAtMs: lastSavedAtMs,
+                ascensionPhase: ascensionPhase,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -8610,6 +9066,7 @@ class $$PlayersTableTableManager
                 currenciesRefs = false,
                 periodicQuestStatesRefs = false,
                 eventShopPurchasesRefs = false,
+                infiniteSpireProgressesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -8627,6 +9084,7 @@ class $$PlayersTableTableManager
                     if (currenciesRefs) db.currencies,
                     if (periodicQuestStatesRefs) db.periodicQuestStates,
                     if (eventShopPurchasesRefs) db.eventShopPurchases,
+                    if (infiniteSpireProgressesRefs) db.infiniteSpireProgresses,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -8891,6 +9349,26 @@ class $$PlayersTableTableManager
                           referencedColumn: 'player_id',
                           typedResults: items,
                         ),
+                      if (infiniteSpireProgressesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          Player,
+                          $PlayersTable,
+                          InfiniteSpireProgressRow,
+                          $InfiniteSpireProgressesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PlayersTableReferences
+                              ._infiniteSpireProgressesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PlayersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).infiniteSpireProgressesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'player_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -8925,6 +9403,7 @@ typedef $$PlayersTableProcessedTableManager =
         bool currenciesRefs,
         bool periodicQuestStatesRefs,
         bool eventShopPurchasesRefs,
+        bool infiniteSpireProgressesRefs,
       })
     >;
 typedef $$SkillProgressesTableCreateCompanionBuilder =
@@ -13999,6 +14478,312 @@ typedef $$UnlockedSpecializationsTableProcessedTableManager =
       UnlockedSpecializationRow,
       PrefetchHooks Function()
     >;
+typedef $$InfiniteSpireProgressesTableCreateCompanionBuilder =
+    InfiniteSpireProgressesCompanion Function({
+      required String playerId,
+      Value<int> highestFloorCleared,
+      Value<String> claimedRewardsBlob,
+      Value<int> rowid,
+    });
+typedef $$InfiniteSpireProgressesTableUpdateCompanionBuilder =
+    InfiniteSpireProgressesCompanion Function({
+      Value<String> playerId,
+      Value<int> highestFloorCleared,
+      Value<String> claimedRewardsBlob,
+      Value<int> rowid,
+    });
+
+final class $$InfiniteSpireProgressesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $InfiniteSpireProgressesTable,
+          InfiniteSpireProgressRow
+        > {
+  $$InfiniteSpireProgressesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('infinite_spire_progress__player_id__players__id');
+
+  $$PlayersTableProcessedTableManager get playerId {
+    final $_column = $_itemColumn<String>('player_id')!;
+
+    final manager = $$PlayersTableTableManager(
+      $_db,
+      $_db.players,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$InfiniteSpireProgressesTableFilterComposer
+    extends Composer<_$AppDatabase, $InfiniteSpireProgressesTable> {
+  $$InfiniteSpireProgressesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get highestFloorCleared => $composableBuilder(
+    column: $table.highestFloorCleared,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get claimedRewardsBlob => $composableBuilder(
+    column: $table.claimedRewardsBlob,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PlayersTableFilterComposer get playerId {
+    final $$PlayersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableFilterComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$InfiniteSpireProgressesTableOrderingComposer
+    extends Composer<_$AppDatabase, $InfiniteSpireProgressesTable> {
+  $$InfiniteSpireProgressesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get highestFloorCleared => $composableBuilder(
+    column: $table.highestFloorCleared,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get claimedRewardsBlob => $composableBuilder(
+    column: $table.claimedRewardsBlob,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PlayersTableOrderingComposer get playerId {
+    final $$PlayersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableOrderingComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$InfiniteSpireProgressesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InfiniteSpireProgressesTable> {
+  $$InfiniteSpireProgressesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get highestFloorCleared => $composableBuilder(
+    column: $table.highestFloorCleared,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get claimedRewardsBlob => $composableBuilder(
+    column: $table.claimedRewardsBlob,
+    builder: (column) => column,
+  );
+
+  $$PlayersTableAnnotationComposer get playerId {
+    final $$PlayersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$InfiniteSpireProgressesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InfiniteSpireProgressesTable,
+          InfiniteSpireProgressRow,
+          $$InfiniteSpireProgressesTableFilterComposer,
+          $$InfiniteSpireProgressesTableOrderingComposer,
+          $$InfiniteSpireProgressesTableAnnotationComposer,
+          $$InfiniteSpireProgressesTableCreateCompanionBuilder,
+          $$InfiniteSpireProgressesTableUpdateCompanionBuilder,
+          (InfiniteSpireProgressRow, $$InfiniteSpireProgressesTableReferences),
+          InfiniteSpireProgressRow,
+          PrefetchHooks Function({bool playerId})
+        > {
+  $$InfiniteSpireProgressesTableTableManager(
+    _$AppDatabase db,
+    $InfiniteSpireProgressesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InfiniteSpireProgressesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$InfiniteSpireProgressesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$InfiniteSpireProgressesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> playerId = const Value.absent(),
+                Value<int> highestFloorCleared = const Value.absent(),
+                Value<String> claimedRewardsBlob = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InfiniteSpireProgressesCompanion(
+                playerId: playerId,
+                highestFloorCleared: highestFloorCleared,
+                claimedRewardsBlob: claimedRewardsBlob,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String playerId,
+                Value<int> highestFloorCleared = const Value.absent(),
+                Value<String> claimedRewardsBlob = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InfiniteSpireProgressesCompanion.insert(
+                playerId: playerId,
+                highestFloorCleared: highestFloorCleared,
+                claimedRewardsBlob: claimedRewardsBlob,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $InfiniteSpireProgressesTable,
+                    InfiniteSpireProgressRow
+                  >(table),
+                  $$InfiniteSpireProgressesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({playerId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (playerId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.playerId,
+                        referencedTable:
+                            $$InfiniteSpireProgressesTableReferences
+                                ._playerIdTable(db),
+                        referencedColumn:
+                            $$InfiniteSpireProgressesTableReferences
+                                ._playerIdTable(db)
+                                .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$InfiniteSpireProgressesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InfiniteSpireProgressesTable,
+      InfiniteSpireProgressRow,
+      $$InfiniteSpireProgressesTableFilterComposer,
+      $$InfiniteSpireProgressesTableOrderingComposer,
+      $$InfiniteSpireProgressesTableAnnotationComposer,
+      $$InfiniteSpireProgressesTableCreateCompanionBuilder,
+      $$InfiniteSpireProgressesTableUpdateCompanionBuilder,
+      (InfiniteSpireProgressRow, $$InfiniteSpireProgressesTableReferences),
+      InfiniteSpireProgressRow,
+      PrefetchHooks Function({bool playerId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -14043,5 +14828,10 @@ class $AppDatabaseManager {
       $$UnlockedSpecializationsTableTableManager(
         _db,
         _db.unlockedSpecializations,
+      );
+  $$InfiniteSpireProgressesTableTableManager get infiniteSpireProgresses =>
+      $$InfiniteSpireProgressesTableTableManager(
+        _db,
+        _db.infiniteSpireProgresses,
       );
 }
