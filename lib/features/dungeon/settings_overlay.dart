@@ -16,6 +16,8 @@ class SettingsOverlay extends StatefulWidget {
     this.onRequestNotificationPermission,
     this.onTestNotification,
     this.cloudSyncSection,
+    this.onOpenUpdateNotice,
+    this.onCheckAppUpdate,
   });
 
   final ValueListenable<GameSettingsData> settings;
@@ -25,6 +27,8 @@ class SettingsOverlay extends StatefulWidget {
   final Future<bool> Function()? onRequestNotificationPermission;
   final Future<void> Function()? onTestNotification;
   final Widget? cloudSyncSection;
+  final VoidCallback? onOpenUpdateNotice;
+  final VoidCallback? onCheckAppUpdate;
 
   @override
   State<SettingsOverlay> createState() => _SettingsOverlayState();
@@ -370,6 +374,35 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                     fontSize: 9,
                                   ),
                                 ),
+                                if (widget.onOpenUpdateNotice != null ||
+                                    widget.onCheckAppUpdate != null) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Wrap(
+                                    spacing: AppSpacing.xs,
+                                    runSpacing: AppSpacing.xs,
+                                    alignment: WrapAlignment.center,
+                                    children: [
+                                      if (widget.onCheckAppUpdate != null)
+                                        SecondaryButton(
+                                          key: const Key(
+                                            'settings_check_update_btn',
+                                          ),
+                                          label: 'Cek Update',
+                                          icon: Icons.system_update_outlined,
+                                          onPressed: widget.onCheckAppUpdate,
+                                        ),
+                                      if (widget.onOpenUpdateNotice != null)
+                                        SecondaryButton(
+                                          key: const Key(
+                                            'settings_update_notice_btn',
+                                          ),
+                                          label: 'Catatan Update & Legacy',
+                                          icon: Icons.auto_awesome_outlined,
+                                          onPressed: widget.onOpenUpdateNotice,
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),

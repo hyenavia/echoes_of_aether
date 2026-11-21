@@ -532,7 +532,9 @@ class CloudLimits {
       return violations;
     }
 
-    // Monotonik tidak turun.
+    // Monotonik tidak turun (kecuali transisi migrasi M16 schemaVersion < 11 -> >= 11).
+    final isM16Migration = prev.schemaVersion < 11 && next.schemaVersion >= 11;
+
     _checkMonotonic(
       violations,
       metric: 'schemaVersion',
@@ -548,13 +550,17 @@ class CloudLimits {
     _checkMonotonic(
       violations,
       metric: 'level',
-      prevVal: prev.level,
+      prevVal: isM16Migration && prev.level > 90
+          ? math.min(prev.level, 90)
+          : prev.level,
       nextVal: next.level,
     );
     _checkMonotonic(
       violations,
       metric: 'highestAscensionRank',
-      prevVal: prev.highestAscensionRank,
+      prevVal: isM16Migration && prev.highestAscensionRank > 5
+          ? math.min(prev.highestAscensionRank, 5)
+          : prev.highestAscensionRank,
       nextVal: next.highestAscensionRank,
     );
     _checkMonotonic(
@@ -646,7 +652,11 @@ class CloudLimits {
     }
 
     final goldDelta = next.gold - prev.gold;
-    final goldCap = maxGoldDelta(next.highestAscensionRank, dtSeconds);
+    final legacyGoldBonus = (isM16Migration && prev.level > 90)
+        ? (prev.level - 90) * 5000.0
+        : 0.0;
+    final goldCap =
+        maxGoldDelta(next.highestAscensionRank, dtSeconds) + legacyGoldBonus;
     if (goldDelta > goldCap) {
       violations.add(
         CloudLimitViolation(

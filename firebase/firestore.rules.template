@@ -104,13 +104,14 @@ service cloud.firestore {
       let dt = float(d.savedAt.toMillis() - prev.savedAt.toMillis()) / 1000.0;
       let effDt = dt + float({{GRACE_SECONDS}});
       let expDenom = float({{EXP_BASE}}) * math.pow(float(prev.level), {{EXP_EXPONENT}});
+      let legacyGoldBonus = (prev.schemaVersion < 11 && d.schemaVersion >= 11 && prev.level > 90) ? float((prev.level - 90) * 5000) : 0.0;
       return d.savedAt.toMillis() >= prev.savedAt.toMillis()
           && d.revision == prev.revision + 1
           && (resource == null || d.revision > resource.data.revision)
           && d.schemaVersion >= prev.schemaVersion
           && d.codecVersion >= prev.codecVersion
-          && d.level >= prev.level
-          && d.highestAscensionRank >= prev.highestAscensionRank
+          && (d.level >= prev.level || (prev.schemaVersion < 11 && d.schemaVersion >= 11 && prev.level > 90 && d.level >= 90))
+          && (d.highestAscensionRank >= prev.highestAscensionRank || (prev.schemaVersion < 11 && d.schemaVersion >= 11 && prev.highestAscensionRank > 5 && d.highestAscensionRank >= 5))
           && d.lifetimeClears >= prev.lifetimeClears
           && d.dailyQuestDone >= prev.dailyQuestDone
           && d.weeklyQuestDone >= prev.weeklyQuestDone
@@ -119,7 +120,7 @@ service cloud.firestore {
           && (d.weeklyQuestDone - prev.weeklyQuestDone) <= int(math.floor(dt / 604800.0)) + 2
           && (d.eventPurchasesLifetime - prev.eventPurchasesLifetime) <= 2 * (int(math.floor(dt / 604800.0)) + 2)
           && (d.highestAscensionRank - prev.highestAscensionRank) <= int(math.floor(dt / float({{MIN_CYCLE_SECONDS}}))) + 1
-          && float(d.gold - prev.gold) <= goldPerSec(d.highestAscensionRank) * effDt * {{SAFETY_FACTOR}} + float({{GOLD_BASE}})
+          && float(d.gold - prev.gold) <= goldPerSec(d.highestAscensionRank) * effDt * {{SAFETY_FACTOR}} + float({{GOLD_BASE}}) + legacyGoldBonus
           && float(d.level - prev.level) <= (expPerSec(d.highestAscensionRank) * effDt * {{SAFETY_FACTOR}}) / expDenom + 1.0
           && float(d.lifetimeClears - prev.lifetimeClears) <= effDt / float({{MIN_RUN_SECONDS}}) + 1.0;
     }
@@ -161,6 +162,11 @@ service cloud.firestore {
           && request.resource.data.t is timestamp
           && request.resource.data.t == request.time;
       allow delete: if false;
+    }
+
+    match /app_config/version {
+      allow get: if request.auth != null;
+      allow list, write: if false;
     }
 
     match /{document=**} {

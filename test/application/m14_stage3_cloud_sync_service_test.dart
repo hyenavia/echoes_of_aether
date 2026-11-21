@@ -22,12 +22,16 @@ import 'package:echoes_of_aether/data/repositories/drift_player_save_repository.
 import 'package:echoes_of_aether/data/repositories/in_memory_cloud_save_repository.dart';
 import 'package:echoes_of_aether/data/repositories/local_backup_service.dart';
 import 'package:echoes_of_aether/data/repositories/save_blob_packer.dart';
+import 'package:echoes_of_aether/domain/entities/cycle_progress.dart';
 import 'package:echoes_of_aether/domain/entities/game_config.dart';
 import 'package:echoes_of_aether/domain/entities/offline_activity.dart';
 import 'package:echoes_of_aether/domain/entities/player_progress.dart';
 import 'package:echoes_of_aether/domain/entities/player_save_snapshot.dart';
 import 'package:echoes_of_aether/domain/repositories/cloud_save_repository.dart';
+import 'package:echoes_of_aether/domain/services/app_version_comparator.dart';
+import 'package:echoes_of_aether/domain/services/cloud_limits.dart';
 import 'package:echoes_of_aether/domain/services/game_clock.dart';
+import 'package:echoes_of_aether/domain/services/legacy_save_converter.dart';
 import 'package:echoes_of_aether/domain/services/save_metrics_calculator.dart';
 import 'package:echoes_of_aether/domain/services/sync_planner.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,13 +82,22 @@ GameConfig _loadRealConfig() {
 PlayerSaveSnapshot _makeSnapshot({
   int level = 1,
   int gold = 0,
+  int ascensionPhase = 0,
+  CycleProgress cycleProgress = const CycleProgress(),
+  Map<String, int> currencies = const {},
   String currentDungeonId = 'forgotten_forest',
 }) => PlayerSaveSnapshot(
   character: PlayerCharacterSnapshot(
-    progress: PlayerProgress(level: level, gold: gold),
+    progress: PlayerProgress(
+      level: level,
+      gold: gold,
+      ascensionPhase: ascensionPhase,
+    ),
   ),
   inventory: const InventorySnapshot(),
   dungeon: DungeonProgressSnapshot(currentDungeonId: currentDungeonId),
+  cycleProgress: cycleProgress,
+  currencies: currencies,
   offlineActivity: const OfflineActivitySnapshot.paused(),
 );
 
@@ -218,6 +231,8 @@ void main() {
     required _ConfigurableAuthGateway authGateway,
     required InMemoryCloudSaveRepository cloudRepo,
     DriftPlayerSaveRepository? saveRepoOverride,
+    int schemaVersion = 8,
+    String appVersion = '1.0.0',
   }) {
     final saveRepo =
         saveRepoOverride ??
@@ -233,8 +248,8 @@ void main() {
         LocalBackupService(db: db, clock: clock),
       ),
       config: config,
-      appVersion: '1.0.0',
-      schemaVersion: 8,
+      appVersion: appVersion,
+      schemaVersion: schemaVersion,
       clock: clock,
     );
   }
@@ -704,6 +719,263 @@ void main() {
         isDungeonRunActive: false,
       );
       expect(corruptRestore, isA<CloudRestoreFailed>());
+    });
+
+    test('migrasi save cloud v10 (Lv 604, Rank 13) -> v11 (Lv 90, Rank 5) diterima saat unggah & dikonversi saat pulihkan', () async {
+      final clock = _MutableClock(1700000000000);
+      final legacySnap = _makeSnapshot(
+        level: 604,
+        gold: 100000,
+        cycleProgress: const CycleProgress(
+          ascensionRank: 13,
+          highestAscensionRank: 13,
+        ),
+        currencies: const {'aether_shard': 100},
+      );
+      const packer = SaveBlobPackerAdapter();
+      final legacyPacked = packer.pack(legacySnap);
+      final legacyMetrics = const SaveMetricsCalculator().compute(
+        snapshot: legacySnap,
+        config: config,
+        blobBytes: legacyPacked.blobBytes,
+        blobSha256: legacyPacked.sha256Hex,
+        schemaVersion: 10,
+        codecVersion: legacyPacked.codecVersion,
+      );
+
+      final cloudRepo = _CountingCloudSaveRepository(
+        serverNowMs: () => clock.nowMs,
+      );
+      cloudRepo.uploadValidatorHook = (req, prev) {
+        final prevCandidate = prev == null
+            ? null
+            : CloudSaveCandidate.fromMeta(prev);
+        final nextCandidate = CloudSaveCandidate.fromMetrics(
+          req.metrics,
+          revision: req.newRevision,
+          deviceId: req.deviceId,
+          appVersion: req.appVersion,
+          actualBlobLength: req.blob.length,
+        );
+        final dt = prev == null
+            ? 0.0
+            : (clock.nowMs - prev.savedAtServerMs) / 1000.0;
+        final violations = const CloudLimits().explainViolation(
+          prevCandidate,
+          nextCandidate,
+          dt,
+        );
+        if (violations.isNotEmpty) {
+          return CloudRejected<CloudSaveMeta>(
+            code: 'permission-denied',
+            message: violations.map((v) => v.message).join(' '),
+          );
+        }
+        return null;
+      };
+
+      cloudRepo.seedSlot(
+        CloudSaveDownload(
+          meta: CloudSaveMeta(
+            revision: 68,
+            slot: 0,
+            savedAtServerMs: clock.nowMs - 60000,
+            deviceId: 'dev-1',
+            appVersion: '1.0.0+1',
+            metrics: legacyMetrics,
+          ),
+          blob: legacyPacked.compressedBytes,
+        ),
+      );
+
+      // Skenario 1: Perangkat sudah terkonversi lokal (Lv 90, Fase A6, Rank 5, Legacy Gift)
+      // dengan lastSyncedRevision == 68 berhasil mengunggah Rev 69 ke cloud.
+      final db1 = AppDatabase(NativeDatabase.memory());
+      await db1.initialize();
+      addTearDown(db1.close);
+      final saveRepo1 = DriftPlayerSaveRepository(
+        db: db1,
+        config: config,
+        clock: clock,
+      );
+      final convertedSnap = LegacySaveConverter.convertToV11IfNeeded(
+        legacySnap,
+        fromSchemaVersion: 10,
+      );
+      expect(convertedSnap.character.progress.level, 90);
+      expect(convertedSnap.character.progress.ascensionPhase, 6);
+      expect(convertedSnap.character.progress.gold, 100000 + (604 - 90) * 5000);
+      expect(convertedSnap.currencies['aether_shard'], 100 + (604 - 90) * 20);
+      expect(convertedSnap.currencies['soul_prism'], (604 - 90) ~/ 10);
+      expect(convertedSnap.cycleProgress.ascensionRank, 5);
+      expect(convertedSnap.cycleProgress.highestAscensionRank, 5);
+
+      await saveRepo1.saveSnapshot(convertedSnap);
+      await DriftCloudSyncStateRepository(db: db1).markSynced(
+        revision: 68,
+        blobSha256: legacyPacked.sha256Hex,
+        syncedAtMs: clock.nowMs - 60000,
+      );
+
+      final service1 = createService(
+        db: db1,
+        clock: clock,
+        authGateway: _ConfigurableAuthGateway(),
+        cloudRepo: cloudRepo,
+        saveRepoOverride: saveRepo1,
+        schemaVersion: 11,
+        appVersion: '1.0.0+1',
+      );
+      final uploadOutcome = await service1.sync(SyncTrigger.manual);
+      expect(uploadOutcome.kind, SyncOutcomeKind.uploaded);
+      expect(uploadOutcome.cloudMeta?.revision, 69);
+      expect(uploadOutcome.cloudMeta?.metrics.level, 90);
+      expect(uploadOutcome.cloudMeta?.metrics.highestAscensionRank, 5);
+      expect(uploadOutcome.cloudMeta?.metrics.schemaVersion, 11);
+
+      // Skenario 2: Restore dari cloud save v10 otomatis mengonversi ke M16 v11 & siap diunggah ulang.
+      final cloudRepo2 = _CountingCloudSaveRepository(
+        serverNowMs: () => clock.nowMs,
+      );
+      cloudRepo2.uploadValidatorHook = cloudRepo.uploadValidatorHook;
+      cloudRepo2.seedSlot(
+        CloudSaveDownload(
+          meta: CloudSaveMeta(
+            revision: 68,
+            slot: 0,
+            savedAtServerMs: clock.nowMs - 60000,
+            deviceId: 'dev-old',
+            appVersion: '1.0.0+1',
+            metrics: legacyMetrics,
+          ),
+          blob: legacyPacked.compressedBytes,
+        ),
+      );
+      final db2 = AppDatabase(NativeDatabase.memory());
+      await db2.initialize();
+      addTearDown(db2.close);
+      final saveRepo2 = DriftPlayerSaveRepository(
+        db: db2,
+        config: config,
+        clock: clock,
+      );
+      final service2 = createService(
+        db: db2,
+        clock: clock,
+        authGateway: _ConfigurableAuthGateway(),
+        cloudRepo: cloudRepo2,
+        saveRepoOverride: saveRepo2,
+        schemaVersion: 11,
+        appVersion: '1.0.0+1',
+      );
+
+      final restored = await service2.restoreFromCloud(
+        isDungeonRunActive: false,
+      );
+      expect(restored, isA<CloudRestoreSuccess>());
+      final success = restored as CloudRestoreSuccess;
+      expect(success.restoredSnapshot.character.progress.level, 90);
+      expect(success.restoredSnapshot.character.progress.ascensionPhase, 6);
+      expect(success.restoredSnapshot.cycleProgress.highestAscensionRank, 5);
+      expect(success.status.phase, CloudSyncPhase.pendingChanges);
+
+      clock.nowMs += 1000;
+      final reSync = await service2.sync(SyncTrigger.manual);
+      expect(reSync.kind, SyncOutcomeKind.uploaded);
+      expect(reSync.cloudMeta?.revision, 69);
+      expect(reSync.cloudMeta?.metrics.schemaVersion, 11);
+    });
+
+    test('pengingat update aplikasi terdeteksi dari cloud schema lebih baru, appVersion lebih baru, dan versionInfo remote', () async {
+      expect(AppVersionComparator.compare('1.0.0+1', '1.0.0+2'), lessThan(0));
+      expect(AppVersionComparator.compare('1.1.0', '1.0.9+99'), greaterThan(0));
+
+      final clock = _MutableClock(1700000000000);
+      final db = AppDatabase(NativeDatabase.memory());
+      await db.initialize();
+      addTearDown(db.close);
+      final saveRepo = DriftPlayerSaveRepository(
+        db: db,
+        config: config,
+        clock: clock,
+      );
+      await saveRepo.saveSnapshot(_makeSnapshot(level: 10, gold: 500));
+
+      final remoteSnap = (await saveRepo.loadSnapshot())!;
+      const packer = SaveBlobPackerAdapter();
+      final remotePacked = packer.pack(remoteSnap);
+
+      // 1. Cloud memakai schemaVersion lebih baru (v12 > lokal v11) -> blokir sync & minta update.
+      final cloudRepo = _CountingCloudSaveRepository(
+        serverNowMs: () => clock.nowMs,
+      );
+      cloudRepo.seedSlot(
+        CloudSaveDownload(
+          meta: CloudSaveMeta(
+            revision: 3,
+            slot: 1,
+            savedAtServerMs: clock.nowMs - 5000,
+            deviceId: 'other-dev',
+            appVersion: '1.2.0+5',
+            metrics: const SaveMetricsCalculator().compute(
+              snapshot: remoteSnap,
+              config: config,
+              blobBytes: remotePacked.blobBytes,
+              blobSha256: remotePacked.sha256Hex,
+              schemaVersion: 12,
+              codecVersion: remotePacked.codecVersion,
+            ),
+          ),
+          blob: remotePacked.compressedBytes,
+        ),
+      );
+
+      final service = createService(
+        db: db,
+        clock: clock,
+        authGateway: _ConfigurableAuthGateway(),
+        cloudRepo: cloudRepo,
+        saveRepoOverride: saveRepo,
+        schemaVersion: 11,
+        appVersion: '1.0.0+1',
+      );
+
+      final blocked = await service.sync(SyncTrigger.appOpen);
+      expect(blocked.kind, SyncOutcomeKind.rejected);
+      expect(blocked.status.isUpdateRequiredForSync, isTrue);
+      expect(blocked.status.updateAvailableVersion, '1.2.0+5');
+      expect(blocked.status.updateAvailableSchemaVersion, 12);
+      expect(
+        blocked.status.updateReminderMessage,
+        contains('Perbarui aplikasi'),
+      );
+
+      // 2. Schema kompatibel, tetapi fetchVersionInfo melaporkan versi baru tersedia.
+      final cloudRepo2 =
+          _CountingCloudSaveRepository(serverNowMs: () => clock.nowMs)
+            ..versionInfo = const RemoteAppVersionInfo(
+              latestAppVersion: '1.3.0+10',
+              latestSchemaVersion: 11,
+              releaseNotes: 'Perbaikan Cloud Sync & keseimbangan Spire',
+            );
+      final service2 = createService(
+        db: db,
+        clock: clock,
+        authGateway: _ConfigurableAuthGateway(),
+        cloudRepo: cloudRepo2,
+        saveRepoOverride: saveRepo,
+        schemaVersion: 11,
+        appVersion: '1.0.0+1',
+      );
+
+      final ok = await service2.sync(SyncTrigger.appOpen);
+      expect(ok.kind, SyncOutcomeKind.uploaded);
+      expect(ok.status.isUpdateRequiredForSync, isFalse);
+      expect(ok.status.updateAvailableVersion, '1.3.0+10');
+      expect(
+        ok.status.updateReminderMessage,
+        contains('Perbaikan Cloud Sync & keseimbangan Spire'),
+      );
     });
   });
 }

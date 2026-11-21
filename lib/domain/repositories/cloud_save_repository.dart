@@ -93,6 +93,22 @@ final class CloudQuotaExceeded<T> extends CloudResult<T> {
   final String message;
 }
 
+/// Informasi versi aplikasi terbaru yang dibaca secara optional dari Firestore
+/// (`app_config/version`).
+class RemoteAppVersionInfo {
+  const RemoteAppVersionInfo({
+    this.latestAppVersion,
+    this.minRequiredAppVersion,
+    this.latestSchemaVersion,
+    this.releaseNotes,
+  });
+
+  final String? latestAppVersion;
+  final String? minRequiredAppVersion;
+  final int? latestSchemaVersion;
+  final String? releaseNotes;
+}
+
 /// Kontrak repository Cloud Save di lapisan domain/application.
 ///
 /// Implementasi memori dipakai pada unit test (Stage 1) dan implementasi
@@ -105,4 +121,8 @@ abstract interface class CloudSaveRepository {
   Future<CloudResult<CloudSaveMeta>> upload(CloudSaveUploadRequest request);
 
   Future<CloudResult<int>> serverTimeMs();
+
+  /// Membaca metadata versi aplikasi terbaru secara best-effort (`null` bila
+  /// offline, belum tersedia, atau dokumen belum disiapkan).
+  Future<RemoteAppVersionInfo?> fetchVersionInfo();
 }

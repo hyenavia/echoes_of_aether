@@ -5,6 +5,7 @@ import '../../application/services/account_service.dart';
 import '../../application/services/cloud_sync_service.dart';
 import '../../domain/repositories/cloud_save_repository.dart';
 import '../shared/widgets/shared_widgets.dart';
+import 'update_reminder_dialog.dart';
 
 typedef EmailAuthAction = Future<EmailAuthOutcome> Function({
   required String email,
@@ -209,6 +210,20 @@ class _CloudSyncSectionState extends State<CloudSyncSection> {
                   key: const Key('cloud_restore_blocked_label'),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+              if (s.updateReminderMessage != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                UpdateReminderBanner(
+                  message: s.updateReminderMessage!,
+                  latestVersion: s.updateAvailableVersion,
+                  isRequired: s.isUpdateRequiredForSync,
+                  onTapDetails: () => showAppUpdateAvailableDialog(
+                    context,
+                    message: s.updateReminderMessage!,
+                    latestVersion: s.updateAvailableVersion,
+                    isRequired: s.isUpdateRequiredForSync,
                   ),
                 ),
               ],

@@ -11,6 +11,7 @@ class GameSettingsData {
     this.notifyEventShopEnding = false,
     this.notifyQuietHoursEnabled = true,
     this.autoSalvageOfflineEquipment = false,
+    this.lastSeenUpdateNoticeVersion = 0,
   }) : bgmVolume = bgmVolume < 0 ? 0.0 : (bgmVolume > 1 ? 1.0 : bgmVolume),
        sfxVolume = sfxVolume < 0 ? 0.0 : (sfxVolume > 1 ? 1.0 : sfxVolume);
 
@@ -24,6 +25,7 @@ class GameSettingsData {
   final bool notifyEventShopEnding;
   final bool notifyQuietHoursEnabled;
   final bool autoSalvageOfflineEquipment;
+  final int lastSeenUpdateNoticeVersion;
 
   bool get anyNotificationCategoryEnabled =>
       notifyAutoFarmingFull ||
@@ -42,6 +44,7 @@ class GameSettingsData {
     bool? notifyEventShopEnding,
     bool? notifyQuietHoursEnabled,
     bool? autoSalvageOfflineEquipment,
+    int? lastSeenUpdateNoticeVersion,
   }) => GameSettingsData(
     bgmEnabled: bgmEnabled ?? this.bgmEnabled,
     sfxEnabled: sfxEnabled ?? this.sfxEnabled,
@@ -57,6 +60,8 @@ class GameSettingsData {
         notifyQuietHoursEnabled ?? this.notifyQuietHoursEnabled,
     autoSalvageOfflineEquipment:
         autoSalvageOfflineEquipment ?? this.autoSalvageOfflineEquipment,
+    lastSeenUpdateNoticeVersion:
+        lastSeenUpdateNoticeVersion ?? this.lastSeenUpdateNoticeVersion,
   );
 
   @override
@@ -72,7 +77,8 @@ class GameSettingsData {
           notifyWeeklyBossReminder == other.notifyWeeklyBossReminder &&
           notifyEventShopEnding == other.notifyEventShopEnding &&
           notifyQuietHoursEnabled == other.notifyQuietHoursEnabled &&
-          autoSalvageOfflineEquipment == other.autoSalvageOfflineEquipment;
+          autoSalvageOfflineEquipment == other.autoSalvageOfflineEquipment &&
+          lastSeenUpdateNoticeVersion == other.lastSeenUpdateNoticeVersion;
 
   @override
   int get hashCode => Object.hash(
@@ -86,5 +92,6 @@ class GameSettingsData {
     notifyEventShopEnding,
     notifyQuietHoursEnabled,
     autoSalvageOfflineEquipment,
+    lastSeenUpdateNoticeVersion,
   );
 }

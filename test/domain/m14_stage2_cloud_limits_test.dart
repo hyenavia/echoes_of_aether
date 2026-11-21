@@ -293,6 +293,131 @@ void main() {
         isEmpty,
       );
     });
+
+    test('transisi migrasi M16 schemaVersion < 11 -> >= 11 mengizinkan clamp Lv>90->90, Rank>5->5, dan bonus gold Legacy Gift', () {
+      const legacyCloud = CloudSaveCandidate(
+        revision: 68,
+        schemaVersion: 10,
+        codecVersion: 1,
+        deviceId: 'dev-1',
+        appVersion: '1.0.0+1',
+        level: 604,
+        gold: 34230000,
+        shards: 2900,
+        highestAscensionRank: 13,
+        lifetimeClears: 2500,
+        dailyQuestDone: 40,
+        weeklyQuestDone: 10,
+        eventPurchasesLifetime: 12,
+        equipmentCount: 40,
+        blobBytes: 1024,
+        blobSha256:
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      );
+      // (604 - 90) * 5000 = 2.570.000 gold kompensasi Aether Legacy Gift
+      const migratedLocal = CloudSaveCandidate(
+        revision: 69,
+        schemaVersion: 11,
+        codecVersion: 1,
+        deviceId: 'dev-1',
+        appVersion: '1.0.0+1',
+        level: 90,
+        gold: 36800000,
+        shards: 2900,
+        highestAscensionRank: 5,
+        lifetimeClears: 2500,
+        dailyQuestDone: 40,
+        weeklyQuestDone: 10,
+        eventPurchasesLifetime: 12,
+        equipmentCount: 40,
+        blobBytes: 1024,
+        blobSha256:
+            'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      );
+      expect(limits.explainViolation(legacyCloud, migratedLocal, 0), isEmpty);
+
+      // Turun di bawah 90 atau rank di bawah 5 tetap ditolak meski schema 10 -> 11.
+      const invalidLevelDrop = CloudSaveCandidate(
+        revision: 69,
+        schemaVersion: 11,
+        codecVersion: 1,
+        deviceId: 'dev-1',
+        appVersion: '1.0.0+1',
+        level: 80,
+        gold: 36800000,
+        shards: 2900,
+        highestAscensionRank: 5,
+        lifetimeClears: 2500,
+        dailyQuestDone: 40,
+        weeklyQuestDone: 10,
+        eventPurchasesLifetime: 12,
+        equipmentCount: 40,
+        blobBytes: 1024,
+        blobSha256:
+            'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      );
+      expect(
+        limits
+            .explainViolation(legacyCloud, invalidLevelDrop, 0)
+            .map((v) => v.metric),
+        contains('level'),
+      );
+
+      const invalidRankDrop = CloudSaveCandidate(
+        revision: 69,
+        schemaVersion: 11,
+        codecVersion: 1,
+        deviceId: 'dev-1',
+        appVersion: '1.0.0+1',
+        level: 90,
+        gold: 36800000,
+        shards: 2900,
+        highestAscensionRank: 4,
+        lifetimeClears: 2500,
+        dailyQuestDone: 40,
+        weeklyQuestDone: 10,
+        eventPurchasesLifetime: 12,
+        equipmentCount: 40,
+        blobBytes: 1024,
+        blobSha256:
+            'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      );
+      expect(
+        limits
+            .explainViolation(legacyCloud, invalidRankDrop, 0)
+            .map((v) => v.metric),
+        contains('highestAscensionRank'),
+      );
+
+      // Pada schema yang sama (11 -> 11), penurunan level maupun rank tetap ditolak.
+      const v11Prev = CloudSaveCandidate(
+        revision: 68,
+        schemaVersion: 11,
+        codecVersion: 1,
+        deviceId: 'dev-1',
+        appVersion: '1.0.0+1',
+        level: 604,
+        gold: 34230000,
+        shards: 2900,
+        highestAscensionRank: 13,
+        lifetimeClears: 2500,
+        dailyQuestDone: 40,
+        weeklyQuestDone: 10,
+        eventPurchasesLifetime: 12,
+        equipmentCount: 40,
+        blobBytes: 1024,
+        blobSha256:
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      );
+      final sameSchemaViolations = limits
+          .explainViolation(v11Prev, migratedLocal, 0)
+          .map((v) => v.metric)
+          .toSet();
+      expect(
+        sameSchemaViolations,
+        containsAll(['level', 'highestAscensionRank']),
+      );
+    });
   });
 }
 

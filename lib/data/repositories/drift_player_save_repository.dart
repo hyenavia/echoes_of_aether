@@ -95,6 +95,8 @@ class DriftPlayerSaveRepository
   static const String _keyNotifyQuietHours =
       'notifications.quiet_hours_enabled';
   static const String _keyOfflineAutoSalvage = 'offline.auto_salvage_equipment';
+  static const String _keyLastSeenUpdateNoticeVersion =
+      'app.last_seen_update_notice_version';
 
   @override
   Future<GameSettingsData> loadSettings() async {
@@ -115,6 +117,14 @@ class DriftPlayerSaveRepository
       final parsed = double.tryParse(raw);
       if (parsed == null || parsed.isNaN || parsed.isInfinite) return fallback;
       return parsed.clamp(0.0, 1.0);
+    }
+
+    int parseNonNegInt(String key, int fallback) {
+      final raw = map[key];
+      if (raw == null) return fallback;
+      final parsed = int.tryParse(raw);
+      if (parsed == null || parsed < 0) return fallback;
+      return parsed;
     }
 
     return GameSettingsData(
@@ -145,6 +155,10 @@ class DriftPlayerSaveRepository
       autoSalvageOfflineEquipment: parseBool(
         _keyOfflineAutoSalvage,
         defaults.autoSalvageOfflineEquipment,
+      ),
+      lastSeenUpdateNoticeVersion: parseNonNegInt(
+        _keyLastSeenUpdateNoticeVersion,
+        defaults.lastSeenUpdateNoticeVersion,
       ),
     );
   }
@@ -194,6 +208,10 @@ class DriftPlayerSaveRepository
           GameSettingsCompanion.insert(
             key: _keyOfflineAutoSalvage,
             value: normalized.autoSalvageOfflineEquipment ? 'true' : 'false',
+          ),
+          GameSettingsCompanion.insert(
+            key: _keyLastSeenUpdateNoticeVersion,
+            value: '${math.max(0, normalized.lastSeenUpdateNoticeVersion)}',
           ),
         ], mode: InsertMode.insertOrReplace);
       });

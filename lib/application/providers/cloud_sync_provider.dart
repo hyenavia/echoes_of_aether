@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/cloud/drift_cloud_sync_adapters.dart';
 import '../../data/cloud/firebase_auth_gateway.dart';
 import '../../data/cloud/firebase_bootstrap.dart';
+import '../../data/cloud/github_release_checker.dart';
 import '../../data/repositories/drift_cloud_sync_state_repository.dart';
 import '../../data/repositories/drift_player_save_repository.dart';
 import '../../data/repositories/firestore_cloud_save_repository.dart';
@@ -15,6 +16,7 @@ import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/repositories/cloud_save_repository.dart';
 import '../../domain/repositories/cloud_sync_state_repository.dart';
 import '../services/account_service.dart';
+import '../services/app_update_service.dart';
 import '../services/cloud_sync_service.dart';
 import 'database_provider.dart' show playerSaveRepositoryProvider;
 import 'game_clock_provider.dart';
@@ -22,6 +24,17 @@ import 'game_config_provider.dart';
 
 /// Versi aplikasi saat ini (selaras dengan `pubspec.yaml` `1.0.0+1`).
 const String kCloudSyncAppVersion = '1.0.0+1';
+
+final appReleaseSourceProvider = Provider<AppReleaseSource>((ref) {
+  return GithubReleaseChecker();
+});
+
+final appUpdateServiceProvider = Provider<AppUpdateService>((ref) {
+  return AppUpdateService(
+    source: ref.watch(appReleaseSourceProvider),
+    currentVersion: kCloudSyncAppVersion,
+  );
+});
 
 final firebaseBootstrapProvider = Provider<FirebaseBootstrap>((ref) {
   final bootstrap = FirebaseBootstrap.instance;

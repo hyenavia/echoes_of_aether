@@ -5,8 +5,10 @@ import 'package:echoes_of_aether/application/providers/cloud_sync_provider.dart'
 import 'package:echoes_of_aether/application/providers/database_provider.dart';
 import 'package:echoes_of_aether/application/providers/game_config_provider.dart';
 import 'package:echoes_of_aether/application/services/account_service.dart';
+import 'package:echoes_of_aether/application/services/app_update_service.dart';
 import 'package:echoes_of_aether/application/services/cloud_sync_service.dart';
 import 'package:echoes_of_aether/data/cloud/firebase_bootstrap.dart';
+import 'package:echoes_of_aether/data/cloud/github_release_checker.dart';
 import 'package:echoes_of_aether/data/database/app_database.dart'
     hide ClockState, CloudSyncState, GameSettings, PeriodicQuestState;
 import 'package:echoes_of_aether/data/models/boss_events_config_parser.dart';
@@ -28,7 +30,10 @@ import 'package:echoes_of_aether/domain/entities/save_metrics.dart';
 import 'package:echoes_of_aether/domain/repositories/cloud_save_repository.dart';
 import 'package:echoes_of_aether/features/dungeon/cloud_sync_section.dart';
 import 'package:echoes_of_aether/features/dungeon/dungeon_screen.dart';
+import 'package:echoes_of_aether/features/dungeon/settings_overlay.dart';
 import 'package:echoes_of_aether/features/dungeon/town_hub_view.dart';
+import 'package:echoes_of_aether/features/dungeon/update_reminder_dialog.dart';
+import 'package:echoes_of_aether/domain/entities/game_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -496,5 +501,264 @@ void main() {
         await tester.runAsync(_flushDb);
       },
     );
+
+    testWidgets(
+      'UpdateReminderBanner, showSystemUpdateNoticeDialog, dan tombol Catatan Update di Settings bekerja',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: CloudSyncSection(
+                  status: const CloudSyncStatusSnapshot(
+                    phase: CloudSyncPhase.rejected,
+                    account: CloudAccountSnapshot(
+                      kind: CloudAccountKind.emailLinked,
+                      uid: 'e-1',
+                      email: 'hero@example.com',
+                    ),
+                    updateAvailableVersion: '1.2.0+5',
+                    updateAvailableSchemaVersion: 12,
+                    updateReminderMessage:
+                        'Save cloud berasal dari versi aplikasi lebih baru.',
+                    isUpdateRequiredForSync: true,
+                  ),
+                  isDungeonRunActive: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          find.byKey(const Key('cloud_update_reminder_banner')),
+          findsOneWidget,
+        );
+        expect(find.text('v1.2.0+5'), findsOneWidget);
+        expect(
+          find.text('Save cloud berasal dari versi aplikasi lebih baru.'),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const Key('cloud_update_reminder_detail_btn')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('app_update_available_dialog')),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Tutup'));
+        await tester.pumpAndSettle();
+
+        // Uji showSystemUpdateNoticeDialog & tombol di SettingsOverlay
+        final settingsNotifier = ValueNotifier(const GameSettingsData());
+        addTearDown(settingsNotifier.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: SettingsOverlay(
+                  settings: settingsNotifier,
+                  onChanged: (_) {},
+                  onClose: () {},
+                  onOpenUpdateNotice: () => showSystemUpdateNoticeDialog(
+                    context,
+                    appVersion: '1.0.0+1',
+                    playerLevel: 90,
+                    ascensionPhase: 6,
+                    highestAscensionRank: 5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.ensureVisible(
+          find.byKey(const Key('settings_update_notice_btn')),
+        );
+        await tester.tap(find.byKey(const Key('settings_update_notice_btn')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('system_update_notice_dialog')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('v1.0.0+1 • Lv 90 • Fase A6 • Rank 5'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Mengerti'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('system_update_notice_dialog')),
+          findsNothing,
+        );
+      },
+    );
+
+    test(
+      'lastSeenUpdateNoticeVersion dipersistensikan di GameSettings Drift',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+        await db.initialize();
+        final repo = DriftPlayerSaveRepository(db: db, config: config);
+
+        final initial = await repo.loadSettings();
+        expect(initial.lastSeenUpdateNoticeVersion, 0);
+
+        await repo.saveSettings(
+          initial.copyWith(
+            lastSeenUpdateNoticeVersion: kLatestSystemUpdateNoticeVersion,
+          ),
+        );
+        final reloaded = await repo.loadSettings();
+        expect(
+          reloaded.lastSeenUpdateNoticeVersion,
+          kLatestSystemUpdateNoticeVersion,
+        );
+      },
+    );
+
+    test('GithubReleaseChecker.parseReleaseJson & AppUpdateService mendeteksi rilis APK lebih baru', () async {
+      const sampleJson = '''
+      {
+        "tag_name": "v1.2.0+3",
+        "name": "Echoes of Aether v1.2.0",
+        "html_url": "https://github.com/hyenavia/echoes_of_aether/releases/tag/v1.2.0+3",
+        "body": "Perbaikan Cloud Sync & rebalancing.",
+        "draft": false,
+        "assets": [
+          {
+            "name": "app-release.apk",
+            "browser_download_url": "https://github.com/hyenavia/echoes_of_aether/releases/download/v1.2.0+3/app-release.apk"
+          }
+        ]
+      }
+      ''';
+      final parsed = GithubReleaseChecker.parseReleaseJson(sampleJson);
+      expect(parsed, isNotNull);
+      expect(parsed!.latestVersion, '1.2.0+3');
+      expect(parsed.hasDirectApk, isTrue);
+      expect(parsed.preferredActionUrl, endsWith('/app-release.apk'));
+
+      final service = AppUpdateService(
+        source: _FakeReleaseSource(parsed),
+        currentVersion: '1.0.0+1',
+      );
+      final check = await service.checkForUpdate();
+      expect(check.hasUpdate, isTrue);
+      expect(check.releaseInfo?.latestVersion, '1.2.0+3');
+
+      final upToDate = await const AppUpdateService(
+        source: _FakeReleaseSource(
+          AppReleaseUpdateInfo(
+            latestVersion: '1.0.0+1',
+            releaseUrl: 'https://github.com/hyenavia/echoes_of_aether/releases',
+          ),
+        ),
+        currentVersion: '1.0.0+1',
+      ).checkForUpdate();
+      expect(upToDate.hasUpdate, isFalse);
+    });
+
+    testWidgets(
+      'DungeonScreen memunculkan popup update di beranda Town saat GitHub Releases punya versi lebih baru',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final db = AppDatabase(NativeDatabase.memory());
+        await tester.runAsync(() async {
+          await db.initialize();
+          final repo = DriftPlayerSaveRepository(db: db, config: config);
+          await repo.saveSnapshot(
+            const PlayerSaveSnapshot(
+              character: PlayerCharacterSnapshot(
+                progress: PlayerProgress(level: 5, gold: 250),
+              ),
+              inventory: InventorySnapshot(),
+              offlineActivity: OfflineActivitySnapshot.paused(),
+            ),
+          );
+        });
+        addTearDown(() => tester.runAsync(db.close));
+
+        final failedBootstrap = FirebaseBootstrap(
+          initializeFirebase: () async =>
+              throw StateError('No Play Services on test device'),
+        );
+        await failedBootstrap.initialize();
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              gameConfigProvider.overrideWith((ref) async => config),
+              playerSaveRepositoryProvider.overrideWith(
+                (ref) async =>
+                    DriftPlayerSaveRepository(db: db, config: config),
+              ),
+              firebaseBootstrapProvider.overrideWithValue(failedBootstrap),
+              appReleaseSourceProvider.overrideWithValue(
+                const _FakeReleaseSource(
+                  AppReleaseUpdateInfo(
+                    latestVersion: '1.2.0+3',
+                    releaseUrl: 'https://github.com/hyenavia/echoes_of_aether/releases/tag/v1.2.0+3',
+                    apkDownloadUrl: 'https://github.com/hyenavia/echoes_of_aether/releases/download/v1.2.0+3/app-release.apk',
+                    releaseNotes: 'Rilis baru tersedia dengan APK langsung.',
+                  ),
+                ),
+              ),
+            ],
+            child: const MaterialApp(
+              home: DungeonScreen(roomTransitionDelaySeconds: 0.05),
+            ),
+          ),
+        );
+
+        for (var i = 0; i < 20; i++) {
+          await tester.pump();
+          await tester.runAsync(_flushDb);
+          await tester.pump();
+          if (find
+              .byKey(const Key('app_update_available_dialog'))
+              .evaluate()
+              .isNotEmpty) {
+            break;
+          }
+        }
+
+        expect(
+          find.byKey(const Key('app_update_available_dialog')),
+          findsOneWidget,
+        );
+        expect(find.text('Versi Terbaru: v1.2.0+3'), findsOneWidget);
+        expect(find.text('Unduh APK'), findsOneWidget);
+        expect(find.text('Nanti'), findsOneWidget);
+
+        await tester.tap(find.text('Nanti'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('app_update_available_dialog')),
+          findsNothing,
+        );
+        await tester.runAsync(_flushDb);
+      },
+    );
   });
+}
+
+class _FakeReleaseSource implements AppReleaseSource {
+  const _FakeReleaseSource(this.info);
+
+  final AppReleaseUpdateInfo? info;
+
+  @override
+  Future<AppReleaseUpdateInfo?> fetchLatestRelease() async => info;
 }

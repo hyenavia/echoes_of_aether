@@ -300,3 +300,320 @@ test('security: all unlisted collection paths are denied', async () => {
   );
   await assertFails(getDoc(doc(aliceDb, 'leaderboard', 'global')));
 });
+
+async function seedSlotDoc(uid, rawDoc, dtSeconds = 60) {
+  const slot = String(rawDoc.revision % 2);
+  const savedAtMs = Date.now() - dtSeconds * 1000 - 25;
+  await testEnv.withSecurityRulesDisabled(async (adminCtx) => {
+    await setDoc(
+      doc(adminCtx.firestore(), 'saves', uid, 'slots', slot),
+      toFirestoreDoc(rawDoc, Timestamp.fromMillis(savedAtMs)),
+    );
+  });
+}
+
+test('migration: M16 schemaVersion 10 -> 11 clamps level 604->90, rank 13->5, and allows legacy gold bonus 2570000', async () => {
+  const sample = testVectors.find((v) => v.name === 'accept_first_upload_revision_1');
+  assert.ok(sample);
+
+  const prev = {
+    ...sample.next,
+    revision: 1,
+    schemaVersion: 10,
+    level: 604,
+    highestAscensionRank: 13,
+    gold: 10000,
+  };
+  await seedSlotDoc('alice', prev, 60);
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const next = {
+    ...sample.next,
+    revision: 2,
+    schemaVersion: 11,
+    level: 90,
+    highestAscensionRank: 5,
+    gold: 10000 + (604 - 90) * 5000, // +2570000 Aether Legacy Gift
+  };
+  await assertSucceeds(
+    setDoc(
+      doc(aliceDb, 'saves', 'alice', 'slots', '0'),
+      toFirestoreDoc(next, serverTimestamp()),
+    ),
+  );
+});
+
+test('migration: M16 schemaVersion 10 -> 11 high-level 100000->90 grants (100000-90)*5000 legacy gold bonus', async () => {
+  const sample = testVectors.find((v) => v.name === 'accept_first_upload_revision_1');
+  assert.ok(sample);
+
+  const legacyBonus = (100000 - 90) * 5000; // 499550000
+  const prev = {
+    ...sample.next,
+    revision: 1,
+    schemaVersion: 10,
+    level: 100000,
+    highestAscensionRank: 0,
+    gold: 10000,
+  };
+  await seedSlotDoc('alice', prev, 60);
+
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  await assertSucceeds(
+    setDoc(
+      doc(aliceDb, 'saves', 'alice', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 90,
+          highestAscensionRank: 0,
+          gold: 10000 + legacyBonus,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+
+  // Exceeding base gold ceiling + legacyGoldBonus must still be rejected.
+  await seedSlotDoc('bob', prev, 60);
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  await assertFails(
+    setDoc(
+      doc(bobDb, 'saves', 'bob', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 90,
+          highestAscensionRank: 0,
+          gold: 10000 + legacyBonus + 100000000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+});
+
+test('migration: M16 schemaVersion 10 -> 11 rejects level below 90, rank below 5, or unclamped drops', async () => {
+  const sample = testVectors.find((v) => v.name === 'accept_first_upload_revision_1');
+  assert.ok(sample);
+
+  const prevHigh = {
+    ...sample.next,
+    revision: 1,
+    schemaVersion: 10,
+    level: 604,
+    highestAscensionRank: 13,
+    gold: 10000,
+  };
+  await seedSlotDoc('alice', prevHigh, 60);
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  // Level dropped below 90 fails.
+  await assertFails(
+    setDoc(
+      doc(aliceDb, 'saves', 'alice', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 89,
+          highestAscensionRank: 5,
+          gold: 10000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+
+  // Rank dropped below 5 fails.
+  await assertFails(
+    setDoc(
+      doc(aliceDb, 'saves', 'alice', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 90,
+          highestAscensionRank: 4,
+          gold: 10000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+
+  // Level <= 90 cannot drop during 10 -> 11.
+  await seedSlotDoc(
+    'bob',
+    {
+      ...sample.next,
+      revision: 1,
+      schemaVersion: 10,
+      level: 85,
+      highestAscensionRank: 4,
+      gold: 10000,
+    },
+    60,
+  );
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  await assertFails(
+    setDoc(
+      doc(bobDb, 'saves', 'bob', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 80,
+          highestAscensionRank: 4,
+          gold: 10000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+
+  // Rank <= 5 cannot drop during 10 -> 11.
+  await assertFails(
+    setDoc(
+      doc(bobDb, 'saves', 'bob', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 85,
+          highestAscensionRank: 3,
+          gold: 10000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+});
+
+test('migration: same-schema 11 -> 11 rejects dropping level, rank, or claiming legacy gold bonus', async () => {
+  const sample = testVectors.find((v) => v.name === 'accept_first_upload_revision_1');
+  assert.ok(sample);
+
+  const prevHigh = {
+    ...sample.next,
+    revision: 1,
+    schemaVersion: 11,
+    level: 604,
+    highestAscensionRank: 13,
+    gold: 10000,
+  };
+  await seedSlotDoc('alice', prevHigh, 60);
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  // Same-schema 11 -> 11 cannot drop level (604 -> 90).
+  await assertFails(
+    setDoc(
+      doc(aliceDb, 'saves', 'alice', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 90,
+          highestAscensionRank: 13,
+          gold: 10000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+
+  // Same-schema 11 -> 11 cannot drop highestAscensionRank (13 -> 5).
+  await assertFails(
+    setDoc(
+      doc(aliceDb, 'saves', 'alice', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 604,
+          highestAscensionRank: 5,
+          gold: 10000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+
+  // Same-schema 11 -> 11 cannot claim legacy gold bonus.
+  await seedSlotDoc(
+    'bob',
+    {
+      ...sample.next,
+      revision: 1,
+      schemaVersion: 11,
+      level: 100000,
+      highestAscensionRank: 0,
+      gold: 10000,
+    },
+    60,
+  );
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  await assertFails(
+    setDoc(
+      doc(bobDb, 'saves', 'bob', 'slots', '0'),
+      toFirestoreDoc(
+        {
+          ...sample.next,
+          revision: 2,
+          schemaVersion: 11,
+          level: 100000,
+          highestAscensionRank: 0,
+          gold: 10000 + (100000 - 90) * 5000,
+        },
+        serverTimestamp(),
+      ),
+    ),
+  );
+});
+
+test('security: /app_config/version allows authenticated get only, denies unauthenticated get and all list/set/delete', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+  const anonDb = testEnv.unauthenticatedContext().firestore();
+
+  // Create on /app_config/version fails even when authenticated.
+  await assertFails(
+    setDoc(doc(aliceDb, 'app_config', 'version'), { latestVersion: '9.9.9' }),
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (adminCtx) => {
+    await setDoc(doc(adminCtx.firestore(), 'app_config', 'version'), {
+      minVersion: '1.0.0',
+      latestVersion: '1.1.0',
+    });
+  });
+
+  // Authenticated get succeeds.
+  const versionSnap = await assertSucceeds(
+    getDoc(doc(aliceDb, 'app_config', 'version')),
+  );
+  assert.equal(versionSnap.exists(), true);
+  assert.equal(versionSnap.data().latestVersion, '1.1.0');
+
+  // Unauthenticated get fails.
+  await assertFails(getDoc(doc(anonDb, 'app_config', 'version')));
+
+  // Authenticated list, update (set), and delete fail.
+  await assertFails(getDocs(collection(aliceDb, 'app_config')));
+  await assertFails(
+    setDoc(doc(aliceDb, 'app_config', 'version'), { latestVersion: '9.9.9' }),
+  );
+  await assertFails(deleteDoc(doc(aliceDb, 'app_config', 'version')));
+
+  // Other documents under /app_config remain denied.
+  await assertFails(getDoc(doc(aliceDb, 'app_config', 'other')));
+});

@@ -17,6 +17,7 @@ import '../../application/services/account_service.dart';
 import '../../application/services/cloud_sync_service.dart';
 import '../../application/services/game_session_coordinator.dart';
 import '../../core/perf/perf_tracer.dart';
+import '../../data/platform/external_url_launcher.dart';
 import '../../domain/entities/altar_blessing.dart';
 import '../../domain/entities/boss_spire.dart';
 import '../../domain/entities/currency_config.dart';
@@ -84,6 +85,7 @@ import 'offline_summary_overlay.dart';
 import 'run_ended_overlay.dart';
 import 'settings_overlay.dart';
 import 'town_hub_view.dart';
+import 'update_reminder_dialog.dart';
 import '../../theme/app_theme.dart';
 
 /// Layar utama gameplay: memuat konfigurasi & save data, menampilkan Town Hub,
@@ -168,6 +170,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   Future<void>? _resumeFuture;
   CloudSyncService? _cloudSync;
   bool _cloudConflictDialogOpen = false;
+  bool _appUpdateDialogShownThisSession = false;
 
   bool get _isDungeonRunActive =>
       _inDungeon && (_dungeonManager?.hasActiveSession ?? false);
@@ -539,6 +542,17 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       final outcome = await cloud.sync(trigger);
       if (!mounted) return;
       if (showConflictPrompt &&
+          outcome.status.isUpdateRequiredForSync &&
+          outcome.status.updateReminderMessage != null &&
+          !_appUpdateDialogShownThisSession) {
+        _appUpdateDialogShownThisSession = true;
+        await showAppUpdateAvailableDialog(
+          context,
+          message: outcome.status.updateReminderMessage!,
+          latestVersion: outcome.status.updateAvailableVersion,
+          isRequired: true,
+        );
+      } else if (showConflictPrompt &&
           (outcome.kind == SyncOutcomeKind.offerRestore ||
               outcome.kind == SyncOutcomeKind.conflict)) {
         final conflictKind = outcome.kind == SyncOutcomeKind.offerRestore
@@ -599,6 +613,11 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         _applyLoadedSession(config, reloaded, resetTransientRewards: true);
         _dirty = false;
         _showMessage('Save cloud revisi ${meta.revision} berhasil dipulihkan.');
+        if (meta.metrics.schemaVersion < 11 &&
+            _audioService.settings.lastSeenUpdateNoticeVersion <
+                kLatestSystemUpdateNoticeVersion) {
+          await _openSystemUpdateNoticeDialog();
+        }
       case CloudRestoreBlockedActiveRun(:final message):
       case CloudRestoreNotFound(:final message):
       case CloudRestoreFailed(:final message):
@@ -847,6 +866,30 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
 
       _initialized = true;
 
+      if (loaded.isFirstLaunch) {
+        final s = _audioService.settings;
+        if (s.lastSeenUpdateNoticeVersion < kLatestSystemUpdateNoticeVersion) {
+          _updateSettings(
+            s.copyWith(
+              lastSeenUpdateNoticeVersion: kLatestSystemUpdateNoticeVersion,
+            ),
+          );
+        }
+      } else if (_audioService.settings.lastSeenUpdateNoticeVersion <
+              kLatestSystemUpdateNoticeVersion &&
+          loaded.character.ascensionPhase > 0) {
+        _updateSettings(
+          _audioService.settings.copyWith(
+            lastSeenUpdateNoticeVersion: kLatestSystemUpdateNoticeVersion,
+          ),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(_openSystemUpdateNoticeDialog());
+          }
+        });
+      }
+
       if (loaded.isFirstLaunch ||
           (!_inDungeon &&
               !identical(_offlineActivity, loaded.offlineActivity))) {
@@ -862,6 +905,9 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
         _showMessage(loaded.offlineResult.failureReason!);
       }
       unawaited(_startupCloudSync(coordinator));
+      if (!_inDungeon) {
+        unawaited(_checkAppUpdate());
+      }
     }();
   }
 
@@ -1786,6 +1832,58 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   void _updateSettings(GameSettingsData next) {
     unawaited(_audioService.applySettings(next));
     unawaited(_settingsRepo?.saveSettings(next));
+  }
+
+  Future<void> _openSystemUpdateNoticeDialog() async {
+    if (!mounted) return;
+    final settings = _audioService.settings;
+    if (settings.lastSeenUpdateNoticeVersion <
+        kLatestSystemUpdateNoticeVersion) {
+      _updateSettings(
+        settings.copyWith(
+          lastSeenUpdateNoticeVersion: kLatestSystemUpdateNoticeVersion,
+        ),
+      );
+    }
+    await showSystemUpdateNoticeDialog(
+      context,
+      appVersion: kCloudSyncAppVersion,
+      playerLevel: _character?.level ?? 1,
+      ascensionPhase: _character?.ascensionPhase ?? 0,
+      highestAscensionRank: _cycleProgress.highestAscensionRank,
+    );
+  }
+
+  Future<void> _checkAppUpdate({bool manual = false}) async {
+    try {
+      final result = await ref.read(appUpdateServiceProvider).checkForUpdate();
+      if (!mounted) return;
+      final info = result.releaseInfo;
+      if (result.hasUpdate && info != null) {
+        if (!manual && (_appUpdateDialogShownThisSession || _inDungeon)) {
+          return;
+        }
+        _appUpdateDialogShownThisSession = true;
+        final notes = info.releaseNotes;
+        final message = (notes != null && notes.isNotEmpty)
+            ? notes
+            : 'Versi baru Echoes of Aether (v${info.latestVersion}) tersedia di GitHub Releases.';
+        await showAppUpdateAvailableDialog(
+          context,
+          message: message,
+          latestVersion: info.latestVersion,
+          actionLabel: info.hasDirectApk ? 'Unduh APK' : 'Buka Rilis',
+          onActionPressed: () =>
+              unawaited(ExternalUrlLauncher.openUrl(info.preferredActionUrl)),
+        );
+      } else if (manual) {
+        _showMessage('Aplikasi sudah versi terbaru (v$kCloudSyncAppVersion).');
+      }
+    } catch (_) {
+      if (manual && mounted) {
+        _showMessage('Gagal memeriksa pembaruan. Periksa koneksi internet.');
+      }
+    }
   }
 
   void _switchCycleRank(GameConfig config, int targetRank) {
@@ -2752,6 +2850,9 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                             .requestPermission(),
                         onTestNotification: _handleTestNotification,
                         cloudSyncSection: _buildCloudSyncSection(cfg),
+                        onOpenUpdateNotice: _openSystemUpdateNoticeDialog,
+                        onCheckAppUpdate: () =>
+                            unawaited(_checkAppUpdate(manual: true)),
                         onEnhanceEquipment: _handleEnhanceEquipment,
                         onReforgeEquipment: _handleReforgeEquipment,
                         onSalvageEquipment: _handleSalvageEquipment,
@@ -3075,6 +3176,9 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                         .requestPermission(),
                     onTestNotification: _handleTestNotification,
                     cloudSyncSection: _buildCloudSyncSection(config),
+                    onOpenUpdateNotice: _openSystemUpdateNoticeDialog,
+                    onCheckAppUpdate: () =>
+                        unawaited(_checkAppUpdate(manual: true)),
                     onClose: () => g.overlays.remove(GameOverlays.settings),
                   ),
                   GameOverlays.blacksmith: (context, g) => BlacksmithOverlay(

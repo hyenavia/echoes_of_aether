@@ -43,6 +43,9 @@ class InMemoryCloudSaveRepository implements CloudSaveRepository {
   )?
   uploadValidatorHook;
 
+  /// Informasi versi aplikasi remote untuk simulasi update reminder di test.
+  RemoteAppVersionInfo? versionInfo;
+
   final Map<int, CloudSaveDownload> _slots = {};
 
   CloudSaveDownload? slotData(int slot) => _slots[slot];
@@ -178,5 +181,13 @@ class InMemoryCloudSaveRepository implements CloudSaveRepository {
     final fault = _checkFault<int>();
     if (fault != null) return fault;
     return CloudSuccess(_serverNowMs());
+  }
+
+  @override
+  Future<RemoteAppVersionInfo?> fetchVersionInfo() async {
+    if (!isSignedIn || nextFault == CloudFaultMode.networkError) {
+      return null;
+    }
+    return versionInfo;
   }
 }

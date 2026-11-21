@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart' show immutable;
 
 /// Jenis banner gacha (Class Awakening vs Mythical Armory).
 enum GachaBannerType {

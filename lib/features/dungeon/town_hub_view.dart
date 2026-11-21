@@ -90,6 +90,8 @@ class TownHubView extends StatefulWidget {
     this.onRequestNotificationPermission,
     this.onTestNotification,
     this.cloudSyncSection,
+    this.onOpenUpdateNotice,
+    this.onCheckAppUpdate,
     this.onEnhanceEquipment,
     this.onReforgeEquipment,
     this.onSalvageEquipment,
@@ -155,6 +157,8 @@ class TownHubView extends StatefulWidget {
   final Future<bool> Function()? onRequestNotificationPermission;
   final Future<void> Function()? onTestNotification;
   final Widget? cloudSyncSection;
+  final VoidCallback? onOpenUpdateNotice;
+  final VoidCallback? onCheckAppUpdate;
   final BlacksmithEnhanceResult Function(String instanceId)? onEnhanceEquipment;
   final BlacksmithReforgeResult Function(String instanceId)? onReforgeEquipment;
   final BlacksmithSalvageResult Function(String instanceId)? onSalvageEquipment;
@@ -372,6 +376,8 @@ class _TownHubViewState extends State<TownHubView> {
                                 widget.onRequestNotificationPermission,
                             onTestNotification: widget.onTestNotification,
                             cloudSyncSection: widget.cloudSyncSection,
+                            onOpenUpdateNotice: widget.onOpenUpdateNotice,
+                            onCheckAppUpdate: widget.onCheckAppUpdate,
                             onClose: () => _selectTab(TownTab.adventure),
                           )
                         : const Center(

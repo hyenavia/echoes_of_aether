@@ -58,8 +58,9 @@ class _DungeonCompletedOverlayState extends State<DungeonCompletedOverlay> {
   @override
   void initState() {
     super.initState();
-    final isTesting =
-        WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains(
+      'Test',
+    );
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 2),
     );

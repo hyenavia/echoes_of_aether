@@ -7,10 +7,13 @@ import '../../domain/entities/player_save_snapshot.dart';
 import '../../domain/repositories/cloud_save_repository.dart';
 import '../../domain/repositories/cloud_sync_state_repository.dart';
 import '../../domain/repositories/player_progress_repository.dart';
+import '../../domain/services/app_version_comparator.dart';
 import '../../domain/services/clock_guard.dart';
 import '../../domain/services/cloud_limits.dart';
 import '../../domain/services/game_clock.dart';
+import '../../domain/services/legacy_save_converter.dart';
 import '../../domain/services/save_metrics_calculator.dart';
+import '../../domain/services/save_snapshot_codec.dart';
 import '../../domain/services/sync_planner.dart';
 import 'account_service.dart';
 
@@ -83,6 +86,10 @@ class CloudSyncStatusSnapshot {
     this.infoMessage,
     this.consecutiveNetworkFailures = 0,
     this.nextNetworkRetryAtMs,
+    this.updateAvailableVersion,
+    this.updateAvailableSchemaVersion,
+    this.updateReminderMessage,
+    this.isUpdateRequiredForSync = false,
   });
 
   const CloudSyncStatusSnapshot.initial()
@@ -100,7 +107,11 @@ class CloudSyncStatusSnapshot {
       conflictKind = null,
       infoMessage = null,
       consecutiveNetworkFailures = 0,
-      nextNetworkRetryAtMs = null;
+      nextNetworkRetryAtMs = null,
+      updateAvailableVersion = null,
+      updateAvailableSchemaVersion = null,
+      updateReminderMessage = null,
+      isUpdateRequiredForSync = false;
 
   final CloudSyncPhase phase;
   final CloudAccountSnapshot account;
@@ -117,6 +128,10 @@ class CloudSyncStatusSnapshot {
   final String? infoMessage;
   final int consecutiveNetworkFailures;
   final int? nextNetworkRetryAtMs;
+  final String? updateAvailableVersion;
+  final int? updateAvailableSchemaVersion;
+  final String? updateReminderMessage;
+  final bool isUpdateRequiredForSync;
 
   CloudSyncStatusSnapshot copyWith({
     CloudSyncPhase? phase,
@@ -138,6 +153,11 @@ class CloudSyncStatusSnapshot {
     int? consecutiveNetworkFailures,
     int? nextNetworkRetryAtMs,
     bool clearNextNetworkRetryAtMs = false,
+    String? updateAvailableVersion,
+    int? updateAvailableSchemaVersion,
+    String? updateReminderMessage,
+    bool? isUpdateRequiredForSync,
+    bool clearUpdateReminder = false,
   }) => CloudSyncStatusSnapshot(
     phase: phase ?? this.phase,
     account: account ?? this.account,
@@ -165,6 +185,18 @@ class CloudSyncStatusSnapshot {
     nextNetworkRetryAtMs: clearNextNetworkRetryAtMs
         ? null
         : (nextNetworkRetryAtMs ?? this.nextNetworkRetryAtMs),
+    updateAvailableVersion: clearUpdateReminder
+        ? null
+        : (updateAvailableVersion ?? this.updateAvailableVersion),
+    updateAvailableSchemaVersion: clearUpdateReminder
+        ? null
+        : (updateAvailableSchemaVersion ?? this.updateAvailableSchemaVersion),
+    updateReminderMessage: clearUpdateReminder
+        ? null
+        : (updateReminderMessage ?? this.updateReminderMessage),
+    isUpdateRequiredForSync: clearUpdateReminder
+        ? false
+        : (isUpdateRequiredForSync ?? this.isUpdateRequiredForSync),
   );
 }
 
@@ -754,6 +786,42 @@ class CloudSyncService {
         );
     }
 
+    await _refreshUpdateReminder(
+      cloudMeta,
+      fetchRemote: trigger != SyncTrigger.background,
+    );
+    if (cloudMeta != null &&
+        (cloudMeta.metrics.schemaVersion > schemaVersion ||
+            cloudMeta.metrics.codecVersion >
+                SaveSnapshotCodec.supportedCodecVersion)) {
+      final reminderMsg =
+          _status.updateReminderMessage ??
+          'Save cloud berasal dari versi aplikasi yang lebih baru '
+              '(v${cloudMeta.appVersion}, skema v${cloudMeta.metrics.schemaVersion}). '
+              'Perbarui aplikasi untuk menyinkronkan.';
+      final snap = _emitStatus(
+        _status.copyWith(
+          phase: CloudSyncPhase.rejected,
+          account: account,
+          pendingCloudMeta: cloudMeta,
+          lastRejectCode: 'app_update_required',
+          lastRejectMessage: reminderMsg,
+          lastRejectAtMs: effectiveNowMs,
+          infoMessage: reminderMsg,
+          updateAvailableVersion: cloudMeta.appVersion,
+          updateAvailableSchemaVersion: cloudMeta.metrics.schemaVersion,
+          updateReminderMessage: reminderMsg,
+          isUpdateRequiredForSync: true,
+        ),
+      );
+      return CloudSyncOutcome(
+        kind: SyncOutcomeKind.rejected,
+        status: snap,
+        cloudMeta: cloudMeta,
+        message: reminderMsg,
+      );
+    }
+
     final plan = planner.plan(
       isSignedIn: account.isSignedIn,
       trigger: trigger,
@@ -1141,6 +1209,15 @@ class CloudSyncService {
         );
     }
 
+    if (payload.meta.metrics.schemaVersion > schemaVersion) {
+      await _refreshPhaseAfterFailure();
+      return CloudRestoreFailed(
+        'Save cloud memakai skema lebih baru '
+        '(v${payload.meta.metrics.schemaVersion}, aplikasi mendukung s/d v$schemaVersion). '
+        'Perbarui aplikasi terlebih dahulu.',
+      );
+    }
+
     final PlayerSaveSnapshot decoded;
     try {
       decoded = blobPort.unpack(
@@ -1155,6 +1232,18 @@ class CloudSyncService {
         'Save lokal tetap dipertahankan.',
       );
     }
+
+    final normalized = schemaVersion >= LegacySaveConverter.m16SchemaVersion
+        ? LegacySaveConverter.convertToV11IfNeeded(
+            decoded,
+            fromSchemaVersion: payload.meta.metrics.schemaVersion,
+          )
+        : decoded;
+    final isLegacyConverted =
+        schemaVersion >= LegacySaveConverter.m16SchemaVersion &&
+        payload.meta.metrics.schemaVersion <
+            LegacySaveConverter.m16SchemaVersion &&
+        !identical(normalized, decoded);
 
     try {
       final replaceRepo = _replaceRepository;
@@ -1173,7 +1262,10 @@ class CloudSyncService {
         );
       }
 
-      await replaceRepo.replaceSnapshot(decoded, restoredAtMs: effectiveNowMs);
+      await replaceRepo.replaceSnapshot(
+        normalized,
+        restoredAtMs: effectiveNowMs,
+      );
     } catch (e) {
       await _refreshPhaseAfterFailure();
       return CloudRestoreFailed(
@@ -1182,9 +1274,11 @@ class CloudSyncService {
     }
 
     final savedAfterRestore = await saveRepository.loadSnapshot();
-    final syncedHash = savedAfterRestore == null
+    final syncedHash = isLegacyConverted
         ? payload.meta.metrics.blobSha256
-        : blobPort.pack(savedAfterRestore).sha256Hex;
+        : (savedAfterRestore == null
+              ? payload.meta.metrics.blobSha256
+              : blobPort.pack(savedAfterRestore).sha256Hex);
 
     await syncStateRepository.markSynced(
       revision: payload.meta.revision,
@@ -1196,7 +1290,9 @@ class CloudSyncService {
 
     final nextStatus = _emitStatus(
       _status.copyWith(
-        phase: CloudSyncPhase.synced,
+        phase: isLegacyConverted
+            ? CloudSyncPhase.pendingChanges
+            : CloudSyncPhase.synced,
         account: accountService.current,
         lastSyncedRevision: payload.meta.revision,
         lastSyncAtMs: effectiveNowMs,
@@ -1204,13 +1300,14 @@ class CloudSyncService {
         clearConflict: true,
         clearNextNetworkRetryAtMs: true,
         consecutiveNetworkFailures: 0,
-        infoMessage:
-            'Save cloud revisi ${payload.meta.revision} berhasil dipulihkan.',
+        infoMessage: isLegacyConverted
+            ? 'Save cloud revisi ${payload.meta.revision} dipulihkan dan dikonversi ke sistem baru.'
+            : 'Save cloud revisi ${payload.meta.revision} berhasil dipulihkan.',
       ),
     );
 
     return CloudRestoreSuccess(
-      restoredSnapshot: savedAfterRestore ?? decoded,
+      restoredSnapshot: savedAfterRestore ?? normalized,
       meta: payload.meta,
       status: nextStatus,
     );
@@ -1488,6 +1585,139 @@ class CloudSyncService {
         ? 'Unggahan ditolak oleh aturan Firestore ($fallbackCode).'
         : fallbackMessage.trim();
     return (code: fallbackCode, reason: cleanMsg);
+  }
+
+  /// Memeriksa metadata cloud & versi aplikasi remote untuk akun aktif tanpa
+  /// menimpa save lokal maupun mengunggah save.
+  Future<CloudSyncStatusSnapshot>
+  inspectCloudMetaForCurrentAccount() => _enqueue(() async {
+    final account = await accountService.refreshState();
+    if (!account.isSignedIn || account.kind == CloudAccountKind.unavailable) {
+      return _status;
+    }
+    CloudSaveMeta? cloudMeta;
+    final metaResult = await cloudSaveRepository.latestMeta();
+    if (metaResult is CloudSuccess<CloudSaveMeta?>) {
+      cloudMeta = metaResult.value;
+    }
+    await _refreshUpdateReminder(cloudMeta, fetchRemote: true);
+    if (cloudMeta != null &&
+        (cloudMeta.metrics.schemaVersion > schemaVersion ||
+            cloudMeta.metrics.codecVersion >
+                SaveSnapshotCodec.supportedCodecVersion)) {
+      final reminderMsg =
+          _status.updateReminderMessage ??
+          'Save cloud berasal dari versi aplikasi yang lebih baru '
+              '(v${cloudMeta.appVersion}, skema v${cloudMeta.metrics.schemaVersion}). '
+              'Perbarui aplikasi untuk menyinkronkan.';
+      return _emitStatus(
+        _status.copyWith(
+          phase: CloudSyncPhase.rejected,
+          account: account,
+          pendingCloudMeta: cloudMeta,
+          lastRejectCode: 'app_update_required',
+          lastRejectMessage: reminderMsg,
+          infoMessage: reminderMsg,
+          updateAvailableVersion: cloudMeta.appVersion,
+          updateAvailableSchemaVersion: cloudMeta.metrics.schemaVersion,
+          updateReminderMessage: reminderMsg,
+          isUpdateRequiredForSync: true,
+        ),
+      );
+    }
+    return _emitStatus(_status.copyWith(account: account));
+  });
+
+  Future<void> _refreshUpdateReminder(
+    CloudSaveMeta? cloudMeta, {
+    required bool fetchRemote,
+  }) async {
+    String? availableVersion;
+    int? availableSchema;
+    String? message;
+    var requiredForSync = false;
+
+    if (cloudMeta != null) {
+      if (cloudMeta.metrics.schemaVersion > schemaVersion ||
+          cloudMeta.metrics.codecVersion >
+              SaveSnapshotCodec.supportedCodecVersion) {
+        availableVersion = cloudMeta.appVersion;
+        availableSchema = cloudMeta.metrics.schemaVersion;
+        requiredForSync = true;
+        message =
+            'Save cloud berasal dari versi aplikasi yang lebih baru '
+            '(v${cloudMeta.appVersion}, skema v${cloudMeta.metrics.schemaVersion}). '
+            'Perbarui aplikasi untuk menyinkronkan.';
+      } else if (AppVersionComparator.isRemoteNewer(
+        localAppVersion: appVersion,
+        localSchemaVersion: schemaVersion,
+        remoteAppVersion: cloudMeta.appVersion,
+        remoteSchemaVersion: cloudMeta.metrics.schemaVersion,
+      )) {
+        availableVersion = cloudMeta.appVersion;
+        availableSchema = cloudMeta.metrics.schemaVersion;
+        message =
+            'Save cloud terakhir berasal dari versi aplikasi lebih baru '
+            '(v${cloudMeta.appVersion}). Perbarui aplikasi agar tetap selaras.';
+      }
+    }
+
+    if (fetchRemote && !requiredForSync) {
+      RemoteAppVersionInfo? remoteInfo;
+      try {
+        remoteInfo = await cloudSaveRepository.fetchVersionInfo();
+      } catch (_) {
+        remoteInfo = null;
+      }
+      if (remoteInfo != null) {
+        final minReq = remoteInfo.minRequiredAppVersion;
+        final belowMin =
+            minReq != null &&
+            AppVersionComparator.compare(minReq, appVersion) > 0;
+        final newerRemote = AppVersionComparator.isRemoteNewer(
+          localAppVersion: appVersion,
+          localSchemaVersion: schemaVersion,
+          remoteAppVersion: remoteInfo.latestAppVersion,
+          remoteSchemaVersion: remoteInfo.latestSchemaVersion,
+        );
+        if (belowMin || newerRemote) {
+          final remoteVer = remoteInfo.latestAppVersion ?? minReq;
+          if (remoteVer != null &&
+              (availableVersion == null ||
+                  AppVersionComparator.compare(remoteVer, availableVersion) >
+                      0)) {
+            availableVersion = remoteVer;
+          }
+          if (remoteInfo.latestSchemaVersion != null &&
+              (availableSchema == null ||
+                  remoteInfo.latestSchemaVersion! > availableSchema)) {
+            availableSchema = remoteInfo.latestSchemaVersion;
+          }
+          requiredForSync = requiredForSync || belowMin;
+          final verLabel = availableVersion != null
+              ? 'v$availableVersion'
+              : 'skema v${availableSchema ?? schemaVersion}';
+          final notes = remoteInfo.releaseNotes;
+          final notesSuffix = (notes != null && notes.isNotEmpty)
+              ? ': $notes'
+              : '.';
+          message = belowMin
+              ? 'Versi aplikasi minimal ($verLabel) diperlukan untuk sinkronisasi penuh$notesSuffix'
+              : 'Pembaruan aplikasi $verLabel tersedia$notesSuffix';
+        }
+      }
+    }
+
+    if (message == null) {
+      _status = _status.copyWith(clearUpdateReminder: true);
+    } else {
+      _status = _status.copyWith(
+        updateAvailableVersion: availableVersion,
+        updateAvailableSchemaVersion: availableSchema,
+        updateReminderMessage: message,
+        isUpdateRequiredForSync: requiredForSync,
+      );
+    }
   }
 
   CloudSyncStatusSnapshot _emitStatus(CloudSyncStatusSnapshot next) {

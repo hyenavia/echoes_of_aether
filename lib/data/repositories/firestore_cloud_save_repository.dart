@@ -236,6 +236,43 @@ class FirestoreCloudSaveRepository implements CloudSaveRepository {
     }
   }
 
+  @override
+  Future<RemoteAppVersionInfo?> fetchVersionInfo() async {
+    final availability = await _bootstrap.initialize();
+    if (availability is CloudUnavailable) return null;
+    final uid = _uid();
+    if (uid == null || uid.isEmpty) return null;
+
+    try {
+      final snap = await _db
+          .collection('app_config')
+          .doc('version')
+          .get(const GetOptions(source: Source.server))
+          .timeout(clockTimeout);
+      final data = snap.data();
+      if (!snap.exists || data == null) return null;
+
+      final latestApp = data['latestAppVersion'];
+      final minReq = data['minRequiredAppVersion'];
+      final latestSchema = data['latestSchemaVersion'];
+      final notes = data['releaseNotes'];
+      return RemoteAppVersionInfo(
+        latestAppVersion: latestApp is String && latestApp.trim().isNotEmpty
+            ? latestApp.trim()
+            : null,
+        minRequiredAppVersion: minReq is String && minReq.trim().isNotEmpty
+            ? minReq.trim()
+            : null,
+        latestSchemaVersion: latestSchema is int ? latestSchema : null,
+        releaseNotes: notes is String && notes.trim().isNotEmpty
+            ? notes.trim()
+            : null,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<({String? uid, CloudResult<T>? error})> _ensureReadyUid<T>() async {
     final availability = await _bootstrap.initialize();
     if (availability is CloudUnavailable) {
