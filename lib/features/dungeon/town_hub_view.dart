@@ -17,6 +17,7 @@ import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/item_definition.dart';
 import '../../domain/entities/loadout_preset.dart';
 import '../../domain/entities/mystery_box.dart';
+import '../../domain/entities/mythical_forge_config.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/player_character.dart';
 import '../../domain/entities/player_save_snapshot.dart';
@@ -99,6 +100,7 @@ class TownHubView extends StatefulWidget {
     this.onReforgeEquipment,
     this.onSalvageEquipment,
     this.onSalvageEquipmentBulk,
+    this.onCraftMythicalEquipment,
     this.onOpenAltar,
     this.getAltarBalances,
     this.onUpgradeAltarBlessing,
@@ -174,6 +176,11 @@ class TownHubView extends StatefulWidget {
   final BlacksmithSalvageResult Function(String instanceId)? onSalvageEquipment;
   final BlacksmithBulkSalvageResult Function(Set<ItemRarity> rarities)?
   onSalvageEquipmentBulk;
+  final BlacksmithCraftMythicalResult Function(
+    String recipeId,
+    String sacrificeInstanceId,
+  )?
+  onCraftMythicalEquipment;
   final VoidCallback? onOpenAltar;
   final Map<String, int> Function()? getAltarBalances;
   final AltarUpgradeResult Function(AltarBlessingType type)?
@@ -638,6 +645,10 @@ class _TownHubViewState extends State<TownHubView> {
                   ),
               onSalvageEquipment: widget.onSalvageEquipment,
               onSalvageEquipmentBulk: widget.onSalvageEquipmentBulk,
+              forgeConfig:
+                  widget.codexConfig?.mythicalForge ??
+                  const MythicalForgeConfig(),
+              onCraftMythicalEquipment: widget.onCraftMythicalEquipment,
               embedded: true,
               onClose: () => _selectTab(TownTab.adventure),
             ),

@@ -61,6 +61,12 @@ abstract final class ItemSpriteRegistry {
     'event_crown_of_dusk': 'assets/sprite/fc2169.png',
     'abyssal_cowl': 'assets/sprite/fc2054.png',
     'void_crown': 'assets/sprite/fc2169.png',
+    'dawns_aegis_helm': 'assets/sprite/fc2171.png',
+    'shadowfang_cowl': 'assets/sprite/fc2054.png',
+    'temporal_crown': 'assets/sprite/fc2169.png',
+    'desperado_visor': 'assets/sprite/fc2158.png',
+    'harvester_crown': 'assets/sprite/fc2053.png',
+    'tempest_circlet': 'assets/sprite/fc2171.png',
 
     // Body Armor
     'padded_vest': 'assets/sprite/fc2019.png',
@@ -71,6 +77,12 @@ abstract final class ItemSpriteRegistry {
     'event_aegis_mail': 'assets/sprite/fc2050.png',
     'event_bulwark_plate': 'assets/sprite/fc2174.png',
     'void_carapace': 'assets/sprite/fc2164.png',
+    'dawns_aegis_cuirass': 'assets/sprite/fc2174.png',
+    'shadowfang_shroud': 'assets/sprite/fc2050.png',
+    'temporal_robe': 'assets/sprite/fc2165.png',
+    'desperado_coat': 'assets/sprite/fc2020.png',
+    'harvester_mantle': 'assets/sprite/fc2164.png',
+    'tempest_vestments': 'assets/sprite/fc2165.png',
 
     // Accessories
     'copper_ring': 'assets/sprite/fc117.png',
@@ -82,6 +94,12 @@ abstract final class ItemSpriteRegistry {
     'event_ember_ring': 'assets/sprite/fc2186.png',
     'event_aether_pendant': 'assets/sprite/fc2177.png',
     'abyssal_eye': 'assets/sprite/fc2185.png',
+    'dawns_aegis_signet': 'assets/sprite/fc2186.png',
+    'shadowfang_ring': 'assets/sprite/fc2185.png',
+    'temporal_loop': 'assets/sprite/fc2177.png',
+    'desperado_ring': 'assets/sprite/fc2186.png',
+    'harvester_talisman': 'assets/sprite/fc165.png',
+    'tempest_amulet': 'assets/sprite/fc2065.png',
   };
 
   /// Pemetaan hub icon & resource -> asset path

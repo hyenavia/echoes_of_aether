@@ -162,6 +162,7 @@ class EquipmentData {
     this.fixedStats = false,
     this.signatureClassId,
     this.resonanceDescription,
+    this.setId,
   });
 
   final EquipmentSlot slot;
@@ -178,6 +179,9 @@ class EquipmentData {
 
   /// Penjelasan efek khusus saat dipakai oleh signature class.
   final String? resonanceDescription;
+
+  /// ID equipment set Mythical yang menaungi item ini (jika bagian dari set).
+  final String? setId;
 }
 
 /// Satu item equipment milik player dengan hasil roll tersendiri (GDD 13).

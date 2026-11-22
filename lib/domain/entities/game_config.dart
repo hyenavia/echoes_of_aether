@@ -15,6 +15,7 @@ import 'hero_ascension.dart';
 import 'infinite_spire.dart';
 import 'item_definition.dart';
 import 'loot_table.dart';
+import 'mythical_forge_config.dart';
 import 'notification_config.dart';
 import 'progression_config.dart';
 import 'revive_config.dart';
@@ -53,6 +54,7 @@ class GameConfig {
     this.gacha,
     this.heroAscension = const HeroAscensionConfig(),
     this.infiniteSpire,
+    this.mythicalForge = const MythicalForgeConfig(),
   });
 
   final Map<String, EnemyDefinition> monsters;
@@ -81,4 +83,5 @@ class GameConfig {
   final GachaConfig? gacha;
   final HeroAscensionConfig heroAscension;
   final InfiniteSpireConfig? infiniteSpire;
+  final MythicalForgeConfig mythicalForge;
 }

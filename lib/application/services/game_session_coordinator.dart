@@ -461,6 +461,7 @@ class GameSessionCoordinator {
       skillCatalog: config.skills,
       specializationConfig: config.specializations,
       itemCatalog: config.items,
+      mythicalForgeConfig: config.mythicalForge,
       statsCalculator: DerivedStatsCalculator(
         pctCaps: config.equipment.pctCaps,
       ),

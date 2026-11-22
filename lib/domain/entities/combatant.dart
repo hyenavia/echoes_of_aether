@@ -86,6 +86,9 @@ class Combatant {
   int freezeTicks = 0;
   bool get isFrozen => freezeTicks > 0;
 
+  /// Penanda durasi vulnerability (+25% damage diterima) dari 4-piece Chronomancer.
+  int chronoVulnerabilityTicks = 0;
+
   /// Penanda status Shock (+15% damage diterima) dari Stormcaller Signature Resonance.
   bool isShocked = false;
   int shockTicks = 0;

@@ -9,6 +9,8 @@ class InventoryEntry {
 
   final ItemDefinition definition;
   final int quantity;
+
+  String get definitionId => definition.id;
 }
 
 class InventoryAddResult {

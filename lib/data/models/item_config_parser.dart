@@ -69,6 +69,7 @@ class ItemConfigParser {
       'fixed_stats',
       'signature_class_id',
       'resonance_description',
+      'set_id',
     });
 
     final slot = _slot(_r.string(data, w, 'slot'), w);
@@ -90,6 +91,7 @@ class ItemConfigParser {
     final resonanceDescription = data['resonance_description'] == null
         ? null
         : _r.string(data, w, 'resonance_description');
+    final setId = data['set_id'] == null ? null : _r.string(data, w, 'set_id');
     return EquipmentData(
       slot: slot,
       baseStats: stats,
@@ -97,6 +99,7 @@ class ItemConfigParser {
       fixedStats: fixedStats,
       signatureClassId: signatureClassId,
       resonanceDescription: resonanceDescription,
+      setId: setId,
     );
   }
 

@@ -244,6 +244,51 @@ class _CodexOverlayState extends State<CodexOverlay> {
                   color: AppColors.textPrimary,
                 ),
               ),
+              if (item.setName != null &&
+                  (item.twoPieceDescription != null ||
+                      item.fourPieceDescription != null)) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs + 2),
+                  decoration: BoxDecoration(
+                    color: ext.panelBackground.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(color: ext.gold.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Set Mythical: ${item.setName}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: ext.gold,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (item.twoPieceDescription != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '• 2-Piece (Semua Class): ${item.twoPieceDescription}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                      if (item.fourPieceDescription != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '• 4-Piece (${item.specializationName}): ${item.fourPieceDescription}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         );

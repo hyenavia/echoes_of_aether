@@ -2,11 +2,13 @@ import 'dart:math' as math;
 
 import '../services/derived_stats_calculator.dart';
 import '../services/progression_service.dart';
+import '../services/set_resonance_service.dart';
 import 'combat_stats.dart';
 import 'equipment.dart';
 import 'equipment_loadout.dart';
 import 'hero_ascension.dart';
 import 'item_definition.dart';
+import 'mythical_forge_config.dart';
 import 'player_progress.dart';
 import 'player_save_snapshot.dart';
 import 'progression_config.dart';
@@ -51,28 +53,41 @@ class PlayerCharacter {
     this.statsCalculator = const DerivedStatsCalculator(),
     this.heroAscensionConfig = const HeroAscensionConfig(),
     Map<String, ItemDefinition> itemCatalog = const {},
+    MythicalForgeConfig mythicalForgeConfig = const MythicalForgeConfig(),
     String? initialSpecializationId,
     Map<String, int> skillLevels = const {},
   }) : _service = ProgressionService(config, heroAscensionConfig),
        _progress = progress ?? const PlayerProgress(),
        loadout = loadout ?? EquipmentLoadout(),
        _itemCatalog = itemCatalog, // ignore: prefer_initializing_formals
+       // ignore: prefer_initializing_formals
+       _mythicalForgeConfig = mythicalForgeConfig,
        _specializationId = initialSpecializationId,
        _skillLevels = {
          for (final entry in skillLevels.entries)
            entry.key: math.max(1, entry.value),
        };
 
+  static const SetResonanceService _setResonanceService = SetResonanceService();
+
   final ProgressionConfig config;
   final HeroAscensionConfig heroAscensionConfig;
   final ProgressionService _service;
   final EquipmentLoadout loadout;
   Map<String, ItemDefinition> _itemCatalog;
+  MythicalForgeConfig _mythicalForgeConfig;
 
   Map<String, ItemDefinition> get itemCatalog => Map.unmodifiable(_itemCatalog);
 
   set itemCatalog(Map<String, ItemDefinition> catalog) {
     _itemCatalog = catalog;
+    buildRevision++;
+  }
+
+  MythicalForgeConfig get mythicalForgeConfig => _mythicalForgeConfig;
+
+  set mythicalForgeConfig(MythicalForgeConfig forgeConfig) {
+    _mythicalForgeConfig = forgeConfig;
     buildRevision++;
   }
 
@@ -88,6 +103,21 @@ class PlayerCharacter {
     }
     return null;
   }
+
+  /// Status aktivasi Set Resonance (2-piece universal + 4-piece class-locked).
+  SetResonanceState get setResonanceState => _setResonanceService.evaluate(
+    loadout: loadout,
+    itemCatalog: _itemCatalog,
+    forgeConfig: _mythicalForgeConfig,
+    specializationId: _specializationId,
+  );
+
+  /// Akumulasi stat bonus 2-piece Set Resonance yang aktif saat ini.
+  EquipmentStats get setBonus => setResonanceState.twoPieceBonus;
+
+  /// ID class specialization yang memperoleh evolusi efek 4-piece, atau null.
+  String? get activeFourPieceClassId =>
+      setResonanceState.activeFourPieceClassId;
 
   /// Seluruh definisi skill dan specialization yang ada di game.
   final Map<String, SkillDefinition> skillCatalog;
@@ -272,16 +302,21 @@ class PlayerCharacter {
   /// Base Stats (level) + Equipment Modifiers + Altar Modifiers
   /// + Ascension Modifiers + Specialization Modifiers + Passive Skill Modifiers
   /// (beserta affinity specialization).
-  CombatStats get stats => statsCalculator.calculate(
-    baseStats: config.statsAt(level),
-    equipmentBonus: loadout.totalBonus,
-    altarBonus: _altarBonus,
-    ascensionBonus: ascensionBonus,
-    specialization: specialization,
-    passiveSkills: passiveSkills,
-    skillLevelOf: skillLevel,
-    activeResonanceClassId: activeResonanceClassId,
-  );
+  CombatStats get stats {
+    final setState = setResonanceState;
+    return statsCalculator.calculate(
+      baseStats: config.statsAt(level),
+      equipmentBonus: loadout.totalBonus,
+      setBonus: setState.twoPieceBonus,
+      altarBonus: _altarBonus,
+      ascensionBonus: ascensionBonus,
+      specialization: specialization,
+      passiveSkills: passiveSkills,
+      skillLevelOf: skillLevel,
+      activeResonanceClassId: activeResonanceClassId,
+      activeFourPieceClassId: setState.activeFourPieceClassId,
+    );
+  }
 
   /// Memperbarui fase Ascension pemain dan memicu pembaruan build stats.
   void updateAscensionPhase(int newPhase) {

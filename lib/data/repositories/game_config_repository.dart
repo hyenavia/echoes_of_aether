@@ -14,6 +14,7 @@ import '../models/infinite_spire_config_parser.dart';
 import '../models/item_config_parser.dart';
 import '../models/loot_config_parser.dart';
 import '../models/monster_config_parser.dart';
+import '../models/mythical_forge_config_parser.dart';
 import '../models/shop_config_parser.dart';
 import '../models/skill_config_parser.dart';
 import '../models/specialization_config_parser.dart';
@@ -81,6 +82,9 @@ class AssetGameConfigRepository implements GameConfigRepository {
       heroAscension: parser.parseHeroAscension(settings),
       infiniteSpire: const InfiniteSpireConfigParser().parse(
         await _read('infinite_spire.json'),
+      ),
+      mythicalForge: const MythicalForgeConfigParser().parse(
+        await _read('mythical_forge.json'),
       ),
     );
     const GameConfigValidator().validate(config);

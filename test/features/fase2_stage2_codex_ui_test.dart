@@ -214,5 +214,57 @@ void main() {
         expect(find.text('Codex & Panduan'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'TownHubView Codex renders without error when inventory has stacks and shows owned quantity',
+      (tester) async {
+        final inv = Inventory(definitions: sampleConfig.items);
+        inv.add('abyssal_remnant', 12);
+        final char = PlayerCharacter(config: progression);
+        final views = InventoryViews(inventory: inv, character: char);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: EchoesTheme.dark(),
+            home: Scaffold(
+              body: TownHubView(
+                character: char,
+                views: views,
+                items: sampleConfig.items,
+                dungeonProgress: const DungeonProgressSnapshot(),
+                dungeonDefinition: null,
+                onEnterDungeon: () {},
+                onEquip: (_) {},
+                onUnequip: (_) {},
+                onChooseSpecialization: (_) {},
+                codexConfig: sampleConfig,
+                unlockedSpecializations: const {'paladin'},
+                inventoryQuantitiesProvider: () => {
+                  for (final stack in inv.snapshot())
+                    stack.definition.id: stack.quantity,
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Hero'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Codex'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ErrorWidget), findsNothing);
+        expect(find.byType(CodexOverlay), findsOneWidget);
+        expect(find.text('Codex & Panduan'), findsOneWidget);
+
+        await tester.tap(find.text('Material & Drop'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Abyssal Remnant'), findsOneWidget);
+        expect(find.text('Dimiliki: 12'), findsOneWidget);
+      },
+    );
   });
 }

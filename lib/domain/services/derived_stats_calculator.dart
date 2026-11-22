@@ -72,14 +72,16 @@ class DerivedStatsCalculator {
   CombatStats calculate({
     required CombatStats baseStats,
     EquipmentStats equipmentBonus = EquipmentStats.zero,
+    EquipmentStats setBonus = EquipmentStats.zero,
     EquipmentStats altarBonus = EquipmentStats.zero,
     EquipmentStats ascensionBonus = EquipmentStats.zero,
     SpecializationDefinition? specialization,
     Iterable<SkillDefinition> passiveSkills = const [],
     int Function(String skillId)? skillLevelOf,
     String? activeResonanceClassId,
+    String? activeFourPieceClassId,
   }) {
-    var totalBonus = equipmentBonus + altarBonus + ascensionBonus;
+    var totalBonus = equipmentBonus + setBonus + altarBonus + ascensionBonus;
     for (final skill in passiveSkills) {
       if (!skill.isPassive) continue;
       final level = skillLevelOf?.call(skill.id) ?? 1;
@@ -93,8 +95,14 @@ class DerivedStatsCalculator {
     if (activeResonanceClassId != null) {
       if (activeResonanceClassId == 'gunslinger') {
         totalBonus = totalBonus + const EquipmentStats(attackRange: 2.0);
+        if (activeFourPieceClassId == 'gunslinger') {
+          totalBonus = totalBonus + const EquipmentStats(attackRange: 1.0);
+        }
       } else if (activeResonanceClassId == 'necromancer') {
         totalBonus = totalBonus + const EquipmentStats(lifesteal: 0.08);
+        if (activeFourPieceClassId == 'necromancer') {
+          totalBonus = totalBonus + const EquipmentStats(lifesteal: 0.04);
+        }
       }
     }
 

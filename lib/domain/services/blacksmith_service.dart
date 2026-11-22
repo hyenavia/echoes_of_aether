@@ -5,6 +5,7 @@ import '../entities/equipment_config.dart';
 import '../entities/equipment_loadout.dart';
 import '../entities/inventory.dart';
 import '../entities/item_definition.dart';
+import '../entities/mythical_forge_config.dart';
 import '../entities/player_character.dart';
 
 /// Status hasil percobaan upgrade (enhance) equipment.
@@ -117,6 +118,41 @@ class BlacksmithBulkSalvageResult {
   final List<String> salvagedIds;
 
   bool get hasSalvaged => salvagedCount > 0;
+}
+
+/// Status hasil penempaan equipment Mythical non-weapon (Tempa Mythical).
+enum BlacksmithCraftMythicalStatus {
+  success,
+  recipeNotFound,
+  targetDefinitionNotFound,
+  missingCatalystWeapon,
+  sacrificeNotFound,
+  cannotSacrificeEquipped,
+  cannotSacrificeFavorite,
+  sacrificeSlotMismatch,
+  sacrificeRarityTooLow,
+  cannotSacrificeMythical,
+  insufficientGold,
+  insufficientMaterials,
+}
+
+/// Hasil eksekusi penempaan equipment Mythical oleh [BlacksmithService].
+class BlacksmithCraftMythicalResult {
+  const BlacksmithCraftMythicalResult({
+    required this.status,
+    this.craftedInstance,
+    this.consumedSacrificeInstance,
+    this.goldSpent = 0,
+    this.materialsSpent = const {},
+  });
+
+  final BlacksmithCraftMythicalStatus status;
+  final EquipmentInstance? craftedInstance;
+  final EquipmentInstance? consumedSacrificeInstance;
+  final int goldSpent;
+  final Map<String, int> materialsSpent;
+
+  bool get isSuccess => status == BlacksmithCraftMythicalStatus.success;
 }
 
 /// Service domain murni untuk pandai besi (Blacksmith):
@@ -583,6 +619,165 @@ class BlacksmithService {
       aetherScrapGained: totalScrap,
       stoppedByInventoryFull: stoppedByInventoryFull,
       salvagedIds: List.unmodifiable(salvagedIds),
+    );
+  }
+
+  /// Memeriksa apakah pemain memiliki senjata katalis [weaponDefinitionId]
+  /// di dalam tas ([inventory]) atau sedang terpasang di [loadout].
+  bool hasCatalystWeapon({
+    required String weaponDefinitionId,
+    required Inventory inventory,
+    EquipmentLoadout? loadout,
+  }) {
+    final equippedWeapon = loadout?.instanceIn(EquipmentSlot.weapon);
+    if (equippedWeapon != null &&
+        equippedWeapon.definitionId == weaponDefinitionId) {
+      return true;
+    }
+    return inventory.equipmentSnapshot().any(
+      (item) => item.definitionId == weaponDefinitionId,
+    );
+  }
+
+  /// Mengembalikan daftar equipment di [inventory] yang sah dijadikan tumbal
+  /// untuk resep [recipe] dengan [targetSlot] (non-equipped, bukan favorit,
+  /// non-Mythical, slot sama, dan rarity >= `recipe.sacrificeMinRarity`).
+  List<EquipmentInstance> findEligibleSacrificeCandidates({
+    required MythicalForgeRecipe recipe,
+    required EquipmentSlot targetSlot,
+    required Inventory inventory,
+    EquipmentLoadout? loadout,
+  }) {
+    final equippedIds = loadout == null
+        ? const <String>{}
+        : {for (final eq in loadout.equipped.values) eq.id};
+    return [
+      for (final item in inventory.equipmentSnapshot())
+        if (!equippedIds.contains(item.id) &&
+            !item.isFavorite &&
+            item.rarity != ItemRarity.mythical &&
+            item.slot == targetSlot &&
+            item.rarity.index >= recipe.sacrificeMinRarity.index)
+          item,
+    ];
+  }
+
+  /// Menempa equipment Mythical non-weapon berdasarkan [recipeId] dan
+  /// mengorbankan [sacrificeInstanceId].
+  ///
+  /// Senjata katalis hanya menjadi prasyarat kepemilikan dan TIDAK dikonsumsi.
+  /// Seluruh validasi dijalankan sebelum mutasi sehingga kegagalan bersifat
+  /// atomik (tidak ada gold, material, atau tumbal yang berkurang).
+  BlacksmithCraftMythicalResult craftMythicalEquipment({
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required MythicalForgeConfig forgeConfig,
+    required String recipeId,
+    required String sacrificeInstanceId,
+    EquipmentLoadout? loadout,
+  }) {
+    final recipe = forgeConfig.recipes[recipeId];
+    if (recipe == null) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.recipeNotFound,
+      );
+    }
+
+    final targetDef = inventory.definitionOf(recipe.targetItemId);
+    final targetEq = targetDef?.equipment;
+    if (targetDef == null || !targetDef.isEquipment || targetEq == null) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.targetDefinitionNotFound,
+      );
+    }
+
+    if (!hasCatalystWeapon(
+      weaponDefinitionId: recipe.requiredCatalystWeaponId,
+      inventory: inventory,
+      loadout: loadout,
+    )) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.missingCatalystWeapon,
+      );
+    }
+
+    final foundSacrifice = findEquipment(
+      instanceId: sacrificeInstanceId,
+      inventory: inventory,
+      loadout: loadout,
+    );
+    if (foundSacrifice == null) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.sacrificeNotFound,
+      );
+    }
+    if (foundSacrifice.isEquipped) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.cannotSacrificeEquipped,
+      );
+    }
+
+    final sacrifice = foundSacrifice.instance;
+    if (sacrifice.isFavorite) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.cannotSacrificeFavorite,
+      );
+    }
+    if (sacrifice.rarity == ItemRarity.mythical) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.cannotSacrificeMythical,
+      );
+    }
+    if (sacrifice.slot != targetEq.slot) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.sacrificeSlotMismatch,
+      );
+    }
+    if (sacrifice.rarity.index < recipe.sacrificeMinRarity.index) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.sacrificeRarityTooLow,
+      );
+    }
+
+    if (!character.canAfford(recipe.goldCost)) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.insufficientGold,
+      );
+    }
+
+    for (final entry in recipe.materials.entries) {
+      if (inventory.quantityOf(entry.key) < entry.value) {
+        return const BlacksmithCraftMythicalResult(
+          status: BlacksmithCraftMythicalStatus.insufficientMaterials,
+        );
+      }
+    }
+
+    // Mutasi atomik setelah seluruh prasyarat tervalidasi.
+    if (recipe.goldCost > 0) {
+      character.spendGold(recipe.goldCost);
+    }
+    for (final entry in recipe.materials.entries) {
+      inventory.remove(entry.key, entry.value);
+    }
+    inventory.removeEquipment(sacrifice.id);
+
+    final crafted = EquipmentInstance(
+      id: inventory.nextEquipmentId(),
+      definitionId: targetDef.id,
+      slot: targetEq.slot,
+      rarity: targetDef.rarity,
+      rolledStats: targetEq.baseStats,
+      enhancementLevel: 0,
+    );
+    inventory.addEquipment(crafted);
+
+    return BlacksmithCraftMythicalResult(
+      status: BlacksmithCraftMythicalStatus.success,
+      craftedInstance: crafted,
+      consumedSacrificeInstance: sacrifice,
+      goldSpent: recipe.goldCost,
+      materialsSpent: Map<String, int>.unmodifiable(recipe.materials),
     );
   }
 }

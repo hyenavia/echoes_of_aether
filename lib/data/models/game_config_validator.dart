@@ -49,6 +49,7 @@ class GameConfigValidator {
     _validateGacha(config);
     _validateHeroAscension(config);
     _validateInfiniteSpire(config);
+    _validateMythicalForge(config);
     for (final table in config.lootTables.values) {
       for (final entry in table.entries) {
         if (!config.items.containsKey(entry.itemId)) {
@@ -1688,6 +1689,106 @@ class GameConfigValidator {
         if (!config.currencies.containsKey(currId)) {
           throw ConfigException(
             'infinite_spire.json: lantai ${floor.floor} reward merujuk currency "$currId" yang tidak ada di game_config.json.',
+          );
+        }
+      }
+    }
+  }
+
+  void _validateMythicalForge(GameConfig config) {
+    final forge = config.mythicalForge;
+    if (forge.sets.isNotEmpty &&
+        config.specializations.definitions.isNotEmpty) {
+      for (final setDef in forge.sets.values) {
+        if (!config.specializations.definitions.containsKey(
+          setDef.signatureClassId,
+        )) {
+          throw ConfigException(
+            'mythical_forge.json: set "${setDef.id}" merujuk signature_class_id '
+            '"${setDef.signatureClassId}" yang tidak ada di specializations.json.',
+          );
+        }
+      }
+    }
+
+    if (forge.sets.isNotEmpty && config.items.isNotEmpty) {
+      for (final item in config.items.values) {
+        final setId = item.equipment?.setId;
+        if (setId != null && !forge.sets.containsKey(setId)) {
+          throw ConfigException(
+            'items.json: item "${item.id}" merujuk set_id "$setId" '
+            'yang tidak ada di mythical_forge.json.',
+          );
+        }
+      }
+    }
+
+    for (final recipe in forge.recipes.values) {
+      if (!forge.sets.containsKey(recipe.setId)) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" merujuk set_id '
+          '"${recipe.setId}" yang tidak terdaftar di sets.',
+        );
+      }
+
+      if (config.items.isEmpty) continue;
+
+      final target = config.items[recipe.targetItemId];
+      if (target == null || !target.isEquipment || target.equipment == null) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" merujuk target_item_id '
+          '"${recipe.targetItemId}" yang tidak ada di items.json atau bukan equipment.',
+        );
+      }
+      if (target.rarity != ItemRarity.mythical) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" target "${target.id}" '
+          'harus ber-rarity mythical.',
+        );
+      }
+      if (target.equipment!.slot == EquipmentSlot.weapon) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" target "${target.id}" '
+          'tidak boleh berslot weapon.',
+        );
+      }
+      if (!target.equipment!.fixedStats || target.sellable) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" target "${target.id}" '
+          'harus fixed_stats: true dan sellable: false.',
+        );
+      }
+      if (target.equipment!.setId != recipe.setId) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" target "${target.id}" '
+          'memiliki set_id "${target.equipment!.setId}" tidak cocok dengan "${recipe.setId}".',
+        );
+      }
+
+      final catalyst = config.items[recipe.requiredCatalystWeaponId];
+      if (catalyst == null ||
+          !catalyst.isEquipment ||
+          catalyst.equipment == null) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" merujuk required_catalyst_weapon_id '
+          '"${recipe.requiredCatalystWeaponId}" yang tidak valid.',
+        );
+      }
+      if (catalyst.rarity != ItemRarity.mythical ||
+          catalyst.equipment!.slot != EquipmentSlot.weapon ||
+          catalyst.equipment!.setId != recipe.setId) {
+        throw ConfigException(
+          'mythical_forge.json: resep "${recipe.id}" katalis "${catalyst.id}" '
+          'harus weapon mythical dengan set_id "${recipe.setId}".',
+        );
+      }
+
+      for (final matId in recipe.materials.keys) {
+        final mat = config.items[matId];
+        if (mat == null || mat.category != ItemCategory.material) {
+          throw ConfigException(
+            'mythical_forge.json: resep "${recipe.id}" merujuk material '
+            '"$matId" yang tidak ada di items.json atau bukan material.',
           );
         }
       }

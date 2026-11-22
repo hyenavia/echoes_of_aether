@@ -1,0 +1,306 @@
+{
+  "sets": [
+    {
+      "id": "dawns_aegis",
+      "name": "Dawn's Aegis",
+      "signature_class_id": "paladin",
+      "two_piece_bonus": {
+        "def_pct": 0.25,
+        "hp_pct": 0.20
+      },
+      "two_piece_description": "+25% DEF dan +20% Max HP.",
+      "four_piece_description": "Holy Nova memulihkan 6% Max HP, damage area 60% DEF, dan cooldown turun menjadi 3 detik."
+    },
+    {
+      "id": "shadowfang_umbra",
+      "name": "Shadowfang Umbra",
+      "signature_class_id": "voidblade",
+      "two_piece_bonus": {
+        "crit_rate": 0.20,
+        "crit_damage": 0.35
+      },
+      "two_piece_description": "+20% Crit Rate dan +35% Crit Damage.",
+      "four_piece_description": "Shadow Mark mengabaikan 100% Armor dan memberi +30% Attack Speed selama 4 detik saat terpicu."
+    },
+    {
+      "id": "temporal_eternity",
+      "name": "Temporal Eternity",
+      "signature_class_id": "chronomancer",
+      "two_piece_bonus": {
+        "skill_haste": 0.25,
+        "atk_pct": 0.20
+      },
+      "two_piece_description": "+25% Skill Haste dan +20% ATK.",
+      "four_piece_description": "Freeze aktif setiap 3x skill dan memberi +25% bonus damage diterima pada target beku (termasuk debuff Boss)."
+    },
+    {
+      "id": "aether_desperado",
+      "name": "Aether Desperado",
+      "signature_class_id": "gunslinger",
+      "two_piece_bonus": {
+        "attack_speed": 0.25,
+        "atk_pct": 0.15
+      },
+      "two_piece_description": "+25% Attack Speed dan +15% ATK.",
+      "four_piece_description": "Tambahan +1 Attack Range (total +3) dan peluru tembus memberi +25% bonus damage pada target kedua dst."
+    },
+    {
+      "id": "soul_harvester",
+      "name": "Soul Harvester",
+      "signature_class_id": "necromancer",
+      "two_piece_bonus": {
+        "lifesteal": 0.12,
+        "spell_vamp": 0.12
+      },
+      "two_piece_description": "+12% Lifesteal dan +12% Spell Vamp.",
+      "four_piece_description": "Lifesteal pasif meningkat ke +12% dan Minion Bayangan mewarisi 75% HP & ATK dengan durasi 10 detik."
+    },
+    {
+      "id": "thunderlords_tempest",
+      "name": "Thunderlord's Tempest",
+      "signature_class_id": "stormcaller",
+      "two_piece_bonus": {
+        "atk_pct": 0.25,
+        "crit_rate": 0.15
+      },
+      "two_piece_description": "+25% ATK dan +15% Crit Rate.",
+      "four_piece_description": "Petir menyambar +4 musuh tambahan dan efek Shock meningkatkan damage diterima sebesar +25%."
+    }
+  ],
+  "recipes": [
+    {
+      "id": "craft_dawns_aegis_helm",
+      "target_item_id": "dawns_aegis_helm",
+      "set_id": "dawns_aegis",
+      "required_catalyst_weapon_id": "dawns_aegis_blade",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_dawns_aegis_cuirass",
+      "target_item_id": "dawns_aegis_cuirass",
+      "set_id": "dawns_aegis",
+      "required_catalyst_weapon_id": "dawns_aegis_blade",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_dawns_aegis_signet",
+      "target_item_id": "dawns_aegis_signet",
+      "set_id": "dawns_aegis",
+      "required_catalyst_weapon_id": "dawns_aegis_blade",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_shadowfang_cowl",
+      "target_item_id": "shadowfang_cowl",
+      "set_id": "shadowfang_umbra",
+      "required_catalyst_weapon_id": "shadowfang_twinblade",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_shadowfang_shroud",
+      "target_item_id": "shadowfang_shroud",
+      "set_id": "shadowfang_umbra",
+      "required_catalyst_weapon_id": "shadowfang_twinblade",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_shadowfang_ring",
+      "target_item_id": "shadowfang_ring",
+      "set_id": "shadowfang_umbra",
+      "required_catalyst_weapon_id": "shadowfang_twinblade",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_temporal_crown",
+      "target_item_id": "temporal_crown",
+      "set_id": "temporal_eternity",
+      "required_catalyst_weapon_id": "hourglass_of_eternity",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_temporal_robe",
+      "target_item_id": "temporal_robe",
+      "set_id": "temporal_eternity",
+      "required_catalyst_weapon_id": "hourglass_of_eternity",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_temporal_loop",
+      "target_item_id": "temporal_loop",
+      "set_id": "temporal_eternity",
+      "required_catalyst_weapon_id": "hourglass_of_eternity",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_desperado_visor",
+      "target_item_id": "desperado_visor",
+      "set_id": "aether_desperado",
+      "required_catalyst_weapon_id": "aether_railgun",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_desperado_coat",
+      "target_item_id": "desperado_coat",
+      "set_id": "aether_desperado",
+      "required_catalyst_weapon_id": "aether_railgun",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_desperado_ring",
+      "target_item_id": "desperado_ring",
+      "set_id": "aether_desperado",
+      "required_catalyst_weapon_id": "aether_railgun",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_harvester_crown",
+      "target_item_id": "harvester_crown",
+      "set_id": "soul_harvester",
+      "required_catalyst_weapon_id": "scythe_of_the_harvester",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_harvester_mantle",
+      "target_item_id": "harvester_mantle",
+      "set_id": "soul_harvester",
+      "required_catalyst_weapon_id": "scythe_of_the_harvester",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_harvester_talisman",
+      "target_item_id": "harvester_talisman",
+      "set_id": "soul_harvester",
+      "required_catalyst_weapon_id": "scythe_of_the_harvester",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_tempest_circlet",
+      "target_item_id": "tempest_circlet",
+      "set_id": "thunderlords_tempest",
+      "required_catalyst_weapon_id": "thunderlords_scepter",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_tempest_vestments",
+      "target_item_id": "tempest_vestments",
+      "set_id": "thunderlords_tempest",
+      "required_catalyst_weapon_id": "thunderlords_scepter",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    },
+    {
+      "id": "craft_tempest_amulet",
+      "target_item_id": "tempest_amulet",
+      "set_id": "thunderlords_tempest",
+      "required_catalyst_weapon_id": "thunderlords_scepter",
+      "sacrifice_min_rarity": "legendary",
+      "gold_cost": 50000,
+      "materials": {
+        "aether_scrap": 200,
+        "boss_remnant": 15,
+        "abyssal_remnant": 5
+      }
+    }
+  ]
+}

@@ -4,9 +4,11 @@ import '../../domain/entities/combat_stats.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/hero_ascension.dart';
 import '../../domain/entities/inventory.dart';
+import '../../domain/entities/mythical_forge_config.dart';
 import '../../domain/entities/player_character.dart';
 import '../../domain/entities/skill_definition.dart';
 import '../../domain/entities/specialization.dart';
+import '../../domain/services/set_resonance_service.dart';
 
 /// Snapshot tampilan equipment: yang terpasang, isi tas, dan stat akhir.
 class EquipmentSnapshot {
@@ -66,6 +68,8 @@ class CharacterSnapshot {
     this.effectiveLevelCap = 20,
     this.heroAscensionConfig = const HeroAscensionConfig(),
     this.hasGoldenAura = false,
+    this.setResonanceState = SetResonanceState.empty,
+    this.mythicalForgeConfig = const MythicalForgeConfig(),
   });
 
   factory CharacterSnapshot.from(
@@ -125,6 +129,8 @@ class CharacterSnapshot {
       hasGoldenAura: c.heroAscensionConfig.hasGoldenAuraForPhase(
         c.ascensionPhase,
       ),
+      setResonanceState: c.setResonanceState,
+      mythicalForgeConfig: c.mythicalForgeConfig,
     );
   }
 
@@ -143,6 +149,8 @@ class CharacterSnapshot {
   final int effectiveLevelCap;
   final HeroAscensionConfig heroAscensionConfig;
   final bool hasGoldenAura;
+  final SetResonanceState setResonanceState;
+  final MythicalForgeConfig mythicalForgeConfig;
 }
 
 /// Jembatan antara domain (Inventory, PlayerCharacter) dan overlay Flutter.

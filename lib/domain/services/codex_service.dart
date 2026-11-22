@@ -13,6 +13,10 @@ class CodexResonanceEntry {
     required this.signatureWeaponName,
     required this.resonanceDescription,
     required this.isUnlocked,
+    this.setId,
+    this.setName,
+    this.twoPieceDescription,
+    this.fourPieceDescription,
   });
 
   final String specializationId;
@@ -22,6 +26,10 @@ class CodexResonanceEntry {
   final String signatureWeaponName;
   final String resonanceDescription;
   final bool isUnlocked;
+  final String? setId;
+  final String? setName;
+  final String? twoPieceDescription;
+  final String? fourPieceDescription;
 }
 
 /// Sumber drop atau perolehan untuk satu material di Codex.
@@ -104,6 +112,12 @@ class CodexService {
       final resolvedDesc = (eqDesc != null && eqDesc.isNotEmpty)
           ? eqDesc
           : (resonanceService.getResonanceDescription(spec.id) ?? '');
+      final weaponSetId = weapon.equipment?.setId;
+      final setDef = weaponSetId != null
+          ? config.mythicalForge.sets[weaponSetId]
+          : config.mythicalForge.sets.values
+                .where((s) => s.signatureClassId == spec.id)
+                .firstOrNull;
 
       entries.add(
         CodexResonanceEntry(
@@ -114,6 +128,10 @@ class CodexService {
           signatureWeaponName: weapon.name,
           resonanceDescription: resolvedDesc,
           isUnlocked: unlockedSpecializations.contains(spec.id),
+          setId: setDef?.id,
+          setName: setDef?.name,
+          twoPieceDescription: setDef?.twoPieceDescription,
+          fourPieceDescription: setDef?.fourPieceDescription,
         ),
       );
     }

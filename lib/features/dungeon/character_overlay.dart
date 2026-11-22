@@ -68,6 +68,90 @@ class CharacterOverlay extends StatelessWidget {
 
   static const TextStyle _baseText = TextStyle(fontSize: 12);
 
+  Widget _buildSetResonanceSummary(BuildContext context, CharacterSnapshot s) {
+    final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
+    final entries = s.setResonanceState.equippedPiecesBySet.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return PanelFrame(
+      key: const Key('character_set_resonance_summary'),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      backgroundColor: AppColors.surfaceDark,
+      borderColor: ext.gold.withValues(alpha: 0.45),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 15, color: ext.gold),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'Set Resonance Aktif',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: ext.gold,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          for (final entry in entries)
+            if (s.mythicalForgeConfig.sets[entry.key] case final setDef?) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            setDef.name,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.rarityMythical,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${entry.value}/4',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: entry.value >= 2
+                                ? ext.success
+                                : AppColors.textMuted,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '2-Piece: ${setDef.twoPieceDescription}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: s.setResonanceState.isTwoPieceActive(setDef.id)
+                            ? ext.success
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                    Text(
+                      '4-Piece: ${setDef.fourPieceDescription}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: s.setResonanceState.isFourPieceActive(setDef.id)
+                            ? ext.gold
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+        ],
+      ),
+    );
+  }
+
   String _equipmentName(EquipmentInstance e) {
     final base = items[e.definitionId]?.name ?? e.definitionId;
     return e.enhancementLevel > 0 ? '$base +${e.enhancementLevel}' : base;
@@ -191,6 +275,13 @@ class CharacterOverlay extends StatelessWidget {
                                   slot,
                                 ),
                               ),
+                            if (s
+                                .setResonanceState
+                                .equippedPiecesBySet
+                                .isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              _buildSetResonanceSummary(context, s),
+                            ],
                           ],
                         ),
                       ),

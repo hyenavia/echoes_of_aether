@@ -962,6 +962,7 @@ class _OfflineCombatRuntime {
   int _spawnCounter = 0;
   int _paladinHolyNovaCooldownTicks = 0;
   int _chronomancerSkillCasts = 0;
+  int _voidbladeFrenzyTicks = 0;
 
   List<SkillDefinition> _skills = const [];
   final Map<String, SkillRuntimeState> _skillStates = {};
@@ -1087,6 +1088,7 @@ class _OfflineCombatRuntime {
     if (reviveCooldownTicks > 0) reviveCooldownTicks--;
     if (player.invulnerableTicks > 0) player.invulnerableTicks--;
     if (_paladinHolyNovaCooldownTicks > 0) _paladinHolyNovaCooldownTicks--;
+    if (_voidbladeFrenzyTicks > 0) _voidbladeFrenzyTicks--;
     for (final id in _skillStates.keys.toList()) {
       _skillStates[id] = _skillStates[id]!.decrementCooldown();
     }
@@ -1115,6 +1117,9 @@ class _OfflineCombatRuntime {
         _paladinHolyNovaCooldownTicks - gap,
       );
     }
+    if (_voidbladeFrenzyTicks > 0) {
+      _voidbladeFrenzyTicks = math.max(0, _voidbladeFrenzyTicks - gap);
+    }
     if (player.cooldownTicks > 0) {
       player.cooldownTicks = math.max(0, player.cooldownTicks - gap);
     }
@@ -1135,6 +1140,12 @@ class _OfflineCombatRuntime {
       if (enemy.shockTicks > 0) {
         enemy.shockTicks = math.max(0, enemy.shockTicks - gap);
         enemy.isShocked = enemy.shockTicks > 0;
+      }
+      if (enemy.chronoVulnerabilityTicks > 0) {
+        enemy.chronoVulnerabilityTicks = math.max(
+          0,
+          enemy.chronoVulnerabilityTicks - gap,
+        );
       }
       if (enemy.freezeTicks > 0) {
         enemy.freezeTicks = math.max(0, enemy.freezeTicks - gap);
@@ -1407,7 +1418,12 @@ class _OfflineCombatRuntime {
     if (target == null) return;
     if (player.distanceTo(target) <= player.stats.attackRange) {
       if (player.cooldownTicks == 0) {
-        player.cooldownTicks = _intervalTicks(player.stats.attackSpeed);
+        final baseTicks = _intervalTicks(player.stats.attackSpeed);
+        final speedMultiplier = _voidbladeFrenzyTicks > 0 ? 1.3 : 1.0;
+        player.cooldownTicks = math.max(
+          1,
+          (baseTicks / speedMultiplier).round(),
+        );
         _strike(player, target, defeated: defeated);
         if (character.activeResonanceClassId == 'gunslinger') {
           _triggerGunslingerPiercingBeam(player, target, defeated);
@@ -1463,6 +1479,9 @@ class _OfflineCombatRuntime {
     if (enemy.shockTicks > 0) {
       enemy.shockTicks--;
       enemy.isShocked = enemy.shockTicks > 0;
+    }
+    if (enemy.chronoVulnerabilityTicks > 0) {
+      enemy.chronoVulnerabilityTicks--;
     }
     if (enemy.freezeTicks > 0) {
       enemy.freezeTicks--;
@@ -1994,13 +2013,18 @@ class _OfflineCombatRuntime {
     var defenderDef = target.stats.def;
     var effectiveDamageType = damageType;
 
-    // REC-05: Voidblade Shadow Mark mengabaikan 50% DEF musuh
+    // REC-05: Voidblade Shadow Mark mengabaikan 50% DEF (100% pada 4-piece)
     final isVoidbladeTrueDamage =
         attacker.team == Team.player &&
         character.activeResonanceClassId == 'voidblade' &&
         (target.isShadowMarked || target.shadowMarkTicks > 0);
     if (isVoidbladeTrueDamage) {
-      defenderDef = (defenderDef * 0.5).round();
+      if (character.activeFourPieceClassId == 'voidblade') {
+        defenderDef = 0;
+        _voidbladeFrenzyTicks = (4.0 * CombatSimulation.ticksPerSecond).round();
+      } else {
+        defenderDef = (defenderDef * 0.5).round();
+      }
     }
 
     final result = damageCalculator.roll(
@@ -2012,9 +2036,17 @@ class _OfflineCombatRuntime {
     );
     var finalDamage = result.amount;
 
-    // Stormcaller: Target dengan status Shock menerima +15% damage
+    // Stormcaller: Target dengan status Shock menerima +15% damage (+25% pada 4-piece)
     if (target.isShocked || target.shockTicks > 0) {
-      finalDamage = (finalDamage * 1.15).round();
+      final shockMult = character.activeFourPieceClassId == 'stormcaller'
+          ? 1.25
+          : 1.15;
+      finalDamage = (finalDamage * shockMult).round();
+    }
+
+    // Chronomancer 4-piece: Target terkena Chrono Vulnerability menerima +25% damage
+    if (target.chronoVulnerabilityTicks > 0) {
+      finalDamage = (finalDamage * 1.25).round();
     }
 
     // Voidblade: Serangan kritikal memberi tanda Shadow Mark
@@ -2091,7 +2123,10 @@ class _OfflineCombatRuntime {
             ..sort(
               (a, b) => target.distanceTo(a).compareTo(target.distanceTo(b)),
             );
-      for (final extra in chainCandidates.take(2)) {
+      final chainCount = character.activeFourPieceClassId == 'stormcaller'
+          ? 4
+          : 2;
+      for (final extra in chainCandidates.take(chainCount)) {
         extra.shockTicks = (4.0 * CombatSimulation.ticksPerSecond).round();
         extra.isShocked = true;
         _strike(
@@ -2105,15 +2140,19 @@ class _OfflineCombatRuntime {
       }
     }
 
-    // REC-06/07: Paladin Holy Nova retaliation saat menerima damage (CD 5.0s, Heal 3% Max HP)
+    // REC-06/07: Paladin Holy Nova retaliation saat menerima damage
+    // Dasar: CD 5.0s, Heal 3% Max HP. 4-piece: CD 3.0s, Heal 6% Max HP, 60% DEF.
     if (identical(target, player) &&
         character.activeResonanceClassId == 'paladin' &&
         _paladinHolyNovaCooldownTicks == 0 &&
         finalDamage > 0) {
-      _paladinHolyNovaCooldownTicks = (5.0 * CombatSimulation.ticksPerSecond)
-          .round();
-      final healAmount = math.max(1, (player.stats.maxHp * 0.03).round());
+      final isFourPiece = character.activeFourPieceClassId == 'paladin';
+      _paladinHolyNovaCooldownTicks =
+          ((isFourPiece ? 3.0 : 5.0) * CombatSimulation.ticksPerSecond).round();
+      final healPct = isFourPiece ? 0.06 : 0.03;
+      final healAmount = math.max(1, (player.stats.maxHp * healPct).round());
       player.heal(healAmount);
+      final strikeMultiplier = isFourPiece ? (0.60 / 0.35) : 1.0;
       final inRange = _aliveEnemies
           .where((e) => player.distanceTo(e) <= 2.0)
           .toList();
@@ -2121,7 +2160,7 @@ class _OfflineCombatRuntime {
         _strike(
           player,
           enemy,
-          multiplier: 1.0,
+          multiplier: strikeMultiplier,
           damageType: SkillDamageType.magic,
           skillId: 'holy_nova_retaliation',
           defeated: defeated,
@@ -2306,10 +2345,13 @@ class _OfflineCombatRuntime {
       if (proj > 0 && proj <= maxDist) {
         final perp2 = (wx * wx + wy * wy) - (proj * proj);
         if (perp2 <= 0.6 * 0.6) {
+          final pierceMult = character.activeFourPieceClassId == 'gunslinger'
+              ? 1.25
+              : 1.0;
           _strike(
             attacker,
             enemy,
-            multiplier: 1.0,
+            multiplier: pierceMult,
             skillId: 'piercing_beam',
             damageType: SkillDamageType.physical,
             defeated: defeated,
@@ -2321,31 +2363,43 @@ class _OfflineCombatRuntime {
 
   void _spawnNecromancerMinion(GridPoint cell) {
     if (_allies.length >= 2) return;
+    final isFourPiece = character.activeFourPieceClassId == 'necromancer';
+    final ratio = isFourPiece ? 0.75 : 0.5;
+    final durationSeconds = isFourPiece ? 10.0 : 6.0;
     final minionId = 'shadow_minion_${_spawnCounter++}';
     final minionStats = CombatStats(
-      maxHp: math.max(1, (player.stats.maxHp * 0.5).round()),
-      atk: math.max(1, (player.stats.atk * 0.5).round()),
-      def: (player.stats.def * 0.5).round(),
+      maxHp: math.max(1, (player.stats.maxHp * ratio).round()),
+      atk: math.max(1, (player.stats.atk * ratio).round()),
+      def: (player.stats.def * ratio).round(),
       attackSpeed: player.stats.attackSpeed,
       moveSpeed: player.stats.moveSpeed,
       attackRange: player.stats.attackRange,
     );
-    final minion = Combatant(
-      id: minionId,
-      team: Team.player,
-      stats: minionStats,
-      cell: cell,
-    )..lifetimeTicks = (6.0 * CombatSimulation.ticksPerSecond).round();
+    final minion =
+        Combatant(
+            id: minionId,
+            team: Team.player,
+            stats: minionStats,
+            cell: cell,
+          )
+          ..lifetimeTicks = (durationSeconds * CombatSimulation.ticksPerSecond)
+              .round();
     _allies.add(minion);
   }
 
   void _onSkillCastResonanceCheck() {
     if (character.activeResonanceClassId == 'chronomancer') {
+      final isFourPiece = character.activeFourPieceClassId == 'chronomancer';
+      final triggerEvery = isFourPiece ? 3 : 4;
       _chronomancerSkillCasts++;
-      if (_chronomancerSkillCasts % 4 == 0) {
+      if (_chronomancerSkillCasts % triggerEvery == 0) {
+        final durationTicks = (2.0 * CombatSimulation.ticksPerSecond).round();
         for (final enemy in _aliveEnemies) {
           if (!enemy.isBoss) {
-            enemy.freezeTicks = (2.0 * CombatSimulation.ticksPerSecond).round();
+            enemy.freezeTicks = durationTicks;
+          }
+          if (isFourPiece) {
+            enemy.chronoVulnerabilityTicks = durationTicks;
           }
         }
       }

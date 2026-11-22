@@ -670,6 +670,7 @@
         "weapon_type": "sword",
         "fixed_stats": true,
         "signature_class_id": "paladin",
+        "set_id": "dawns_aegis",
         "resonance_description": "Saat memblokir serangan, memicu holy nova yang memulihkan 3% Max HP dan memberikan damage area sebesar 35% DEF (cooldown 5 detik).",
         "stats": {
           "atk": 28,
@@ -691,6 +692,7 @@
         "weapon_type": "sword",
         "fixed_stats": true,
         "signature_class_id": "voidblade",
+        "set_id": "shadowfang_umbra",
         "resonance_description": "Serangan kritikal memberi tanda Shadow Mark. Menyerang target bertanda menghasilkan True Damage (mengabaikan 50% Armor).",
         "stats": {
           "atk": 34,
@@ -712,6 +714,7 @@
         "weapon_type": "staff",
         "fixed_stats": true,
         "signature_class_id": "chronomancer",
+        "set_id": "temporal_eternity",
         "resonance_description": "Setiap 4x penggunaan skill, membekukan (Freeze) seluruh monster biasa di ruangan selama 2 detik.",
         "stats": {
           "atk": 28,
@@ -732,6 +735,7 @@
         "weapon_type": "bow",
         "fixed_stats": true,
         "signature_class_id": "gunslinger",
+        "set_id": "aether_desperado",
         "resonance_description": "Jangkauan serang +2 petak. Peluru menembus seluruh monster dalam satu garis lurus tanpa pengurangan damage.",
         "stats": {
           "atk": 36,
@@ -753,6 +757,7 @@
         "weapon_type": "staff",
         "fixed_stats": true,
         "signature_class_id": "necromancer",
+        "set_id": "soul_harvester",
         "resonance_description": "Serangan menghasilkan +8% Lifesteal pasif. Minion bayangan mewarisi 50% HP dan ATK hero.",
         "stats": {
           "atk": 30,
@@ -774,6 +779,7 @@
         "weapon_type": "staff",
         "fixed_stats": true,
         "signature_class_id": "stormcaller",
+        "set_id": "thunderlords_tempest",
         "resonance_description": "Serangan petir menyambar ke +2 musuh tambahan dan menyebabkan efek Shock (+15% damage diterima).",
         "stats": {
           "atk": 32,
@@ -908,6 +914,364 @@
           "hp": 95,
           "crit_rate": 0.07,
           "skill_haste": 0.08
+        }
+      }
+    },
+    {
+      "id": "dawns_aegis_helm",
+      "name": "Dawn's Radiant Greathelm",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "set_id": "dawns_aegis",
+        "stats": {
+          "def": 14,
+          "hp": 140,
+          "def_pct": 0.08,
+          "hp_pct": 0.06
+        }
+      }
+    },
+    {
+      "id": "dawns_aegis_cuirass",
+      "name": "Dawn's Bulwark Cuirass",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "set_id": "dawns_aegis",
+        "stats": {
+          "def": 18,
+          "hp": 180,
+          "def_pct": 0.10,
+          "hp_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "dawns_aegis_signet",
+      "name": "Dawn's Sacred Signet",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "set_id": "dawns_aegis",
+        "stats": {
+          "atk": 10,
+          "def": 12,
+          "hp": 130,
+          "def_pct": 0.08,
+          "skill_haste": 0.06
+        }
+      }
+    },
+    {
+      "id": "shadowfang_cowl",
+      "name": "Shadowfang Cowl",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "set_id": "shadowfang_umbra",
+        "stats": {
+          "def": 10,
+          "hp": 100,
+          "atk": 10,
+          "crit_rate": 0.06,
+          "crit_damage": 0.15
+        }
+      }
+    },
+    {
+      "id": "shadowfang_shroud",
+      "name": "Shadowfang Shroud",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "set_id": "shadowfang_umbra",
+        "stats": {
+          "def": 13,
+          "hp": 135,
+          "atk": 12,
+          "crit_rate": 0.06,
+          "atk_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "shadowfang_ring",
+      "name": "Shadowfang Ring of Duskwalker",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "set_id": "shadowfang_umbra",
+        "stats": {
+          "atk": 14,
+          "hp": 95,
+          "crit_rate": 0.08,
+          "crit_damage": 0.20,
+          "move_speed": 0.06
+        }
+      }
+    },
+    {
+      "id": "temporal_crown",
+      "name": "Crown of Frozen Moments",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "set_id": "temporal_eternity",
+        "stats": {
+          "def": 10,
+          "hp": 110,
+          "atk": 10,
+          "skill_haste": 0.08,
+          "atk_pct": 0.06
+        }
+      }
+    },
+    {
+      "id": "temporal_robe",
+      "name": "Robe of Time Weaver",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "set_id": "temporal_eternity",
+        "stats": {
+          "def": 13,
+          "hp": 145,
+          "atk": 12,
+          "skill_haste": 0.10,
+          "atk_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "temporal_loop",
+      "name": "Loop of Paradox",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "set_id": "temporal_eternity",
+        "stats": {
+          "atk": 14,
+          "def": 6,
+          "hp": 105,
+          "skill_haste": 0.10,
+          "crit_rate": 0.06
+        }
+      }
+    },
+    {
+      "id": "desperado_visor",
+      "name": "Outlaw's Targeting Visor",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "set_id": "aether_desperado",
+        "stats": {
+          "def": 10,
+          "hp": 100,
+          "atk": 12,
+          "attack_speed": 0.10,
+          "crit_rate": 0.06
+        }
+      }
+    },
+    {
+      "id": "desperado_coat",
+      "name": "Aether-Plated Duster Coat",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "set_id": "aether_desperado",
+        "stats": {
+          "def": 13,
+          "hp": 135,
+          "atk": 12,
+          "attack_speed": 0.12,
+          "atk_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "desperado_ring",
+      "name": "High-Caliber Bandolier Ring",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "set_id": "aether_desperado",
+        "stats": {
+          "atk": 15,
+          "hp": 95,
+          "attack_speed": 0.12,
+          "crit_damage": 0.18
+        }
+      }
+    },
+    {
+      "id": "harvester_crown",
+      "name": "Skull Crown of the Crypt",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "set_id": "soul_harvester",
+        "stats": {
+          "def": 11,
+          "hp": 125,
+          "atk": 10,
+          "lifesteal": 0.05,
+          "hp_pct": 0.06
+        }
+      }
+    },
+    {
+      "id": "harvester_mantle",
+      "name": "Deathlord's Ribcage Mantle",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "set_id": "soul_harvester",
+        "stats": {
+          "def": 14,
+          "hp": 160,
+          "atk": 11,
+          "lifesteal": 0.06,
+          "spell_vamp": 0.06
+        }
+      }
+    },
+    {
+      "id": "harvester_talisman",
+      "name": "Talisman of Bound Souls",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "set_id": "soul_harvester",
+        "stats": {
+          "atk": 13,
+          "def": 7,
+          "hp": 120,
+          "lifesteal": 0.05,
+          "spell_vamp": 0.06,
+          "atk_pct": 0.06
+        }
+      }
+    },
+    {
+      "id": "tempest_circlet",
+      "name": "Circlet of the Thunder God",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "head",
+        "fixed_stats": true,
+        "set_id": "thunderlords_tempest",
+        "stats": {
+          "def": 10,
+          "hp": 105,
+          "atk": 11,
+          "crit_rate": 0.06,
+          "atk_pct": 0.06
+        }
+      }
+    },
+    {
+      "id": "tempest_vestments",
+      "name": "Vestments of the Tempest",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "body",
+        "fixed_stats": true,
+        "set_id": "thunderlords_tempest",
+        "stats": {
+          "def": 13,
+          "hp": 140,
+          "atk": 12,
+          "attack_speed": 0.10,
+          "atk_pct": 0.08
+        }
+      }
+    },
+    {
+      "id": "tempest_amulet",
+      "name": "Storm Conduit Amulet",
+      "category": "equipment",
+      "rarity": "mythical",
+      "sell_value": 0,
+      "sellable": false,
+      "equipment": {
+        "slot": "accessory",
+        "fixed_stats": true,
+        "set_id": "thunderlords_tempest",
+        "stats": {
+          "atk": 14,
+          "hp": 100,
+          "crit_rate": 0.07,
+          "crit_damage": 0.18,
+          "skill_haste": 0.06
         }
       }
     }

@@ -7,13 +7,14 @@ import '../../core/utils/number_formatter.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/mythical_forge_config.dart';
 import '../../domain/services/blacksmith_service.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'equipment_text.dart';
 import 'item_filter_widgets.dart';
 
-enum _BlacksmithTab { enhance, reforge, salvage }
+enum _BlacksmithTab { enhance, reforge, salvage, mythicalForge }
 
 /// Overlay Pandai Besi (Blacksmith) di Town Hub.
 /// Memungkinkan pemain menempa perlengkapan (+1 s/d +10) menggunakan Gold dan
@@ -30,6 +31,8 @@ class BlacksmithOverlay extends StatefulWidget {
     required this.onReforgeEquipment,
     this.onSalvageEquipment,
     this.onSalvageEquipmentBulk,
+    this.forgeConfig = const MythicalForgeConfig(),
+    this.onCraftMythicalEquipment,
     this.initialSelectedInstanceId,
     this.embedded = false,
     required this.onClose,
@@ -44,6 +47,12 @@ class BlacksmithOverlay extends StatefulWidget {
   final BlacksmithSalvageResult Function(String instanceId)? onSalvageEquipment;
   final BlacksmithBulkSalvageResult Function(Set<ItemRarity> rarities)?
   onSalvageEquipmentBulk;
+  final MythicalForgeConfig forgeConfig;
+  final BlacksmithCraftMythicalResult Function(
+    String recipeId,
+    String sacrificeInstanceId,
+  )?
+  onCraftMythicalEquipment;
   final String? initialSelectedInstanceId;
   final bool embedded;
   final VoidCallback onClose;
@@ -58,9 +67,16 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
   _BlacksmithTab _currentTab = _BlacksmithTab.enhance;
   ItemCategoryFilter _categoryFilter = ItemCategoryFilter.all;
   String? _selectedId;
+  String? _selectedForgeSetId;
+  String? _selectedForgeRecipeId;
+  String? _selectedSacrificeId;
   String? _feedbackMessage;
   bool _feedbackIsError = false;
   bool _busy = false;
+
+  bool get _showForgeTab =>
+      widget.forgeConfig.recipes.isNotEmpty ||
+      widget.onCraftMythicalEquipment != null;
 
   @override
   void initState() {
@@ -207,15 +223,25 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
                         _buildFeedbackBanner(theme, ext),
                       ],
                       const SizedBox(height: AppSpacing.xs),
-                      _buildItemSelector(
-                        theme,
-                        ext,
-                        filteredItems,
-                        eqSnapshot.equipped,
-                      ),
-                      const Divider(height: AppSpacing.md),
+                      if (_currentTab != _BlacksmithTab.mythicalForge) ...[
+                        _buildItemSelector(
+                          theme,
+                          ext,
+                          filteredItems,
+                          eqSnapshot.equipped,
+                        ),
+                        const Divider(height: AppSpacing.md),
+                      ],
                       Expanded(
-                        child: selectedItem == null
+                        child: _currentTab == _BlacksmithTab.mythicalForge
+                            ? _buildMythicalForgeView(
+                                theme,
+                                ext,
+                                eqSnapshot,
+                                charSnapshot.gold,
+                                stacks,
+                              )
+                            : selectedItem == null
                             ? const Center(
                                 child: Text(
                                   'Tidak ada perlengkapan yang dipilih.',
@@ -293,14 +319,18 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
       children: [
         Icon(Icons.hardware_outlined, color: ext.gold, size: 22),
         const SizedBox(width: AppSpacing.xs),
-        Text(
-          'Pandai Besi',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: ext.gold,
+        Expanded(
+          child: Text(
+            'Pandai Besi',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: ext.gold,
+            ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: AppSpacing.xs),
         ResourceChip.gold(playerGold),
         if (!widget.embedded) ...[
           const SizedBox(width: AppSpacing.xs),
@@ -316,31 +346,40 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
   }
 
   Widget _buildModeSelector() {
-    return SegmentedButton<_BlacksmithTab>(
-      segments: const [
-        ButtonSegment<_BlacksmithTab>(
-          value: _BlacksmithTab.enhance,
-          icon: Icon(Icons.upgrade),
-          label: Text('Tempa (+1..+10)', overflow: TextOverflow.ellipsis),
-        ),
-        ButtonSegment<_BlacksmithTab>(
-          value: _BlacksmithTab.reforge,
-          icon: Icon(Icons.casino_outlined),
-          label: Text('Reforge Sub-stat', overflow: TextOverflow.ellipsis),
-        ),
-        ButtonSegment<_BlacksmithTab>(
-          value: _BlacksmithTab.salvage,
-          icon: Icon(Icons.recycling),
-          label: Text('Bongkar', overflow: TextOverflow.ellipsis),
-        ),
-      ],
-      selected: {_currentTab},
-      onSelectionChanged: (next) {
-        setState(() {
-          _currentTab = next.first;
-          _feedbackMessage = null;
-        });
-      },
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SegmentedButton<_BlacksmithTab>(
+        segments: [
+          const ButtonSegment<_BlacksmithTab>(
+            value: _BlacksmithTab.enhance,
+            icon: Icon(Icons.upgrade),
+            label: Text('Tempa (+1..+10)', overflow: TextOverflow.ellipsis),
+          ),
+          const ButtonSegment<_BlacksmithTab>(
+            value: _BlacksmithTab.reforge,
+            icon: Icon(Icons.casino_outlined),
+            label: Text('Reforge Sub-stat', overflow: TextOverflow.ellipsis),
+          ),
+          const ButtonSegment<_BlacksmithTab>(
+            value: _BlacksmithTab.salvage,
+            icon: Icon(Icons.recycling),
+            label: Text('Bongkar', overflow: TextOverflow.ellipsis),
+          ),
+          if (_showForgeTab)
+            const ButtonSegment<_BlacksmithTab>(
+              value: _BlacksmithTab.mythicalForge,
+              icon: Icon(Icons.auto_fix_high),
+              label: Text('Tempa Mythical', overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        selected: {_currentTab},
+        onSelectionChanged: (next) {
+          setState(() {
+            _currentTab = next.first;
+            _feedbackMessage = null;
+          });
+        },
+      ),
     );
   }
 
@@ -386,14 +425,18 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
       children: [
         Row(
           children: [
-            Text(
-              'Pilih Perlengkapan:',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+            Expanded(
+              child: Text(
+                'Pilih Perlengkapan:',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.xs),
             DropdownButton<ItemCategoryFilter>(
               value: _categoryFilter,
               isDense: true,
@@ -1375,6 +1418,435 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
                   : () => _openBulkSalvageDialog(bagItems, equipped),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmAndCraftMythical({
+    required MythicalForgeRecipe recipe,
+    required ItemDefinition targetDef,
+    required EquipmentInstance sacrifice,
+    required String catalystName,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => EchoesDialog(
+        title: 'Konfirmasi Tempa Mythical',
+        icon: Icons.auto_fix_high,
+        accentColor: AppColors.rarityMythical,
+        primaryLabel: 'Konfirmasi Tempa',
+        onPrimary: () => Navigator.of(dialogContext).pop(true),
+        secondaryLabel: 'Batal',
+        onSecondary: () => Navigator.of(dialogContext).pop(false),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tempa ${targetDef.name} (+0, Stat Tetap)?',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Tumbal ${_name(sacrifice)} akan dikonsumsi secara permanen. '
+              'Senjata katalis $catalystName tetap aman dan tidak hilang.',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _handleCraftMythical(recipe, sacrifice, targetDef);
+    }
+  }
+
+  void _handleCraftMythical(
+    MythicalForgeRecipe recipe,
+    EquipmentInstance sacrifice,
+    ItemDefinition targetDef,
+  ) {
+    if (_busy || widget.onCraftMythicalEquipment == null) return;
+    setState(() => _busy = true);
+    try {
+      final res = widget.onCraftMythicalEquipment!(recipe.id, sacrifice.id);
+      if (res.isSuccess && res.craftedInstance != null) {
+        setState(() {
+          _feedbackIsError = false;
+          _feedbackMessage = 'Sukses! ${targetDef.name} berhasil ditempa (+0).';
+          _selectedSacrificeId = null;
+        });
+      } else {
+        setState(() {
+          _feedbackIsError = true;
+          switch (res.status) {
+            case BlacksmithCraftMythicalStatus.missingCatalystWeapon:
+              _feedbackMessage =
+                  'Memerlukan senjata katalis di tas atau sedang terpasang.';
+            case BlacksmithCraftMythicalStatus.insufficientGold:
+              _feedbackMessage = 'Gold tidak mencukupi untuk menempa Mythical.';
+            case BlacksmithCraftMythicalStatus.insufficientMaterials:
+              _feedbackMessage = 'Material penempaan belum mencukupi.';
+            case BlacksmithCraftMythicalStatus.cannotSacrificeFavorite:
+              _feedbackMessage = 'Equipment favorit tidak dapat ditumbalkan.';
+            case BlacksmithCraftMythicalStatus.cannotSacrificeEquipped:
+              _feedbackMessage = 'Lepas equipment tumbal terlebih dahulu.';
+            case BlacksmithCraftMythicalStatus.sacrificeRarityTooLow:
+              _feedbackMessage = 'Rarity tumbal minimal Legendary.';
+            case BlacksmithCraftMythicalStatus.sacrificeSlotMismatch:
+              _feedbackMessage = 'Slot tumbal harus sama dengan target.';
+            case BlacksmithCraftMythicalStatus.cannotSacrificeMythical:
+              _feedbackMessage = 'Gear Mythical tidak dapat ditumbalkan.';
+            case BlacksmithCraftMythicalStatus.recipeNotFound:
+            case BlacksmithCraftMythicalStatus.targetDefinitionNotFound:
+            case BlacksmithCraftMythicalStatus.sacrificeNotFound:
+              _feedbackMessage = 'Resep atau tumbal tidak ditemukan.';
+            case BlacksmithCraftMythicalStatus.success:
+              break;
+          }
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _buildMythicalForgeView(
+    ThemeData theme,
+    EchoesThemeExtension ext,
+    EquipmentSnapshot eqSnapshot,
+    int playerGold,
+    List<InventoryEntry> stacks,
+  ) {
+    final recipes = widget.forgeConfig.recipes.values.toList();
+    if (recipes.isEmpty) {
+      return const Center(
+        child: Text(
+          'Belum ada resep Tempa Mythical yang tersedia.',
+          style: TextStyle(color: AppColors.textMuted),
+        ),
+      );
+    }
+
+    final setIds = <String>{
+      for (final s in widget.forgeConfig.sets.values)
+        if (recipes.any((r) => r.setId == s.id)) s.id,
+      for (final r in recipes)
+        if (!widget.forgeConfig.sets.containsKey(r.setId)) r.setId,
+    }.toList();
+
+    final activeSetId = setIds.contains(_selectedForgeSetId)
+        ? _selectedForgeSetId!
+        : setIds.first;
+    final setRecipes = recipes.where((r) => r.setId == activeSetId).toList();
+    final selectedRecipe =
+        setRecipes.where((r) => r.id == _selectedForgeRecipeId).firstOrNull ??
+        setRecipes.first;
+
+    final setDef = widget.forgeConfig.sets[activeSetId];
+    final targetDef = widget.items[selectedRecipe.targetItemId];
+    final targetEq = targetDef?.equipment;
+    final catalystName =
+        widget.items[selectedRecipe.requiredCatalystWeaponId]?.name ??
+        selectedRecipe.requiredCatalystWeaponId;
+    final hasCatalyst =
+        eqSnapshot.equipped[EquipmentSlot.weapon]?.definitionId ==
+            selectedRecipe.requiredCatalystWeaponId ||
+        eqSnapshot.bag.any(
+          (e) => e.definitionId == selectedRecipe.requiredCatalystWeaponId,
+        );
+
+    final equippedIds = {for (final eq in eqSnapshot.equipped.values) eq.id};
+    final candidates = targetEq == null
+        ? const <EquipmentInstance>[]
+        : [
+            for (final item in eqSnapshot.bag)
+              if (!equippedIds.contains(item.id) &&
+                  !item.isFavorite &&
+                  item.rarity != ItemRarity.mythical &&
+                  item.slot == targetEq.slot &&
+                  item.rarity.index >= selectedRecipe.sacrificeMinRarity.index)
+                item,
+          ];
+    final selectedSacrifice =
+        candidates.where((c) => c.id == _selectedSacrificeId).firstOrNull ??
+        (candidates.isNotEmpty ? candidates.first : null);
+
+    final hasGold = playerGold >= selectedRecipe.goldCost;
+    final hasMaterials = selectedRecipe.materials.entries.every(
+      (m) => _materialCount(m.key, stacks) >= m.value,
+    );
+    final canCraft =
+        widget.onCraftMythicalEquipment != null &&
+        !_busy &&
+        targetDef != null &&
+        targetEq != null &&
+        hasCatalyst &&
+        hasGold &&
+        hasMaterials &&
+        selectedSacrifice != null;
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Pilih Set Mythical:',
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: ext.gold,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final setId in setIds)
+                ChoiceChip(
+                  key: Key('forge_set_$setId'),
+                  label: Text(
+                    widget.forgeConfig.sets[setId]?.name ?? setId,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  selected: setId == activeSetId,
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedForgeSetId = setId;
+                      _selectedForgeRecipeId = null;
+                      _selectedSacrificeId = null;
+                      _feedbackMessage = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final recipe in setRecipes)
+                ChoiceChip(
+                  key: Key('forge_recipe_${recipe.id}'),
+                  label: Text(
+                    widget.items[recipe.targetItemId]?.equipment != null
+                        ? slotLabel(
+                            widget.items[recipe.targetItemId]!.equipment!.slot,
+                          )
+                        : recipe.targetItemId,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  selected: recipe.id == selectedRecipe.id,
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedForgeRecipeId = recipe.id;
+                      _selectedSacrificeId = null;
+                      _feedbackMessage = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (targetDef != null && targetEq != null) ...[
+            PanelFrame(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              backgroundColor: AppColors.surfaceDark,
+              borderColor: AppColors.rarityMythical.withValues(alpha: 0.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      PixelItemIcon(itemId: targetDef.id, size: 32),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              targetDef.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: AppColors.rarityMythical,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '${slotLabel(targetEq.slot)} • Stat Tetap (+0)',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const RarityLabel(
+                        rarity: ItemRarity.mythical,
+                        compact: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    equipmentStatLines(targetEq.baseStats).join(' • '),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (setDef != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Set ${setDef.name} • 2P: ${setDef.twoPieceDescription}',
+                      style: TextStyle(fontSize: 11, color: ext.gold),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      Icon(
+                        hasCatalyst ? Icons.check_circle : Icons.lock_outline,
+                        size: 15,
+                        color: hasCatalyst
+                            ? ext.success
+                            : theme.colorScheme.error,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          hasCatalyst
+                              ? 'Katalis Tersedia: $catalystName (Tidak Dikonsumsi)'
+                              : 'Butuh Katalis: $catalystName (Tidak Dikonsumsi)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: hasCatalyst
+                                ? ext.success
+                                : theme.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            PanelFrame(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              backgroundColor: AppColors.surfaceDark,
+              borderColor: ext.panelInnerBorder,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Biaya & Material Penempaan:',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _costRow(
+                    label: 'Gold',
+                    owned: playerGold,
+                    requiredCount: selectedRecipe.goldCost,
+                    okColor: ext.success,
+                    errColor: theme.colorScheme.error,
+                  ),
+                  for (final mat in selectedRecipe.materials.entries)
+                    _costRow(
+                      label: widget.items[mat.key]?.name ?? mat.key,
+                      owned: _materialCount(mat.key, stacks),
+                      requiredCount: mat.value,
+                      okColor: ext.success,
+                      errColor: theme.colorScheme.error,
+                    ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Pilih Tumbal (${selectedRecipe.sacrificeMinRarity.name.toUpperCase()} ${slotLabel(targetEq.slot)}, Non-Favorit):',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (candidates.isEmpty)
+                    Text(
+                      'Tidak ada tumbal ${selectedRecipe.sacrificeMinRarity.name.toUpperCase()} (${slotLabel(targetEq.slot)}) non-favorit di tas.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.error,
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        for (final cand in candidates)
+                          ChoiceChip(
+                            key: Key('forge_sacrifice_${cand.id}'),
+                            label: Text(
+                              _name(cand),
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            selected: cand.id == selectedSacrifice?.id,
+                            onSelected: (_) =>
+                                setState(() => _selectedSacrificeId = cand.id),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            PrimaryButton(
+              key: Key('forge_craft_button_${selectedRecipe.id}'),
+              label: 'Tempa Mythical',
+              icon: Icons.auto_fix_high,
+              expand: true,
+              onPressed: canCraft
+                  ? () => _confirmAndCraftMythical(
+                      recipe: selectedRecipe,
+                      targetDef: targetDef,
+                      sacrifice: selectedSacrifice,
+                      catalystName: catalystName,
+                    )
+                  : null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _costRow({
+    required String label,
+    required int owned,
+    required int requiredCount,
+    required Color okColor,
+    required Color errColor,
+  }) {
+    final ok = owned >= requiredCount;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
+          Text(
+            '${NumberFormatter.format(owned)} / ${NumberFormatter.format(requiredCount)}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: ok ? okColor : errColor,
+            ),
+          ),
         ],
       ),
     );

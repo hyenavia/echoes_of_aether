@@ -140,6 +140,7 @@ class CombatSystem extends Component {
   @override
   Future<void> onLoad() async {
     simulation.activeResonanceClassId = character.activeResonanceClassId;
+    simulation.activeFourPieceClassId = character.activeFourPieceClassId;
     final manager = dungeonManager;
     if (manager != null) {
       _dungeonListener = _onDungeonEvent;
@@ -773,6 +774,7 @@ class CombatSystem extends Component {
     _appliedLoadoutRevision = revision;
     _appliedBuildRevision = character.buildRevision;
     simulation.activeResonanceClassId = character.activeResonanceClassId;
+    simulation.activeFourPieceClassId = character.activeFourPieceClassId;
     simulation.player.applyStats(character.stats);
     simulation.setPlayerSkills(
       character.activeSkills,

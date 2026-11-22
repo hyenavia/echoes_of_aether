@@ -1600,6 +1600,35 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     return result;
   }
 
+  BlacksmithCraftMythicalResult _handleCraftMythicalEquipment(
+    String recipeId,
+    String sacrificeInstanceId,
+  ) {
+    final char = _character;
+    final inv = _inventory;
+    final cfg = _config;
+    if (char == null || inv == null || cfg == null) {
+      return const BlacksmithCraftMythicalResult(
+        status: BlacksmithCraftMythicalStatus.recipeNotFound,
+      );
+    }
+    const service = BlacksmithService();
+    final result = service.craftMythicalEquipment(
+      character: char,
+      inventory: inv,
+      forgeConfig: cfg.mythicalForge,
+      recipeId: recipeId,
+      sacrificeInstanceId: sacrificeInstanceId,
+      loadout: char.loadout,
+    );
+    if (result.isSuccess) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
   ShopService _shopServiceFor(GameConfig cfg) => ShopService(
     catalog: cfg.shop,
     items: cfg.items,
@@ -2970,6 +2999,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                         onReforgeEquipment: _handleReforgeEquipment,
                         onSalvageEquipment: _handleSalvageEquipment,
                         onSalvageEquipmentBulk: _handleSalvageEquipmentBulk,
+                        onCraftMythicalEquipment: _handleCraftMythicalEquipment,
                         getAltarBalances: () =>
                             _currencyService?.balances ?? const {},
                         onUpgradeAltarBlessing: _handleUpgradeAltarBlessing,
@@ -2984,8 +3014,9 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                         onAscendHero: _handleHeroAscension,
                         inventoryQuantitiesProvider: () => {
                           for (final stack
-                              in (_inventory?.snapshot() ?? const []))
-                            stack.definitionId: stack.quantity,
+                              in (_inventory?.snapshot() ??
+                                  const <InventoryEntry>[]))
+                            stack.definition.id: stack.quantity,
                         },
                         currenciesProvider: () =>
                             _currencyService?.balances ?? const {},
@@ -3283,8 +3314,10 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                     onUpgradeSkill: g.upgradeSkill,
                     onAscendHero: _handleHeroAscension,
                     inventoryQuantitiesProvider: () => {
-                      for (final stack in (_inventory?.snapshot() ?? const []))
-                        stack.definitionId: stack.quantity,
+                      for (final stack
+                          in (_inventory?.snapshot() ??
+                              const <InventoryEntry>[]))
+                        stack.definition.id: stack.quantity,
                     },
                     currenciesProvider: () =>
                         _currencyService?.balances ?? const {},
