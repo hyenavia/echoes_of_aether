@@ -306,7 +306,7 @@ void main() {
         addTearDown(db.close);
         await db.initialize();
 
-        expect(db.schemaVersion, 11);
+        expect(db.schemaVersion, 12);
         final tables = await db
             .customSelect("SELECT name FROM sqlite_master WHERE type = 'table'")
             .get();

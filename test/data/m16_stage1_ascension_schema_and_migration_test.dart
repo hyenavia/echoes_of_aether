@@ -18,10 +18,12 @@ import 'package:echoes_of_aether/data/models/shop_config_parser.dart';
 import 'package:echoes_of_aether/data/models/skill_config_parser.dart';
 import 'package:echoes_of_aether/data/models/specialization_config_parser.dart';
 import 'package:echoes_of_aether/data/repositories/drift_player_save_repository.dart';
+import 'package:echoes_of_aether/domain/entities/cycle_progress.dart';
 import 'package:echoes_of_aether/domain/entities/game_config.dart';
 import 'package:echoes_of_aether/domain/entities/infinite_spire.dart';
 import 'package:echoes_of_aether/domain/entities/player_progress.dart';
 import 'package:echoes_of_aether/domain/entities/player_save_snapshot.dart';
+import 'package:echoes_of_aether/domain/services/legacy_save_converter.dart';
 import 'package:echoes_of_aether/domain/services/save_snapshot_codec.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -188,12 +190,12 @@ void main() {
       addTearDown(db.close);
       await db.initialize();
 
-      expect(db.schemaVersion, 11);
+      expect(db.schemaVersion, 12);
 
       final versionRow = await db
           .customSelect('PRAGMA user_version')
           .getSingle();
-      expect(versionRow.read<int>('user_version'), 11);
+      expect(versionRow.read<int>('user_version'), 12);
 
       // Verifikasi tabel infinite_spire_progress ada
       final tables = await db
@@ -272,6 +274,19 @@ void main() {
               unlocked_at_ms INTEGER NOT NULL
             );
           ''');
+            raw.execute('''
+            CREATE TABLE dungeon_progresses (
+              player_id TEXT NOT NULL,
+              dungeon_id TEXT NOT NULL,
+              current_room_id TEXT NOT NULL,
+              current_room_index INTEGER NOT NULL,
+              highest_cleared_room_index INTEGER NOT NULL,
+              clears_count INTEGER NOT NULL,
+              cleared_in_cycle_rank INTEGER NOT NULL DEFAULT -1,
+              reward_state_json TEXT NOT NULL DEFAULT '{}',
+              PRIMARY KEY (player_id, dungeon_id)
+            );
+          ''');
 
             // Masukkan 6 data pemain lama berbeda level:
             // p_beginner: Lv 15 (A0)
@@ -299,9 +314,12 @@ void main() {
             INSERT INTO players VALUES ('p_super_overleveled', 110, 600, 20000, 600, 'vanguard', '{}', 0, 1000000);
           ''');
 
-            // Masukkan cycle_progresses dengan rank > 5
+            // Masukkan cycle_progresses dengan rank > 5 dan dungeon_progresses dengan cleared_in_cycle_rank > 5
             raw.execute('''
             INSERT INTO cycle_progresses VALUES ('p_master', 8, 12, 'ancient_crypt', 1000000);
+          ''');
+            raw.execute('''
+            INSERT INTO dungeon_progresses VALUES ('p_master', 'forgotten_forest', 'ancient_heart', 4, 4, 12, 8, '{}');
           ''');
 
             // Masukkan gacha pity & spec
@@ -321,7 +339,7 @@ void main() {
         addTearDown(migratedDb.close);
         await migratedDb.initialize();
 
-        expect(migratedDb.schemaVersion, 11);
+        expect(migratedDb.schemaVersion, 12);
 
         // Verifikasi p_beginner (Lv 15 -> A0)
         final rowBeginner = await (migratedDb.select(
@@ -395,12 +413,21 @@ void main() {
                 .getSingle();
         expect(superPrism.amount, 2);
 
-        // Verifikasi cycle_rank di-clamp ke 5
+        // Verifikasi cycle_rank dan cleared_in_cycle_rank di-clamp ke 5
         final cycleRow = await (migratedDb.select(
           migratedDb.cycleProgresses,
         )..where((t) => t.playerId.equals('p_master'))).getSingle();
         expect(cycleRow.ascensionRank, 5);
         expect(cycleRow.highestAscensionRank, 5);
+
+        final dungeonRow =
+            await (migratedDb.select(migratedDb.dungeonProgresses)..where(
+                  (t) =>
+                      t.playerId.equals('p_master') &
+                      t.dungeonId.equals('forgotten_forest'),
+                ))
+                .getSingle();
+        expect(dungeonRow.clearedInCycleRank, 5);
 
         // Verifikasi data gacha & specialization tetap utuh
         final pityRow = await (migratedDb.select(
@@ -495,6 +522,162 @@ void main() {
       // Encode ulang kanonis harus identik
       final reEncoded = codec.encodeToCanonicalJson(decoded);
       expect(reEncoded, equals(jsonCanonical));
+    });
+
+    test('Migrasi v11 -> v12 men-clamp cleared_in_cycle_rank > 5 ke Rank 5 dan menjaga Infinite Spire', () async {
+      final tempDir = Directory.systemTemp.createTempSync(
+        'echoes_mig_v11_to_v12_',
+      );
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      final dbFile = File('${tempDir.path}/legacy_v11.sqlite');
+
+      final rawDb = NativeDatabase(
+        dbFile,
+        setup: (raw) {
+          raw.execute('PRAGMA foreign_keys = ON;');
+          raw.execute('PRAGMA user_version = 11;');
+          raw.execute('''
+              CREATE TABLE players (
+                id TEXT NOT NULL PRIMARY KEY,
+                level INTEGER NOT NULL,
+                current_exp INTEGER NOT NULL,
+                gold INTEGER NOT NULL,
+                current_hp INTEGER,
+                active_specialization_id TEXT,
+                base_stats_json TEXT NOT NULL,
+                equipment_counter INTEGER NOT NULL DEFAULT 0,
+                last_saved_at_ms INTEGER NOT NULL,
+                ascension_phase INTEGER NOT NULL DEFAULT 0
+              );
+            ''');
+          raw.execute('''
+              CREATE TABLE cycle_progresses (
+                player_id TEXT NOT NULL PRIMARY KEY,
+                ascension_rank INTEGER NOT NULL DEFAULT 0,
+                highest_ascension_rank INTEGER NOT NULL DEFAULT 0,
+                last_normal_dungeon_id TEXT,
+                updated_at_ms INTEGER NOT NULL
+              );
+            ''');
+          raw.execute('''
+              CREATE TABLE dungeon_progresses (
+                player_id TEXT NOT NULL,
+                dungeon_id TEXT NOT NULL,
+                current_room_id TEXT NOT NULL,
+                current_room_index INTEGER NOT NULL,
+                highest_cleared_room_index INTEGER NOT NULL,
+                clears_count INTEGER NOT NULL,
+                cleared_in_cycle_rank INTEGER NOT NULL DEFAULT -1,
+                reward_state_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (player_id, dungeon_id)
+              );
+            ''');
+          raw.execute('''
+              CREATE TABLE infinite_spire_progress (
+                player_id TEXT NOT NULL PRIMARY KEY,
+                highest_floor_cleared INTEGER NOT NULL DEFAULT 0,
+                claimed_rewards_blob TEXT NOT NULL DEFAULT '[]'
+              );
+            ''');
+
+          raw.execute('''
+              INSERT INTO players VALUES ('p_1', 90, 0, 50000, 3000, 'vanguard', '{}', 0, 1000000, 6);
+            ''');
+          raw.execute('''
+              INSERT INTO cycle_progresses VALUES ('p_1', 5, 5, 'forgotten_forest', 1000000);
+            ''');
+          raw.execute('''
+              INSERT INTO dungeon_progresses VALUES
+                ('p_1', 'forgotten_forest', 'ancient_heart', 4, 4, 10, 6, '{}'),
+                ('p_1', 'crystal_cavern', 'cc_prismatic_core', 5, 5, 8, 7, '{}'),
+                ('p_1', 'ancient_crypt', 'ac_crypt_gate', 0, 2, 3, 4, '{}');
+            ''');
+          raw.execute('''
+              INSERT INTO infinite_spire_progress VALUES ('p_1', 12, '[1,2,3]');
+            ''');
+        },
+      );
+      await rawDb.ensureOpen(_SchemaUser(11));
+      await rawDb.close();
+
+      final migratedDb = AppDatabase(NativeDatabase(dbFile));
+      addTearDown(migratedDb.close);
+      await migratedDb.initialize();
+
+      expect(migratedDb.schemaVersion, 12);
+      final versionRow = await migratedDb
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      expect(versionRow.read<int>('user_version'), 12);
+
+      final rows = await (migratedDb.select(
+        migratedDb.dungeonProgresses,
+      )..where((t) => t.playerId.equals('p_1'))).get();
+      final byId = {for (final r in rows) r.dungeonId: r.clearedInCycleRank};
+      expect(byId['forgotten_forest'], 5);
+      expect(byId['crystal_cavern'], 5);
+      expect(byId['ancient_crypt'], 4);
+
+      final spireRow = await (migratedDb.select(
+        migratedDb.infiniteSpireProgresses,
+      )..where((t) => t.playerId.equals('p_1'))).getSingle();
+      expect(spireRow.highestFloorCleared, 12);
+      expect(spireRow.claimedRewardsBlob, '[1,2,3]');
+    });
+
+    test('LegacySaveConverter men-clamp clearedInCycleRank > 5 pada dungeon dan dungeonProgresses untuk v10 maupun v11', () {
+      for (final schemaVer in [10, 11]) {
+        final raw = PlayerSaveSnapshot(
+          playerId: 'p_legacy',
+          character: const PlayerCharacterSnapshot(
+            progress: PlayerProgress(level: 90, ascensionPhase: 6),
+          ),
+          inventory: const InventorySnapshot(),
+          dungeon: const DungeonProgressSnapshot(
+            currentDungeonId: 'forgotten_forest',
+            clearedInCycleRank: 6,
+          ),
+          dungeonProgresses: const {
+            'forgotten_forest': DungeonProgressSnapshot(
+              currentDungeonId: 'forgotten_forest',
+              clearsCount: 5,
+              clearedInCycleRank: 6,
+            ),
+            'crystal_cavern': DungeonProgressSnapshot(
+              currentDungeonId: 'crystal_cavern',
+              clearsCount: 2,
+              clearedInCycleRank: 7,
+            ),
+            'ancient_crypt': DungeonProgressSnapshot(
+              currentDungeonId: 'ancient_crypt',
+              clearsCount: 1,
+              clearedInCycleRank: 4,
+            ),
+          },
+          cycleProgress: const CycleProgress(
+            ascensionRank: 5,
+            highestAscensionRank: 5,
+          ),
+        );
+
+        final converted = LegacySaveConverter.convertToV11IfNeeded(
+          raw,
+          fromSchemaVersion: schemaVer,
+        );
+        expect(converted.dungeon.clearedInCycleRank, 5);
+        expect(
+          converted.dungeonProgresses['forgotten_forest']?.clearedInCycleRank,
+          5,
+        );
+        expect(
+          converted.dungeonProgresses['crystal_cavern']?.clearedInCycleRank,
+          5,
+        );
+        expect(
+          converted.dungeonProgresses['ancient_crypt']?.clearedInCycleRank,
+          4,
+        );
+      }
     });
   });
 }

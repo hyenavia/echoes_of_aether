@@ -24,10 +24,16 @@ class LegacySaveConverter {
   }) {
     final oldProgress = snapshot.character.progress;
     final oldCycle = snapshot.cycleProgress;
+    final hasOverRankDungeonClear =
+        snapshot.dungeon.clearedInCycleRank > legacyMaxRank ||
+        snapshot.dungeonProgresses.values.any(
+          (d) => d.clearedInCycleRank > legacyMaxRank,
+        );
     if (fromSchemaVersion >= m16SchemaVersion &&
         oldProgress.level <= legacyMaxLevel &&
         oldCycle.highestAscensionRank <= legacyMaxRank &&
-        oldCycle.ascensionRank <= legacyMaxRank) {
+        oldCycle.ascensionRank <= legacyMaxRank &&
+        !hasOverRankDungeonClear) {
       return snapshot;
     }
 
@@ -68,6 +74,13 @@ class LegacySaveConverter {
       math.max(0, oldCycle.ascensionRank),
     );
 
+    final normalizedDungeon = _clampDungeonClearRank(snapshot.dungeon);
+    final normalizedDungeonProgresses =
+        Map<String, DungeonProgressSnapshot>.unmodifiable({
+          for (final entry in snapshot.dungeonProgresses.entries)
+            entry.key: _clampDungeonClearRank(entry.value),
+        });
+
     return snapshot.copyWith(
       character: snapshot.character.copyWith(
         progress: oldProgress.copyWith(
@@ -77,11 +90,28 @@ class LegacySaveConverter {
           ascensionPhase: nextPhase,
         ),
       ),
+      dungeon: normalizedDungeon,
+      dungeonProgresses: normalizedDungeonProgresses,
       cycleProgress: oldCycle.copyWith(
         ascensionRank: clampedRank,
         highestAscensionRank: clampedHighestRank,
       ),
       currencies: Map<String, int>.unmodifiable(nextCurrencies),
+    );
+  }
+
+  static DungeonProgressSnapshot _clampDungeonClearRank(
+    DungeonProgressSnapshot d,
+  ) {
+    if (d.clearedInCycleRank <= legacyMaxRank) return d;
+    return DungeonProgressSnapshot(
+      currentDungeonId: d.currentDungeonId,
+      currentRoomId: d.currentRoomId,
+      currentRoomIndex: d.currentRoomIndex,
+      highestClearedRoomIndex: d.highestClearedRoomIndex,
+      clearsCount: d.clearsCount,
+      clearedInCycleRank: legacyMaxRank,
+      rewardState: d.rewardState,
     );
   }
 

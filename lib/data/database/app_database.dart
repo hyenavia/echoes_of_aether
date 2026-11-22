@@ -337,7 +337,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? _openDefaultConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -494,6 +494,25 @@ class AppDatabase extends _$AppDatabase {
           }
 
           // 3. Clamp cycle_rank > 5 ke 5 (Peak World Tier)
+          await customStatement('''
+            UPDATE cycle_progresses
+            SET ascension_rank = 5
+            WHERE ascension_rank > 5
+          ''');
+          await customStatement('''
+            UPDATE cycle_progresses
+            SET highest_ascension_rank = 5
+            WHERE highest_ascension_rank > 5
+          ''');
+        }
+        if (from < 12) {
+          // Migrasi progres clear dungeon dari Rank lama (> 5) ke Peak World Tier (Rank 5)
+          // agar status Selesai & unlock dungeon berikutnya tetap terjaga.
+          await customStatement('''
+            UPDATE dungeon_progresses
+            SET cleared_in_cycle_rank = 5
+            WHERE cleared_in_cycle_rank > 5
+          ''');
           await customStatement('''
             UPDATE cycle_progresses
             SET ascension_rank = 5

@@ -195,7 +195,7 @@ void main() {
     test('instalasi baru v5 membuat tabel shop_purchases dengan PK dan CHECK constraint', () async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
-      expect(db.schemaVersion, 11);
+      expect(db.schemaVersion, 12);
       await db.initialize();
 
       final cols = await db

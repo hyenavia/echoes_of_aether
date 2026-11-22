@@ -180,7 +180,7 @@ void main() {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 11);
+      expect(db.schemaVersion, 12);
       await db.initialize();
 
       final dpCols = await db

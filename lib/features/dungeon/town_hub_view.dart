@@ -1300,9 +1300,16 @@ class _TownHubViewState extends State<TownHubView> {
                     );
                     final totalRoomsInDungeon = d.roomOrder.length;
                     final snapshot = progressMap[d.id];
+                    final isStaleFullClear =
+                        !clearedInCycle &&
+                        snapshot != null &&
+                        totalRoomsInDungeon > 0 &&
+                        snapshot.highestClearedRoomIndex >=
+                            totalRoomsInDungeon - 1;
                     final clearedRoomsInDungeon = clearedInCycle
                         ? totalRoomsInDungeon
                         : (snapshot != null &&
+                                  !isStaleFullClear &&
                                   snapshot.highestClearedRoomIndex >= 0
                               ? (snapshot.highestClearedRoomIndex + 1).clamp(
                                   0,

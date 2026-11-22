@@ -282,12 +282,12 @@ void main() {
       addTearDown(db.close);
       await db.initialize();
 
-      expect(db.schemaVersion, 11);
+      expect(db.schemaVersion, 12);
 
       final versionRow = await db
           .customSelect('PRAGMA user_version')
           .getSingle();
-      expect(versionRow.read<int>('user_version'), 11);
+      expect(versionRow.read<int>('user_version'), 12);
 
       // Verifikasi tabel baru ada
       final tables = await db

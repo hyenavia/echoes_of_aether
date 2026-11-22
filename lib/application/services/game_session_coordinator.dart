@@ -133,6 +133,8 @@ class GameSessionCoordinator {
   Object? lastSaveError;
 
   ClockState get clockState => _clockState;
+  InfiniteSpireProgressSnapshot _lastInfiniteSpireProgress =
+      const InfiniteSpireProgressSnapshot();
 
   int? get serverOffsetMs => _serverOffsetMs;
 
@@ -532,6 +534,7 @@ class GameSessionCoordinator {
       rawNowMs: now,
     );
     _clockState = clockReading.state;
+    _lastInfiniteSpireProgress = loaded.infiniteSpireProgress;
     // Saat online dengan selisih jam server melampaui toleransi, offline
     // progression dihitung terhadap waktu server (`raw + offset`). Saat
     // offline, `raw` tetap diteruskan agar deteksi `invalidClock` terjaga.
@@ -1159,6 +1162,10 @@ class GameSessionCoordinator {
       dungeon.currentDungeonId: dungeon,
     };
 
+    final resolvedInfiniteSpire =
+        infiniteSpireProgress ?? _lastInfiniteSpireProgress;
+    _lastInfiniteSpireProgress = resolvedInfiniteSpire;
+
     return saveSnapshot(
       PlayerSaveSnapshot(
         character: updatedCharSnap,
@@ -1190,8 +1197,7 @@ class GameSessionCoordinator {
         eventShopPurchases: eventShopPurchases,
         gachaPityStates: gachaPityStates,
         unlockedSpecializations: unlockedSpecializations,
-        infiniteSpireProgress:
-            infiniteSpireProgress ?? const InfiniteSpireProgressSnapshot(),
+        infiniteSpireProgress: resolvedInfiniteSpire,
       ),
     );
   }

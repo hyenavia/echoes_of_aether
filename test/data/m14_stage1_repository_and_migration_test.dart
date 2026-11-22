@@ -720,7 +720,7 @@ void main() {
       addTearDown(db.close);
       await db.initialize();
 
-      expect(db.schemaVersion, 11);
+      expect(db.schemaVersion, 12);
       final tables = await db
           .customSelect("SELECT name FROM sqlite_master WHERE type = 'table'")
           .get();
@@ -754,12 +754,12 @@ void main() {
           addTearDown(migratedDb.close);
           await migratedDb.initialize();
 
-          expect(migratedDb.schemaVersion, 11);
+          expect(migratedDb.schemaVersion, 12);
 
           final versionRow = await migratedDb
               .customSelect('PRAGMA user_version')
               .getSingle();
-          expect(versionRow.read<int>('user_version'), 11);
+          expect(versionRow.read<int>('user_version'), 12);
 
           final repo = DriftPlayerSaveRepository(
             db: migratedDb,
@@ -819,7 +819,7 @@ void main() {
             ),
             reason: 'post_migration_test',
           );
-          expect(backup.schemaVersion, 11);
+          expect(backup.schemaVersion, 12);
         },
       );
     }

@@ -1202,6 +1202,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
             unlockedSpecializations: Set<String>.unmodifiable(
               _unlockedSpecializations,
             ),
+            infiniteSpireProgress: _infiniteSpireProgress,
           );
         } catch (e) {
           _dirty = true;
@@ -1331,6 +1332,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
           } else {
             _dungeon = updated;
             _dungeonProgresses = nextProgressMap;
+            unawaited(_flushSaveNow());
           }
         } else if (event.finalStatus == DungeonSessionStatus.failed &&
             event.effectiveReason == DungeonEndReason.defeated) {
