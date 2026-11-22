@@ -4,6 +4,7 @@ import '../../app/theme/app_tokens.dart';
 import '../../app/theme/echoes_theme.dart';
 import '../../core/utils/number_formatter.dart';
 import '../../domain/entities/infinite_spire.dart';
+import '../../domain/services/infinite_spire_service.dart';
 import '../shared/widgets/shared_widgets.dart';
 
 /// Overlay mode end-game The Infinite Spire (100 Lantai & Hadiah First-Clear)
@@ -16,6 +17,7 @@ class InfiniteSpireOverlay extends StatefulWidget {
     required this.playerLevel,
     required this.onFightFloor,
     required this.onClose,
+    this.weeklyBossRush,
     this.embedded = false,
   });
 
@@ -24,6 +26,7 @@ class InfiniteSpireOverlay extends StatefulWidget {
   final int playerLevel;
   final void Function(int floor) onFightFloor;
   final VoidCallback onClose;
+  final WeeklySpireBossRushInfo? weeklyBossRush;
   final bool embedded;
 
   @override
@@ -144,6 +147,14 @@ class _InfiniteSpireOverlayState extends State<InfiniteSpireOverlay> {
         const Divider(height: 1, color: AppColors.panelBorder),
         const SizedBox(height: AppSpacing.xs),
 
+        if (widget.weeklyBossRush != null) ...[
+          _WeeklyBossRushBanner(
+            info: widget.weeklyBossRush!,
+            onFightFloor: widget.onFightFloor,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+
         // Floor list
         Expanded(
           child: ListView.separated(
@@ -190,6 +201,133 @@ class _InfiniteSpireOverlayState extends State<InfiniteSpireOverlay> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WeeklyBossRushBanner extends StatelessWidget {
+  const _WeeklyBossRushBanner({required this.info, required this.onFightFloor});
+
+  final WeeklySpireBossRushInfo info;
+  final void Function(int floor) onFightFloor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ext = EchoesTheme.of(context);
+    final featured = info.featuredFloor;
+    final scrap =
+        info.reward.items[InfiniteSpireService.aetherScrapItemId] ?? 0;
+    final shard =
+        info.reward.currencies[InfiniteSpireService.aetherShardCurrencyId] ?? 0;
+
+    return PanelFrame(
+      key: const Key('weekly_spire_boss_rush_card'),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      backgroundColor: AppColors.surfaceDark,
+      borderColor: info.isUnlocked
+          ? ext.gold.withValues(alpha: 0.6)
+          : AppColors.panelInnerBorder,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.local_fire_department_outlined,
+                size: 16,
+                color: info.isUnlocked ? ext.gold : AppColors.textMuted,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Tantangan Bos Mingguan',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: info.isUnlocked ? ext.gold : AppColors.textSecondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Text(
+                'Minggu ${info.periodKey}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (!info.isUnlocked || featured == null)
+            Text(
+              'Tamatkan Lantai 10 untuk membuka Tantangan Bos Mingguan.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textMuted,
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lantai ${featured.floor} — ${featured.bossName ?? featured.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '+${NumberFormatter.format(info.reward.gold)} Gold • +$scrap Scrap • +$shard Shard',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: ext.success,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                if (info.isCompletedThisWeek)
+                  Container(
+                    key: const Key('weekly_spire_boss_rush_completed_badge'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs + 2,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ext.success.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(
+                        color: ext.success.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Text(
+                      'Selesai Minggu Ini',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: ext.success,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                else
+                  PrimaryButton(
+                    key: const Key('weekly_spire_boss_rush_fight_button'),
+                    label: 'Tantang',
+                    onPressed: () => onFightFloor(featured.floor),
+                  ),
+              ],
+            ),
+        ],
       ),
     );
   }

@@ -19,6 +19,9 @@ class CharacterIllustration extends StatelessWidget {
     this.height = 172,
     this.showPedestal = true,
     this.showAura = true,
+    this.sequence = CharacterAnimationSequence.idle,
+    this.frameIndex = 0,
+    this.useShowcase = false,
   });
 
   final String specializationId;
@@ -26,11 +29,22 @@ class CharacterIllustration extends StatelessWidget {
   final double height;
   final bool showPedestal;
   final bool showAura;
+  final CharacterAnimationSequence sequence;
+  final int frameIndex;
+  final bool useShowcase;
 
   @override
   Widget build(BuildContext context) {
     final spec = CharacterVisualSpec.resolve(specializationId);
-    final spriteAsset = 'assets/char/frames/hero_${spec.classId}_idle0.png';
+    final useLegacyDefault =
+        !useShowcase &&
+        sequence == CharacterAnimationSequence.idle &&
+        frameIndex == 0;
+    final spriteAsset = useShowcase
+        ? spec.showcasePath
+        : (useLegacyDefault
+              ? 'assets/char/frames/hero_${spec.classId}_idle0.png'
+              : spec.manifest.frameFor(sequence, frameIndex));
 
     return Semantics(
       image: true,
@@ -40,7 +54,11 @@ class CharacterIllustration extends StatelessWidget {
         width: width,
         height: height,
         child: GameAssetRegistry.hasRasterAsset(spec.assetPath)
-            ? Image.asset(spec.assetPath, fit: BoxFit.contain)
+            ? Image.asset(
+                spec.assetPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.none,
+              )
             : Stack(
                 alignment: Alignment.center,
                 children: [
@@ -64,6 +82,23 @@ class CharacterIllustration extends StatelessWidget {
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.none,
                       errorBuilder: (context, error, stackTrace) {
+                        if (spriteAsset != spec.portraitPath) {
+                          return Image.asset(
+                            spec.portraitPath,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.none,
+                            errorBuilder: (_, _, _) => RepaintBoundary(
+                              child: CustomPaint(
+                                size: Size(width, height),
+                                painter: _CharacterIllustrationPainter(
+                                  spec: spec,
+                                  showPedestal: showPedestal,
+                                  showAura: showAura,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                         return RepaintBoundary(
                           child: CustomPaint(
                             size: Size(width, height),
@@ -79,6 +114,38 @@ class CharacterIllustration extends StatelessWidget {
                   ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+/// Ikon crest/emblem class pixel-art dengan fallback ikon yang aman.
+class ClassEmblemIcon extends StatelessWidget {
+  const ClassEmblemIcon({
+    super.key,
+    required this.specializationId,
+    this.size = 24,
+    this.fallbackColor,
+  });
+
+  final String specializationId;
+  final double size;
+  final Color? fallbackColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = CharacterVisualSpec.resolve(specializationId);
+    return Image.asset(
+      spec.emblemPath,
+      key: ValueKey<String>('class_emblem_${spec.classId}'),
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.none,
+      errorBuilder: (_, _, _) => Icon(
+        Icons.shield_outlined,
+        size: size * 0.85,
+        color: fallbackColor ?? spec.accentColor,
       ),
     );
   }

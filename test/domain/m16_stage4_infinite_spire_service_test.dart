@@ -12,6 +12,8 @@ import 'package:echoes_of_aether/data/models/monster_config_parser.dart';
 import 'package:echoes_of_aether/data/models/skill_config_parser.dart';
 import 'package:echoes_of_aether/data/models/specialization_config_parser.dart';
 import 'package:echoes_of_aether/data/repositories/drift_player_save_repository.dart';
+import 'package:echoes_of_aether/domain/entities/combat_stats.dart';
+import 'package:echoes_of_aether/domain/entities/combatant.dart';
 import 'package:echoes_of_aether/domain/entities/cycle_progress.dart';
 import 'package:echoes_of_aether/domain/entities/dungeon_definition.dart';
 import 'package:echoes_of_aether/domain/entities/game_config.dart';
@@ -23,7 +25,11 @@ import 'package:echoes_of_aether/domain/entities/player_character.dart';
 import 'package:echoes_of_aether/domain/entities/player_progress.dart';
 import 'package:echoes_of_aether/domain/entities/player_save_snapshot.dart';
 import 'package:echoes_of_aether/domain/repositories/player_progress_repository.dart';
+import 'package:echoes_of_aether/domain/services/astar_pathfinder.dart';
+import 'package:echoes_of_aether/domain/services/combat_simulation.dart';
 import 'package:echoes_of_aether/domain/services/currency_service.dart';
+import 'package:echoes_of_aether/domain/services/dungeon_manager.dart';
+import 'package:echoes_of_aether/domain/services/encounter_tracker.dart';
 import 'package:echoes_of_aether/domain/services/equipment_factory.dart';
 import 'package:echoes_of_aether/domain/services/infinite_spire_service.dart';
 import 'package:echoes_of_aether/domain/services/offline_dungeon_runner.dart';
@@ -539,6 +545,68 @@ void main() {
         progResult.failureReason,
         contains('Auto Farming ditolak: Boss Event / Spire'),
       );
+    });
+
+    test('lantai bos Infinite Spire (Lantai 10 corrupted_guardian) berhasil spawn dan menyelesaikan dungeon saat bos dikalahkan', () {
+      final layout = InfiniteSpireService.resolveArenaLayout(config)!;
+      final floor10 = spireService.buildFloorDungeon(
+        floorNumber: 10,
+        arenaLayout: layout,
+      );
+      final tracker = EncounterTracker(monsterCatalog: config.monsters);
+      final manager = DungeonManager(
+        dungeons: config.dungeons,
+        encounterTracker: tracker,
+      );
+
+      manager.startRuntimeDungeon(floor10, cycleRank: 0);
+      final room = manager.activeRoom!;
+      final grid = room.createNavigationGrid();
+      final player = Combatant(
+        id: 'player',
+        team: Team.player,
+        stats: const CombatStats(
+          maxHp: 1000,
+          atk: 200,
+          def: 20,
+          attackSpeed: 2,
+          moveSpeed: 5,
+          attackRange: 1.5,
+        ),
+        cell: room.entryPosition,
+      );
+      final sim = CombatSimulation(
+        grid: grid,
+        pathfinder: const AStarPathfinder(),
+        player: player,
+        seed: 1,
+      );
+
+      manager.activateRoom();
+      final spawned = tracker.onRoomActivated(sim, grid: grid);
+      final bossRecord = spawned
+          .where((e) => e.monsterId == 'corrupted_guardian')
+          .toList();
+      expect(bossRecord, hasLength(1));
+      expect(tracker.primaryBossEncounter?.isFailed, isFalse);
+      expect(
+        sim.enemies.any((e) => e.id == bossRecord.first.enemyId && e.isBoss),
+        isTrue,
+      );
+
+      // Kalahkan bos Lantai 10 (meski minion masih ada) -> room & dungeon selesai.
+      tracker.onEnemyDefeated(
+        bossRecord.first.enemyId,
+        simulation: sim,
+        grid: grid,
+      );
+      final eval = manager.evaluateCurrentRoom(playerCell: room.entryPosition);
+      expect(eval.isCompleted, isTrue);
+      expect(
+        manager.tryCompleteActiveRoom(playerCell: room.entryPosition),
+        isTrue,
+      );
+      expect(manager.session?.isTerminal, isTrue);
     });
   });
 }

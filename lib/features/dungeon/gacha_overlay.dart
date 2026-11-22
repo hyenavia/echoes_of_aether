@@ -436,11 +436,22 @@ class _GachaOverlayState extends State<GachaOverlay> {
                                 ),
                               ),
                             )
-                          : Icon(
-                              isClassBanner ? Icons.person_pin : Icons.hardware,
-                              color: mythicalColor,
-                              size: 26,
-                            ),
+                          : (isClassBanner
+                                ? Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: CharacterIllustration(
+                                      specializationId: info.featuredId,
+                                      width: 42,
+                                      height: 42,
+                                      showPedestal: false,
+                                      showAura: false,
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.hardware,
+                                    color: mythicalColor,
+                                    size: 26,
+                                  )),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
@@ -765,6 +776,14 @@ class _GachaResultDialog extends StatelessWidget {
                             children: [
                               RarityLabel(rarity: rarity, compact: true),
                               const SizedBox(width: AppSpacing.xs),
+                              if (pull.isSpecialization) ...[
+                                ClassEmblemIcon(
+                                  specializationId: pull.itemId,
+                                  size: 20,
+                                  fallbackColor: color,
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                              ],
                               Expanded(
                                 child: Text(
                                   _nameFor(pull),

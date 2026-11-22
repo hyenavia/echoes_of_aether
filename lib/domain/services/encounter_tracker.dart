@@ -376,9 +376,7 @@ class EncounterTracker {
     }
 
     if ((config.isElite && config.isBoss) ||
-        (definition.isElite && definition.isBoss) ||
-        (config.isBoss && definition.isElite) ||
-        (config.isElite && definition.isBoss)) {
+        (definition.isElite && definition.isBoss)) {
       return _failEncounter(
         encounter,
         'Konflik role elite/boss pada spawn "${config.id}" (${config.monsterId}).',

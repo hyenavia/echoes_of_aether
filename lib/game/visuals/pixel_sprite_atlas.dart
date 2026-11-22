@@ -1,5 +1,10 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/services.dart' show AssetBundle, rootBundle;
+
+import '../../features/shared/assets/game_assets.dart';
 import 'pixel_sprite_data.dart';
 
 /// Resolusi dasar pixel art untuk tile dan karakter MVP (16x16).
@@ -133,6 +138,102 @@ class PixelSpriteAtlas {
   }
 
   final Map<String, ui.Image> _images = {};
+  final Map<String, ui.Image> _characterImages = {};
+  Future<void>? _preloadFuture;
+  bool _disposed = false;
+
+  /// Mengambil frame karakter PNG hasil ekstraksi jika sudah di-preload.
+  ui.Image? characterFrameImage(String assetPath) =>
+      _characterImages[assetPath];
+
+  /// Memuat seluruh sprite frame karakter & portrait untuk 10 class ke memori GPU.
+  Future<void> preloadCharacterAssets([AssetBundle? bundle]) {
+    _disposed = false;
+    return _preloadFuture ??= _doPreloadCharacterAssets(bundle ?? rootBundle);
+  }
+
+  Future<void> _doPreloadCharacterAssets(AssetBundle bundle) async {
+    final paths = CharacterAssetCatalog.gameplaySpriteFramePaths;
+    for (final path in paths) {
+      if (_disposed) return;
+      await loadCharacterFrame(path, bundle);
+    }
+  }
+
+  /// Memuat satu file aset frame karakter secara aman; mengembalikan `null` jika hilang/gagal.
+  Future<ui.Image?> loadCharacterFrame(
+    String assetPath, [
+    AssetBundle? bundle,
+  ]) async {
+    final existing = _characterImages[assetPath];
+    if (existing != null) return existing;
+    try {
+      final data = await (bundle ?? rootBundle).load(assetPath);
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+      if (_disposed) {
+        frame.image.dispose();
+        return null;
+      }
+      final current = _characterImages[assetPath];
+      if (current != null) {
+        frame.image.dispose();
+        return current;
+      }
+      _characterImages[assetPath] = frame.image;
+      return frame.image;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PixelSpriteAtlas: gagal memuat aset "$assetPath": $e');
+      }
+      return null;
+    }
+  }
+
+  /// Mengambil sprite combatant berdasarkan sequence & index animasi dengan fallback
+  /// ke frame idle, portrait class, lalu 16x16 [combatantSprite].
+  ui.Image combatantSequenceSprite({
+    required bool isPlayer,
+    String? specializationId,
+    String? definitionId,
+    String? spriteRef,
+    required CharacterAnimationSequence sequence,
+    required int frameIndex,
+    required String fallbackPose,
+  }) {
+    if (isPlayer) {
+      final manifest = CharacterAssetCatalog.forClass(
+        specializationId ?? 'base',
+      );
+      final frames = manifest.framesForSequence(sequence);
+      if (frames.isNotEmpty) {
+        final primaryPath = manifest.frameFor(sequence, frameIndex);
+        final direct = _characterImages[primaryPath];
+        if (direct != null) return direct;
+        for (final candidate in frames) {
+          final img = _characterImages[candidate];
+          if (img != null) return img;
+        }
+        final idleFrames = manifest.framesForSequence(
+          CharacterAnimationSequence.idle,
+        );
+        for (final candidate in idleFrames) {
+          final img = _characterImages[candidate];
+          if (img != null) return img;
+        }
+        final portrait = _characterImages[manifest.portraitPath];
+        if (portrait != null) return portrait;
+      }
+    }
+    return combatantSprite(
+      isPlayer: isPlayer,
+      specializationId: specializationId,
+      definitionId: definitionId,
+      spriteRef: spriteRef,
+      pose: fallbackPose,
+    );
+  }
 
   /// Memetakan sprite monster: memakai [spriteRef] bila tersedia (tidak kosong),
   /// fallback ke [definitionId], dan terakhir `enemy_generic` bila tidak dikenal.
@@ -219,10 +320,16 @@ class PixelSpriteAtlas {
   }
 
   void dispose() {
+    _disposed = true;
+    _preloadFuture = null;
     for (final img in _images.values) {
       img.dispose();
     }
     _images.clear();
+    for (final img in _characterImages.values) {
+      img.dispose();
+    }
+    _characterImages.clear();
   }
 
   String _playerSpecies(String? specId) {

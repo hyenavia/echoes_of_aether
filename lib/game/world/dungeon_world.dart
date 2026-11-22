@@ -29,6 +29,7 @@ import '../components/player/player_component.dart';
 import '../hud/hud_state.dart';
 import '../hud/inventory_views.dart';
 import '../systems/combat_system.dart';
+import '../visuals/pixel_sprite_atlas.dart';
 import 'debug_room_component.dart';
 
 /// Dunia dungeon (GDD 12.2).
@@ -215,6 +216,7 @@ class DungeonWorld extends World {
 
     await addAll([_roomView!, playerView, _combatSystem]);
     if (_sessionDetached) return;
+    unawaited(PixelSpriteAtlas.instance.preloadCharacterAssets());
 
     if (manager != null) {
       _dungeonListener = _onDungeonEvent;

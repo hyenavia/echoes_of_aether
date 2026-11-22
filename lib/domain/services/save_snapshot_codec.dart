@@ -9,6 +9,7 @@ import '../entities/gacha_config.dart';
 import '../entities/game_config.dart';
 import '../entities/infinite_spire.dart';
 import '../entities/item_definition.dart';
+import '../entities/loadout_preset.dart';
 import '../entities/offline_activity.dart';
 import '../entities/periodic_quest_state.dart';
 import '../entities/player_progress.dart';
@@ -206,6 +207,23 @@ class SaveSnapshotCodec {
         'equipmentCounter': snapshot.inventory.equipmentCounter,
         'stacks': _sortedIntMap(snapshot.inventory.stacks),
       }),
+      if (snapshot.loadoutPresets.isNotEmpty)
+        'loadoutPresets': [
+          for (final preset in [
+            ...snapshot.loadoutPresets,
+          ]..sort((a, b) => a.slotIndex.compareTo(b.slotIndex)))
+            _sortedMap({
+              'equipmentInstanceIds': _sortedMap({
+                for (final entry in preset.equipmentInstanceIds.entries)
+                  entry.key.name: entry.value,
+              }),
+              'name': preset.name,
+              'slotIndex': preset.slotIndex,
+              if (preset.specializationId != null &&
+                  preset.specializationId!.trim().isNotEmpty)
+                'specializationId': preset.specializationId!.trim(),
+            }),
+        ],
       'periodicQuestStates': [
         for (final quest in sortedQuests)
           _sortedMap({
@@ -289,6 +307,7 @@ class SaveSnapshotCodec {
       'gachaPityStates',
       'infiniteSpireProgress',
       'inventory',
+      'loadoutPresets',
       'periodicQuestStates',
       'playerId',
       'session',
@@ -429,6 +448,17 @@ class SaveSnapshotCodec {
       infiniteSpire = const InfiniteSpireProgressSnapshot();
     }
 
+    final List<LoadoutPreset> loadoutPresets;
+    final rawPresets = root['loadoutPresets'];
+    if (rawPresets != null) {
+      loadoutPresets = _decodeLoadoutPresets(
+        _requireList(root, 'loadoutPresets', path: 'loadoutPresets'),
+        config: config,
+      );
+    } else {
+      loadoutPresets = const [];
+    }
+
     return PlayerSaveSnapshot(
       playerId: playerId,
       character: character,
@@ -448,6 +478,7 @@ class SaveSnapshotCodec {
       gachaPityStates: gachaPityStates,
       unlockedSpecializations: unlockedSpecializations,
       infiniteSpireProgress: infiniteSpire,
+      loadoutPresets: loadoutPresets,
     );
   }
 
@@ -1590,6 +1621,106 @@ class SaveSnapshotCodec {
       result.addAll(['vanguard', 'arcanist', 'ranger']);
     }
     return result;
+  }
+
+  List<LoadoutPreset> _decodeLoadoutPresets(
+    List<dynamic> list, {
+    required GameConfig config,
+  }) {
+    final bySlot = <int, LoadoutPreset>{};
+    for (var i = 0; i < list.length; i++) {
+      final item = list[i];
+      if (item is! Map<String, dynamic>) {
+        throw SaveCodecException(
+          SaveCodecErrorCode.invalidFieldType,
+          'loadoutPresets[$i] harus berupa object.',
+          path: 'loadoutPresets[$i]',
+        );
+      }
+      _rejectUnknownKeys(item, const {
+        'equipmentInstanceIds',
+        'name',
+        'slotIndex',
+        'specializationId',
+      }, 'loadoutPresets[$i]');
+
+      final slotIndex = _requireInt(
+        item,
+        'slotIndex',
+        path: 'loadoutPresets[$i].slotIndex',
+        min: 0,
+      );
+      if (slotIndex >= LoadoutPreset.maxSlots) {
+        throw SaveCodecException(
+          SaveCodecErrorCode.invalidValueRange,
+          'loadoutPresets[$i].slotIndex harus < ${LoadoutPreset.maxSlots} (nilai: $slotIndex).',
+          path: 'loadoutPresets[$i].slotIndex',
+        );
+      }
+      if (bySlot.containsKey(slotIndex)) {
+        throw SaveCodecException(
+          SaveCodecErrorCode.invalidValueRange,
+          'loadoutPresets[$i].slotIndex duplikat: $slotIndex.',
+          path: 'loadoutPresets[$i].slotIndex',
+        );
+      }
+      final name = _requireNonEmptyString(
+        item,
+        'name',
+        path: 'loadoutPresets[$i].name',
+      );
+      final specId = _optionalNonEmptyString(
+        item,
+        'specializationId',
+        path: 'loadoutPresets[$i].specializationId',
+      );
+      if (specId != null &&
+          config.specializations.definitions.isNotEmpty &&
+          !config.specializations.definitions.containsKey(specId)) {
+        throw SaveCodecException(
+          SaveCodecErrorCode.unknownReferenceId,
+          'loadoutPresets[$i].specializationId tidak dikenal "$specId".',
+          path: 'loadoutPresets[$i].specializationId',
+        );
+      }
+      final rawEqMap = _requireMap(
+        item,
+        'equipmentInstanceIds',
+        path: 'loadoutPresets[$i].equipmentInstanceIds',
+      );
+      final eqIds = <EquipmentSlot, String>{};
+      for (final entry in rawEqMap.entries) {
+        final slot = EquipmentSlot.values
+            .where((s) => s.name == entry.key)
+            .firstOrNull;
+        if (slot == null) {
+          throw SaveCodecException(
+            SaveCodecErrorCode.unknownReferenceId,
+            'loadoutPresets[$i].equipmentInstanceIds slot tidak dikenal "${entry.key}".',
+            path: 'loadoutPresets[$i].equipmentInstanceIds.${entry.key}',
+          );
+        }
+        final val = entry.value;
+        if (val is! String || val.trim().isEmpty) {
+          throw SaveCodecException(
+            SaveCodecErrorCode.invalidFieldType,
+            'loadoutPresets[$i].equipmentInstanceIds.${entry.key} harus berupa string tidak kosong.',
+            path: 'loadoutPresets[$i].equipmentInstanceIds.${entry.key}',
+          );
+        }
+        eqIds[slot] = val.trim();
+      }
+      bySlot[slotIndex] = LoadoutPreset(
+        slotIndex: slotIndex,
+        name: name,
+        specializationId: specId,
+        equipmentInstanceIds: Map<EquipmentSlot, String>.unmodifiable(eqIds),
+      );
+    }
+    final sortedKeys = bySlot.keys.toList()..sort();
+    return List<LoadoutPreset>.unmodifiable([
+      for (final k in sortedKeys) bySlot[k]!,
+    ]);
   }
 
   static double _normDouble(double v) => v == 0 ? 0.0 : v;

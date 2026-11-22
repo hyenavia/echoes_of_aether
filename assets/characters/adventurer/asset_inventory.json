@@ -1,0 +1,306 @@
+[
+  {
+    "path": "source_sprite_sheet.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "icons/adventurer_class_compass.png",
+    "size": [
+      127,
+      125
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "showcase/adventurer_showcase.png",
+    "size": [
+      380,
+      520
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/run/adventurer_run_01.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/run/adventurer_run_02.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/run/adventurer_run_03.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/run/adventurer_run_04.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/walk/adventurer_walk_01.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/walk/adventurer_walk_02.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/walk/adventurer_walk_03.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/walk/adventurer_walk_04.png",
+    "size": [
+      150,
+      175
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle_alternate/adventurer_idle_alternate_01.png",
+    "size": [
+      150,
+      150
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle_alternate/adventurer_idle_alternate_02.png",
+    "size": [
+      150,
+      150
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle_alternate/adventurer_idle_alternate_03.png",
+    "size": [
+      150,
+      150
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle_alternate/adventurer_idle_alternate_04.png",
+    "size": [
+      150,
+      150
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/skill_special/adventurer_skill_special_01.png",
+    "size": [
+      150,
+      220
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/skill_special/adventurer_skill_special_02.png",
+    "size": [
+      150,
+      220
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/skill_special/adventurer_skill_special_03.png",
+    "size": [
+      150,
+      220
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/skill_special/adventurer_skill_special_04.png",
+    "size": [
+      150,
+      220
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/attack/adventurer_attack_01.png",
+    "size": [
+      150,
+      195
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/attack/adventurer_attack_02.png",
+    "size": [
+      150,
+      195
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/attack/adventurer_attack_03.png",
+    "size": [
+      150,
+      195
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/attack/adventurer_attack_04.png",
+    "size": [
+      150,
+      195
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle/adventurer_idle_01.png",
+    "size": [
+      150,
+      145
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle/adventurer_idle_02.png",
+    "size": [
+      150,
+      145
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle/adventurer_idle_03.png",
+    "size": [
+      150,
+      145
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/idle/adventurer_idle_04.png",
+    "size": [
+      150,
+      145
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/downed/adventurer_downed_01.png",
+    "size": [
+      225,
+      150
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "animations/downed/adventurer_downed_02.png",
+    "size": [
+      225,
+      150
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/adventurer_class_description.png",
+    "size": [
+      335,
+      91
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/adventurer_nameplate.png",
+    "size": [
+      418,
+      94
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_attack.png",
+    "size": [
+      150,
+      49
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_downed.png",
+    "size": [
+      175,
+      55
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_idle.png",
+    "size": [
+      165,
+      51
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_idle_alternate.png",
+    "size": [
+      240,
+      51
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_run.png",
+    "size": [
+      135,
+      52
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_skill_special.png",
+    "size": [
+      225,
+      50
+    ],
+    "mode": "RGBA"
+  },
+  {
+    "path": "ui/label_walk.png",
+    "size": [
+      145,
+      52
+    ],
+    "mode": "RGBA"
+  }
+]

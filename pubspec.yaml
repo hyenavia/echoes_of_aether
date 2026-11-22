@@ -91,6 +91,48 @@ flutter:
     - assets/environment/mines_caves/
     - assets/environment/biomes/
     - assets/icons/class/
+    - assets/characters/adventurer/
+    - assets/characters/adventurer/icons/
+    - assets/characters/adventurer/showcase/
+    - assets/characters/adventurer/ui/
+    - assets/characters/adventurer/animations/attack/
+    - assets/characters/adventurer/animations/downed/
+    - assets/characters/adventurer/animations/idle/
+    - assets/characters/adventurer/animations/idle_alternate/
+    - assets/characters/adventurer/animations/run/
+    - assets/characters/adventurer/animations/skill_special/
+    - assets/characters/adventurer/animations/walk/
+    - assets/characters/classes/arcanist/sprites/
+    - assets/characters/classes/arcanist/ui/
+    - assets/characters/classes/arcanist/animations/attack/
+    - assets/characters/classes/chronomancer/showcase/
+    - assets/characters/classes/chronomancer/sprites/
+    - assets/characters/classes/chronomancer/ui/
+    - assets/characters/classes/chronomancer/animations/attack/
+    - assets/characters/classes/gunslinger/sprites/
+    - assets/characters/classes/gunslinger/ui/
+    - assets/characters/classes/gunslinger/animations/attack/
+    - assets/characters/classes/necromancer/showcase/
+    - assets/characters/classes/necromancer/sprites/
+    - assets/characters/classes/necromancer/ui/
+    - assets/characters/classes/necromancer/animations/attack/
+    - assets/characters/classes/paladin/showcase/
+    - assets/characters/classes/paladin/sprites/
+    - assets/characters/classes/paladin/ui/
+    - assets/characters/classes/paladin/animations/attack/
+    - assets/characters/classes/ranger/sprites/
+    - assets/characters/classes/ranger/ui/
+    - assets/characters/classes/ranger/animations/attack/
+    - assets/characters/classes/stormcaller/sprites/
+    - assets/characters/classes/stormcaller/ui/
+    - assets/characters/classes/stormcaller/animations/attack/
+    - assets/characters/classes/vanguard/showcase/
+    - assets/characters/classes/vanguard/sprites/
+    - assets/characters/classes/vanguard/ui/
+    - assets/characters/classes/vanguard/animations/attack/
+    - assets/characters/classes/voidblade/sprites/
+    - assets/characters/classes/voidblade/ui/
+    - assets/characters/classes/voidblade/animations/attack/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

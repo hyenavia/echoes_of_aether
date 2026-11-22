@@ -32,6 +32,8 @@ import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/inventory.dart';
 import '../../domain/entities/infinite_spire.dart';
+import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/loadout_preset.dart';
 import '../../domain/entities/mystery_box.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/player_character.dart';
@@ -58,6 +60,7 @@ import '../../domain/services/gacha_service.dart';
 import '../../domain/services/game_clock.dart';
 import '../../domain/services/hero_ascension_service.dart';
 import '../../domain/services/infinite_spire_service.dart';
+import '../../domain/services/loadout_preset_service.dart';
 import '../../domain/services/mystery_box_service.dart';
 import '../../domain/services/offline_progression_service.dart';
 import '../../domain/services/period_service.dart';
@@ -68,6 +71,7 @@ import '../../game/audio/audio_service.dart';
 import '../../game/echoes_game.dart';
 import '../../game/hud/inventory_views.dart';
 import '../../game/overlays.dart';
+import '../../game/visuals/pixel_sprite_atlas.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'altar_overlay.dart';
 import 'blacksmith_overlay.dart';
@@ -142,6 +146,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   Set<String> _unlockedSpecializations = {};
   InfiniteSpireProgressSnapshot _infiniteSpireProgress =
       const InfiniteSpireProgressSnapshot();
+  List<LoadoutPreset> _loadoutPresets = const [];
   BossQuestService _bossQuestService = BossQuestService();
   Map<String, int> _consecutiveDefeats = const {};
   String? _lastFailedDungeonId;
@@ -401,6 +406,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     _unlockedSpecializations = Set<String>.of(loaded.unlockedSpecializations);
     _views?.setUnlockedSpecializations(_unlockedSpecializations);
     _infiniteSpireProgress = loaded.infiniteSpireProgress;
+    _loadoutPresets = List<LoadoutPreset>.of(loaded.loadoutPresets);
     _autoSkill.value = loaded.session.autoSkillEnabled;
     if (resetTransientRewards) {
       _lastCompletionReward = null;
@@ -716,6 +722,17 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     for (final asset in uiAssets) {
       precacheImage(AssetImage(asset), context).catchError((_) {});
     }
+    for (final manifest in CharacterAssetCatalog.manifests.values) {
+      precacheImage(
+        AssetImage(manifest.emblemPath),
+        context,
+      ).catchError((_) {});
+      precacheImage(
+        AssetImage(manifest.portraitPath),
+        context,
+      ).catchError((_) {});
+    }
+    unawaited(PixelSpriteAtlas.instance.preloadCharacterAssets());
   }
 
   Future<void> _ensureInitialized(GameConfig config) {
@@ -786,6 +803,8 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
       _gachaPityStates = Map<String, GachaPityState>.of(loaded.gachaPityStates);
       _unlockedSpecializations = Set<String>.of(loaded.unlockedSpecializations);
       _views?.setUnlockedSpecializations(_unlockedSpecializations);
+      _infiniteSpireProgress = loaded.infiniteSpireProgress;
+      _loadoutPresets = List<LoadoutPreset>.of(loaded.loadoutPresets);
       _lastOfflineClaimAtMs = loaded.offlineResult.newLastOfflineClaimAtMs;
       _autoSkill.value = loaded.session.autoSkillEnabled;
       final manager = config.dungeons.isNotEmpty
@@ -1203,6 +1222,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
               _unlockedSpecializations,
             ),
             infiniteSpireProgress: _infiniteSpireProgress,
+            loadoutPresets: _loadoutPresets,
           );
         } catch (e) {
           _dirty = true;
@@ -1554,6 +1574,32 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     return result;
   }
 
+  BlacksmithBulkSalvageResult _handleSalvageEquipmentBulk(
+    Set<ItemRarity> targetRarities,
+  ) {
+    final char = _character;
+    final inv = _inventory;
+    if (char == null || inv == null) {
+      return const BlacksmithBulkSalvageResult(
+        salvagedCount: 0,
+        skippedCount: 0,
+        aetherScrapGained: 0,
+      );
+    }
+    const service = BlacksmithService();
+    final result = service.salvageEquipmentBulk(
+      inventory: inv,
+      targetRarities: targetRarities,
+      loadout: char.loadout,
+    );
+    if (result.hasSalvaged) {
+      _views?.refresh();
+      unawaited(_flushSaveNow());
+      unawaited(_audioService.playSfx(AudioCue.loot));
+    }
+    return result;
+  }
+
   ShopService _shopServiceFor(GameConfig cfg) => ShopService(
     catalog: cfg.shop,
     items: cfg.items,
@@ -1817,6 +1863,61 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
     if (character != null && character.chooseSpecialization(id)) {
       _views?.refresh();
       unawaited(_flushSaveNow());
+    }
+  }
+
+  void _handleSaveLoadoutPreset(int slotIndex) {
+    final character = _character;
+    if (character == null) return;
+    const service = LoadoutPresetService();
+    final captured = service.captureCurrentBuild(
+      slotIndex: slotIndex,
+      character: character,
+    );
+    setState(() {
+      _loadoutPresets = service.upsertPreset(_loadoutPresets, captured);
+    });
+    unawaited(_audioService.playSfx(AudioCue.loot));
+    unawaited(_flushSaveNow());
+    if (mounted) {
+      showAppNotification(
+        context,
+        message: 'Build disimpan ke ${captured.name}.',
+        kind: AppNotificationKind.success,
+      );
+    }
+  }
+
+  void _handleApplyLoadoutPreset(int slotIndex) {
+    final character = _character;
+    final inventory = _inventory;
+    if (character == null || inventory == null) return;
+    final preset = _loadoutPresets
+        .where((p) => p.slotIndex == slotIndex)
+        .firstOrNull;
+    if (preset == null || preset.isEmpty) return;
+
+    const service = LoadoutPresetService();
+    final result = service.applyPreset(
+      preset: preset,
+      character: character,
+      inventory: inventory,
+      unlockedSpecializations: _unlockedSpecializations,
+    );
+    _views?.refresh();
+    setState(() {});
+    if (result.hasChanges) {
+      unawaited(_audioService.playSfx(AudioCue.loot));
+      unawaited(_flushSaveNow());
+    }
+    if (mounted) {
+      showAppNotification(
+        context,
+        message: result.buildSummaryMessage(preset.name),
+        kind: result.hasChanges
+            ? AppNotificationKind.success
+            : AppNotificationKind.info,
+      );
     }
   }
 
@@ -2435,10 +2536,20 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
   Widget _buildInfiniteSpireOverlay(GameConfig config) {
     final spireConfig = config.infiniteSpire;
     if (spireConfig == null) return const SizedBox.shrink();
+    final nowMs = _coordinator?.effectiveClockMs ?? _clock.nowMs;
+    final periodService = PeriodService(config: config.time);
+    final weeklyBossRush = InfiniteSpireService(spireConfig)
+        .resolveWeeklyBossRush(
+          progress: _infiniteSpireProgress,
+          periodService: periodService,
+          nowMs: nowMs,
+          claimedEventIds: _rewardProcessor?.claimedEventIds ?? const {},
+        );
     return InfiniteSpireOverlay(
       config: spireConfig,
       progress: _infiniteSpireProgress,
       playerLevel: _character?.level ?? 1,
+      weeklyBossRush: weeklyBossRush,
       onFightFloor: (floor) => unawaited(_enterInfiniteSpireRun(config, floor)),
       onClose: () => setState(() => _showInfiniteSpire = false),
     );
@@ -2858,6 +2969,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                         onEnhanceEquipment: _handleEnhanceEquipment,
                         onReforgeEquipment: _handleReforgeEquipment,
                         onSalvageEquipment: _handleSalvageEquipment,
+                        onSalvageEquipmentBulk: _handleSalvageEquipmentBulk,
                         getAltarBalances: () =>
                             _currencyService?.balances ?? const {},
                         onUpgradeAltarBlessing: _handleUpgradeAltarBlessing,
@@ -2877,6 +2989,16 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                         },
                         currenciesProvider: () =>
                             _currencyService?.balances ?? const {},
+                        loadoutPresets: _loadoutPresets,
+                        onSaveLoadoutPreset: _handleSaveLoadoutPreset,
+                        onApplyLoadoutPreset: _handleApplyLoadoutPreset,
+                        specializationNames: {
+                          for (final entry
+                              in cfg.specializations.definitions.entries)
+                            entry.key: entry.value.name,
+                        },
+                        codexConfig: cfg,
+                        unlockedSpecializations: _unlockedSpecializations,
                       )
                     : _buildGame(cfg);
                 final pendingSummary = _offlineActivity.pendingSummary;
@@ -3191,6 +3313,7 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                     onEnhanceEquipment: _handleEnhanceEquipment,
                     onReforgeEquipment: _handleReforgeEquipment,
                     onSalvageEquipment: _handleSalvageEquipment,
+                    onSalvageEquipmentBulk: _handleSalvageEquipmentBulk,
                     onClose: () => g.overlays.remove(GameOverlays.blacksmith),
                   ),
                   GameOverlays.altar: (context, g) => AltarOverlay(
@@ -3202,13 +3325,44 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                   GameOverlays.runEnded: (context, _) {
                     final failedDef = _dungeonManager?.activeDungeon;
                     final isAscensionRun = failedDef?.isAscension ?? false;
+                    final isSpireRun = failedDef?.isInfiniteSpire ?? false;
+                    final clearedRooms =
+                        _dungeonManager?.session?.clearedRoomIds.length ?? 0;
+                    final totalRooms = failedDef?.rooms.length ?? 0;
+                    final heroLevel = _character?.level ?? 1;
+                    final recLevel = failedDef?.recommendedLevel ?? 1;
+                    final progressText = failedDef == null
+                        ? null
+                        : (isSpireRun
+                              ? 'Lantai ${failedDef.order}'
+                              : 'Ruangan $clearedRooms / $totalRooms');
+                    final levelComparisonText = failedDef == null
+                        ? null
+                        : 'Hero Lv $heroLevel • Rek. Lv $recLevel';
+                    final adviceText = failedDef == null
+                        ? null
+                        : (heroLevel + 3 <= recLevel
+                              ? 'Level Hero (Lv $heroLevel) di bawah rekomendasi (Lv $recLevel). Farming dungeon sebelumnya atau lakukan Terobosan.'
+                              : (clearedRooms == 0
+                                    ? 'Tumbang di awal pertarungan. Coba tingkatkan Armor/HP di Blacksmith atau ganti spesialisasi.'
+                                    : 'Terhenti di tengah dungeon. Perkuat senjata/skill atau cek sinergi Resonance.'));
                     return RunEndedOverlay(
                       subtitle: isAscensionRun
                           ? 'Ascension Rank tidak berubah dan loot terkonfirmasi tetap disimpan.'
                           : null,
+                      dungeonName: failedDef?.name,
+                      progressText: progressText,
+                      levelComparisonText: levelComparisonText,
+                      adviceText: adviceText,
                       onRetry: () {
                         unawaited(_flushSaveNow());
-                        _enterDungeon(config, dungeonId: failedDef?.id);
+                        if (isSpireRun && failedDef != null) {
+                          unawaited(
+                            _enterInfiniteSpireRun(config, failedDef.order),
+                          );
+                        } else {
+                          _enterDungeon(config, dungeonId: failedDef?.id);
+                        }
                       },
                       onReturnToTown: _returnToTown,
                     );
@@ -3237,6 +3391,15 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                     final isBossEvent = dungeon?.isBossEvent ?? false;
                     final isBossSpire = dungeon?.isBossSpire ?? false;
                     final isInfiniteSpire = dungeon?.isInfiniteSpire ?? false;
+                    final nextSpireFloorNumber =
+                        isInfiniteSpire && dungeon != null
+                        ? dungeon.order + 1
+                        : null;
+                    final nextSpireFloorDef =
+                        nextSpireFloorNumber != null &&
+                            config.infiniteSpire != null
+                        ? config.infiniteSpire!.floor(nextSpireFloorNumber)
+                        : null;
                     final ascResult = _lastAscensionResult;
                     return DungeonCompletedOverlay(
                       dungeonName: dungeonName,
@@ -3260,6 +3423,17 @@ class _DungeonScreenState extends ConsumerState<DungeonScreen>
                                       ? (_lastBossQuestResult?.userMessage ??
                                             'Memproses hadiah boss quest...')
                                       : null)),
+                      onNextFloor: nextSpireFloorDef != null
+                          ? () => unawaited(
+                              _enterInfiniteSpireRun(
+                                config,
+                                nextSpireFloorDef.floor,
+                              ),
+                            )
+                          : null,
+                      nextFloorLabel: nextSpireFloorDef != null
+                          ? 'Lanjut Lantai ${nextSpireFloorDef.floor}'
+                          : null,
                       onRetry:
                           (isAscension ||
                               isBossEvent ||

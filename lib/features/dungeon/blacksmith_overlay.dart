@@ -29,6 +29,7 @@ class BlacksmithOverlay extends StatefulWidget {
     required this.onEnhanceEquipment,
     required this.onReforgeEquipment,
     this.onSalvageEquipment,
+    this.onSalvageEquipmentBulk,
     this.initialSelectedInstanceId,
     this.embedded = false,
     required this.onClose,
@@ -41,6 +42,8 @@ class BlacksmithOverlay extends StatefulWidget {
   final BlacksmithEnhanceResult Function(String instanceId) onEnhanceEquipment;
   final BlacksmithReforgeResult Function(String instanceId) onReforgeEquipment;
   final BlacksmithSalvageResult Function(String instanceId)? onSalvageEquipment;
+  final BlacksmithBulkSalvageResult Function(Set<ItemRarity> rarities)?
+  onSalvageEquipmentBulk;
   final String? initialSelectedInstanceId;
   final bool embedded;
   final VoidCallback onClose;
@@ -239,6 +242,7 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
                                 ext,
                                 selectedItem,
                                 eqSnapshot.equipped,
+                                eqSnapshot.bag,
                                 stacks,
                               ),
                       ),
@@ -1026,11 +1030,207 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
     }
   }
 
+  Future<void> _openBulkSalvageDialog(
+    List<EquipmentInstance> bagItems,
+    Map<EquipmentSlot, EquipmentInstance> equipped,
+  ) async {
+    if (_busy || widget.onSalvageEquipmentBulk == null) return;
+    final equippedIds = {for (final eq in equipped.values) eq.id};
+    const presets = <({String label, Set<ItemRarity> rarities})>[
+      (label: 'Common', rarities: {ItemRarity.common}),
+      (
+        label: 'Common + Uncommon',
+        rarities: {ItemRarity.common, ItemRarity.uncommon},
+      ),
+      (
+        label: 'Semua ≤ Rare',
+        rarities: {ItemRarity.common, ItemRarity.uncommon, ItemRarity.rare},
+      ),
+    ];
+
+    var selectedIndex = 1;
+    final chosenRarities = await showDialog<Set<ItemRarity>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final preset = presets[selectedIndex];
+            final candidates = [
+              for (final eq in bagItems)
+                if (_service.isBulkSalvageCandidate(
+                  eq,
+                  targetRarities: preset.rarities,
+                  equippedIds: equippedIds,
+                ))
+                  eq,
+            ];
+            final totalScrap = candidates.fold<int>(
+              0,
+              (sum, eq) => sum + _service.getSalvageScrapYield(eq),
+            );
+            final theme = Theme.of(context);
+            final ext = EchoesTheme.of(context);
+
+            return AlertDialog(
+              title: const Text('Bongkar Massal'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Pilih batas rarity perlengkapan yang akan dibongkar menjadi Aether Scrap:',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    for (var i = 0; i < presets.length; i++) ...[
+                      InkWell(
+                        key: Key('bulk_salvage_preset_$i'),
+                        onTap: () => setDialogState(() => selectedIndex = i),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xs + 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selectedIndex == i
+                                ? ext.gold.withValues(alpha: 0.14)
+                                : AppColors.surfaceDark,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            border: Border.all(
+                              color: selectedIndex == i
+                                  ? ext.gold
+                                  : ext.panelInnerBorder,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                selectedIndex == i
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_off,
+                                size: 18,
+                                color: selectedIndex == i
+                                    ? ext.gold
+                                    : AppColors.textMuted,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  presets[i].label,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: selectedIndex == i
+                                        ? ext.gold
+                                        : AppColors.textPrimary,
+                                    fontWeight: selectedIndex == i
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (i < presets.length - 1)
+                        const SizedBox(height: AppSpacing.xs),
+                    ],
+                    const SizedBox(height: AppSpacing.sm),
+                    PanelFrame(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      backgroundColor: AppColors.surfaceDark,
+                      borderColor: ext.panelInnerBorder,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Terpilih: ${candidates.length} perlengkapan',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Estimasi Hasil: +${NumberFormatter.format(totalScrap)} Aether Scrap',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: candidates.isNotEmpty
+                                  ? ext.success
+                                  : AppColors.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Item terpasang, favorit, +1 ke atas, dan Mythical otomatis dilindungi.',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                SecondaryButton(
+                  label: 'Batal',
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+                PrimaryButton(
+                  key: const Key('bulk_salvage_confirm_button'),
+                  label: 'Bongkar (${candidates.length})',
+                  icon: Icons.delete_sweep_outlined,
+                  onPressed: candidates.isEmpty
+                      ? null
+                      : () =>
+                            Navigator.of(dialogContext)
+                                .pop(presets[selectedIndex].rarities),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (chosenRarities == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final res = widget.onSalvageEquipmentBulk!(chosenRarities);
+      if (!mounted) return;
+      if (res.hasSalvaged) {
+        setState(() {
+          _feedbackIsError = false;
+          _feedbackMessage =
+              'Berhasil membongkar ${res.salvagedCount} perlengkapan (+${NumberFormatter.format(res.aetherScrapGained)} Aether Scrap)!${res.stoppedByInventoryFull ? ' Sebagian tertunda karena kapasitas Aether Scrap penuh.' : ''}';
+          if (_selectedId != null && res.salvagedIds.contains(_selectedId)) {
+            _selectedId = null;
+          }
+        });
+      } else {
+        setState(() {
+          _feedbackIsError = true;
+          _feedbackMessage = res.stoppedByInventoryFull
+              ? 'Kapasitas tas untuk Aether Scrap sudah penuh.'
+              : 'Tidak ada perlengkapan yang memenuhi syarat untuk dibongkar.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Widget _buildSalvageView(
     ThemeData theme,
     EchoesThemeExtension ext,
     EquipmentInstance item,
     Map<EquipmentSlot, EquipmentInstance> equipped,
+    List<EquipmentInstance> bagItems,
     List<InventoryEntry> stacks,
   ) {
     final isEquipped = equipped.values.any((e) => e.id == item.id);
@@ -1161,6 +1361,18 @@ class _BlacksmithOverlayState extends State<BlacksmithOverlay> {
               icon: Icons.recycling,
               expand: true,
               onPressed: canSalvage ? () => _handleSalvage(item) : null,
+            ),
+          ],
+          if (widget.onSalvageEquipmentBulk != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SecondaryButton(
+              key: const Key('blacksmith_bulk_salvage_button'),
+              label: 'Bongkar Massal...',
+              icon: Icons.delete_sweep_outlined,
+              expand: true,
+              onPressed: _busy
+                  ? null
+                  : () => _openBulkSalvageDialog(bagItems, equipped),
             ),
           ],
         ],

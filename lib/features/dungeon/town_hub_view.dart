@@ -12,8 +12,10 @@ import '../../domain/entities/difficulty_config.dart';
 import '../../domain/entities/dungeon_definition.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/farming_config.dart';
+import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/loadout_preset.dart';
 import '../../domain/entities/mystery_box.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/player_character.dart';
@@ -34,6 +36,7 @@ import '../shared/widgets/shared_widgets.dart';
 import 'altar_overlay.dart';
 import 'blacksmith_overlay.dart';
 import 'character_overlay.dart';
+import 'codex_overlay.dart';
 import 'equipment_overlay.dart';
 import 'inventory_overlay.dart';
 import 'settings_overlay.dart';
@@ -95,6 +98,7 @@ class TownHubView extends StatefulWidget {
     this.onEnhanceEquipment,
     this.onReforgeEquipment,
     this.onSalvageEquipment,
+    this.onSalvageEquipmentBulk,
     this.onOpenAltar,
     this.getAltarBalances,
     this.onUpgradeAltarBlessing,
@@ -106,6 +110,12 @@ class TownHubView extends StatefulWidget {
     this.currenciesProvider,
     this.bagLevelProvider,
     this.onExpandBag,
+    this.loadoutPresets = const [],
+    this.onSaveLoadoutPreset,
+    this.onApplyLoadoutPreset,
+    this.specializationNames = const {},
+    this.codexConfig,
+    this.unlockedSpecializations = const {},
   });
 
   static const int underLevelWarningDelta = 5;
@@ -162,6 +172,8 @@ class TownHubView extends StatefulWidget {
   final BlacksmithEnhanceResult Function(String instanceId)? onEnhanceEquipment;
   final BlacksmithReforgeResult Function(String instanceId)? onReforgeEquipment;
   final BlacksmithSalvageResult Function(String instanceId)? onSalvageEquipment;
+  final BlacksmithBulkSalvageResult Function(Set<ItemRarity> rarities)?
+  onSalvageEquipmentBulk;
   final VoidCallback? onOpenAltar;
   final Map<String, int> Function()? getAltarBalances;
   final AltarUpgradeResult Function(AltarBlessingType type)?
@@ -175,6 +187,12 @@ class TownHubView extends StatefulWidget {
   final Map<String, int> Function()? currenciesProvider;
   final int Function()? bagLevelProvider;
   final Future<bool> Function()? onExpandBag;
+  final List<LoadoutPreset> loadoutPresets;
+  final void Function(int slotIndex)? onSaveLoadoutPreset;
+  final void Function(int slotIndex)? onApplyLoadoutPreset;
+  final Map<String, String> specializationNames;
+  final GameConfig? codexConfig;
+  final Set<String> unlockedSpecializations;
 
   @override
   State<TownHubView> createState() => _TownHubViewState();
@@ -433,7 +451,11 @@ class _TownHubViewState extends State<TownHubView> {
         widget.getAltarBalances != null &&
         widget.onUpgradeAltarBlessing != null;
     final hasAltar = hasAltarEmbedded || widget.onOpenAltar != null;
-    final effectiveSubTab = (!hasAltar && _heroSubTab == 2) ? 0 : _heroSubTab;
+    final hasCodex = widget.codexConfig != null;
+    final effectiveSubTab =
+        (!hasAltar && _heroSubTab == 2) || (!hasCodex && _heroSubTab == 3)
+        ? 0
+        : _heroSubTab;
 
     return Column(
       children: [
@@ -459,6 +481,12 @@ class _TownHubViewState extends State<TownHubView> {
                     value: 2,
                     icon: Icon(Icons.auto_awesome),
                     label: Text('Altar'),
+                  ),
+                if (hasCodex)
+                  const ButtonSegment<int>(
+                    value: 3,
+                    icon: Icon(Icons.menu_book_outlined),
+                    label: Text('Codex'),
                   ),
               ],
               selected: {effectiveSubTab},
@@ -494,6 +522,13 @@ class _TownHubViewState extends State<TownHubView> {
               inventoryQuantitiesProvider: widget.inventoryQuantitiesProvider,
               currenciesProvider: widget.currenciesProvider,
               sectionMode: CharacterSectionMode.classAndSkills,
+              embedded: true,
+              onClose: () => _selectTab(TownTab.adventure),
+            ),
+            3 when hasCodex => CodexOverlay(
+              config: widget.codexConfig!,
+              unlockedSpecializations: widget.unlockedSpecializations,
+              inventoryQuantitiesProvider: widget.inventoryQuantitiesProvider,
               embedded: true,
               onClose: () => _selectTab(TownTab.adventure),
             ),
@@ -572,6 +607,10 @@ class _TownHubViewState extends State<TownHubView> {
               bagLevelProvider: widget.bagLevelProvider,
               playerGoldProvider: () => widget.character.gold,
               onExpandBag: widget.onExpandBag,
+              loadoutPresets: widget.loadoutPresets,
+              onSaveLoadoutPreset: widget.onSaveLoadoutPreset,
+              onApplyLoadoutPreset: widget.onApplyLoadoutPreset,
+              specializationNames: widget.specializationNames,
               showEquippedSummary: false,
               embedded: true,
               onClose: () => _selectTab(TownTab.adventure),
@@ -598,6 +637,7 @@ class _TownHubViewState extends State<TownHubView> {
                     status: BlacksmithReforgeStatus.itemNotFound,
                   ),
               onSalvageEquipment: widget.onSalvageEquipment,
+              onSalvageEquipmentBulk: widget.onSalvageEquipmentBulk,
               embedded: true,
               onClose: () => _selectTab(TownTab.adventure),
             ),
@@ -871,7 +911,9 @@ class _TownHubViewState extends State<TownHubView> {
             (
               key: const Key('quick_access_infinite_spire'),
               label: 'Spire',
-              subtitle: '100 Lantai',
+              subtitle: widget.character.level < 20
+                  ? 'Rek. Lv 20+ • 100 Lt'
+                  : '100 Lantai',
               icon: Icons.stairs_outlined,
               spritePath: 'assets/sprite/fc145.png',
               onTap: widget.onOpenInfiniteSpire!,

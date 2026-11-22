@@ -33,6 +33,9 @@ class EquipmentFactory {
               config.rollVariance,
               rollBonus: rollBonus,
             ),
+      isFavorite:
+          definition.rarity == ItemRarity.legendary ||
+          definition.rarity == ItemRarity.mythical,
     );
   }
 }

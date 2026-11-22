@@ -8,6 +8,43 @@ import '../entities/infinite_spire.dart';
 import '../entities/inventory.dart';
 import '../entities/player_character.dart';
 import 'currency_service.dart';
+import 'period_service.dart';
+
+/// Info tantangan mingguan (Weekly Spire Boss Rush) berbasis [PeriodService].
+class WeeklySpireBossRushInfo {
+  const WeeklySpireBossRushInfo({
+    required this.isUnlocked,
+    required this.periodKey,
+    required this.nextResetMs,
+    required this.claimId,
+    required this.isCompletedThisWeek,
+    required this.reward,
+    this.featuredFloor,
+  });
+
+  final bool isUnlocked;
+  final String periodKey;
+  final int nextResetMs;
+  final String claimId;
+  final bool isCompletedThisWeek;
+  final InfiniteSpireReward reward;
+  final InfiniteSpireFloorDefinition? featuredFloor;
+}
+
+/// Hasil klaim bonus Tantangan Bos Mingguan di The Infinite Spire.
+class WeeklySpireBossRushSettlement {
+  const WeeklySpireBossRushSettlement({
+    required this.claimed,
+    required this.claimId,
+    required this.periodKey,
+    required this.reward,
+  });
+
+  final bool claimed;
+  final String claimId;
+  final String periodKey;
+  final InfiniteSpireReward reward;
+}
 
 /// Hasil eksekusi penyelesaian lantai The Infinite Spire.
 class InfiniteSpireSettlementResult {
@@ -18,6 +55,9 @@ class InfiniteSpireSettlementResult {
     required this.updatedProgress,
     required this.userMessage,
     required this.claimId,
+    this.weeklyBonusClaimed = false,
+    this.weeklyBonusClaimId,
+    this.weeklyBonusReward,
   });
 
   final int floor;
@@ -26,6 +66,9 @@ class InfiniteSpireSettlementResult {
   final InfiniteSpireProgressSnapshot updatedProgress;
   final String userMessage;
   final String claimId;
+  final bool weeklyBonusClaimed;
+  final String? weeklyBonusClaimId;
+  final InfiniteSpireReward? weeklyBonusReward;
 }
 
 /// Layanan domain untuk mengelola arena tantangan The Infinite Spire (Lantai 1 s/d 100+).
@@ -36,6 +79,9 @@ class InfiniteSpireService {
 
   static const String aetherShardCurrencyId = 'aether_shard';
   static const String soulPrismCurrencyId = 'soul_prism';
+  static const String aetherScrapItemId = 'aether_scrap';
+  static const String weeklyBossRushClaimPrefix =
+      'infinite_spire:weekly_boss_rush:';
 
   /// Memeriksa apakah karakter diizinkan menantang [floorNumber].
   ///
@@ -248,6 +294,111 @@ class InfiniteSpireService {
       updatedProgress: updatedProgress,
       userMessage: userMessage,
       claimId: claimId,
+    );
+  }
+
+  /// Menentukan tantangan bos mingguan Spire untuk periode aktif via [periodService].
+  /// Terbuka setelah pemain menamatkan minimal 1 lantai bos (Lantai 10).
+  /// Memutar di antara maksimal 5 lantai bos tertinggi yang sudah ditamatkan.
+  WeeklySpireBossRushInfo resolveWeeklyBossRush({
+    required InfiniteSpireProgressSnapshot progress,
+    required PeriodService periodService,
+    required int nowMs,
+    Set<String> claimedEventIds = const {},
+  }) {
+    final periodKey = periodService.keyFor(Period.weekly, nowMs);
+    final nextResetMs = periodService.nextResetMs(Period.weekly, nowMs);
+    final claimId = '$weeklyBossRushClaimPrefix$periodKey';
+
+    final eligibleBossFloors = [
+      for (final floor in config.floors)
+        if (floor.isBossFloor && floor.floor <= progress.highestFloorCleared)
+          floor,
+    ]..sort((a, b) => a.floor.compareTo(b.floor));
+
+    if (eligibleBossFloors.isEmpty) {
+      return WeeklySpireBossRushInfo(
+        isUnlocked: false,
+        periodKey: periodKey,
+        nextResetMs: nextResetMs,
+        claimId: claimId,
+        isCompletedThisWeek: false,
+        reward: const InfiniteSpireReward(),
+      );
+    }
+
+    final pool = eligibleBossFloors.length > 5
+        ? eligibleBossFloors.sublist(eligibleBossFloors.length - 5)
+        : eligibleBossFloors;
+    final weekIdx = periodService.weekIndex(nowMs).abs();
+    final featured = pool[weekIdx % pool.length];
+    final tier = math.max(1, featured.floor ~/ 10);
+
+    final weeklyReward = InfiniteSpireReward(
+      gold: 10000 + featured.floor * 200,
+      items: {aetherScrapItemId: 15 + tier * 3},
+      currencies: {aetherShardCurrencyId: 15 + tier * 2},
+    );
+
+    return WeeklySpireBossRushInfo(
+      isUnlocked: true,
+      periodKey: periodKey,
+      nextResetMs: nextResetMs,
+      claimId: claimId,
+      isCompletedThisWeek: claimedEventIds.contains(claimId),
+      reward: weeklyReward,
+      featuredFloor: featured,
+    );
+  }
+
+  /// Memberikan hadiah bonus Tantangan Bos Mingguan secara atomik dan idempoten
+  /// apabila [floorNumber] merupakan lantai unggulan minggu ini dan belum diklaim.
+  WeeklySpireBossRushSettlement? trySettleWeeklyBossRush({
+    required int floorNumber,
+    required PlayerCharacter character,
+    required Inventory inventory,
+    required CurrencyService currencyService,
+    required InfiniteSpireProgressSnapshot progress,
+    required PeriodService periodService,
+    required int nowMs,
+    required Set<String> claimedEventIds,
+  }) {
+    final info = resolveWeeklyBossRush(
+      progress: progress,
+      periodService: periodService,
+      nowMs: nowMs,
+      claimedEventIds: claimedEventIds,
+    );
+    if (!info.isUnlocked ||
+        info.isCompletedThisWeek ||
+        info.featuredFloor?.floor != floorNumber) {
+      return null;
+    }
+
+    final reward = info.reward;
+    if (reward.gold > 0) {
+      character.receiveReward(gold: reward.gold);
+    }
+    for (final entry in reward.items.entries) {
+      if (entry.value > 0 && inventory.definitionOf(entry.key) != null) {
+        inventory.add(entry.key, entry.value);
+      }
+    }
+    for (final entry in reward.currencies.entries) {
+      if (entry.value > 0) {
+        currencyService.grant(
+          entry.key,
+          entry.value,
+          claimId: '${info.claimId}:${entry.key}',
+        );
+      }
+    }
+
+    return WeeklySpireBossRushSettlement(
+      claimed: true,
+      claimId: info.claimId,
+      periodKey: info.periodKey,
+      reward: reward,
     );
   }
 

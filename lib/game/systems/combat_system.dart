@@ -534,7 +534,7 @@ class CombatSystem extends Component {
         }
       } else if (event is SkillCastEvent &&
           event.casterId == simulation.player.id) {
-        playerView?.triggerAttackAnimation();
+        playerView?.triggerSkillAnimation();
         _lastSkill = config.skills[event.skillId]?.name ?? event.skillId;
         _skillTimer = _skillMessageSeconds;
       } else if (event is PlayerDownedEvent) {
@@ -592,7 +592,11 @@ class CombatSystem extends Component {
 
   void _onAttackVisual(AttackEvent event) {
     final attackerView = _viewFor(event.attackerId);
-    attackerView?.triggerAttackAnimation();
+    if (event.skillId != null) {
+      attackerView?.triggerSkillAnimation();
+    } else {
+      attackerView?.triggerAttackAnimation();
+    }
     final targetView = _viewFor(event.targetId);
     if (event.damage > 0) targetView?.triggerHitFlash();
 
@@ -612,6 +616,60 @@ class CombatSystem extends Component {
         unawaited(audioService?.playSfx(AudioCue.magic));
       } else if (event.skillId == 'life_siphon') {
         _addTransientEffect(SkillVfxComponent.lifeSiphon(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'death_bolt') {
+        _addTransientEffect(SkillVfxComponent.deathBolt(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'soul_eruption') {
+        _addTransientEffect(
+          SkillVfxComponent.soulEruption(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'radiant_smite') {
+        _addTransientEffect(
+          SkillVfxComponent.radiantSmite(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'divine_judgment') {
+        _addTransientEffect(
+          SkillVfxComponent.divineJudgment(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'phantom_slash') {
+        _addTransientEffect(
+          SkillVfxComponent.phantomSlash(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.slash));
+      } else if (event.skillId == 'void_execution') {
+        _addTransientEffect(
+          SkillVfxComponent.voidExecution(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.slash));
+      } else if (event.skillId == 'time_bolt') {
+        _addTransientEffect(SkillVfxComponent.timeBolt(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'chrono_collapse') {
+        _addTransientEffect(
+          SkillVfxComponent.chronoCollapse(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'rapid_fire') {
+        _addTransientEffect(SkillVfxComponent.rapidFire(position: targetPos));
+        unawaited(audioService?.playSfx(AudioCue.slash));
+      } else if (event.skillId == 'aether_barrage') {
+        _addTransientEffect(
+          SkillVfxComponent.aetherBarrage(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.slash));
+      } else if (event.skillId == 'lightning_arc') {
+        _addTransientEffect(
+          SkillVfxComponent.lightningArc(position: targetPos),
+        );
+        unawaited(audioService?.playSfx(AudioCue.magic));
+      } else if (event.skillId == 'thunderstorm') {
+        _addTransientEffect(
+          SkillVfxComponent.thunderstorm(position: targetPos),
+        );
         unawaited(audioService?.playSfx(AudioCue.magic));
       } else if (event.skillId == 'quick_shot' || event.skillId == 'volley') {
         _addTransientEffect(SkillVfxComponent.arrowShot(position: targetPos));

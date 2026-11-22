@@ -381,6 +381,16 @@ void main() {
           expect(buyRes, isA<ShopBuySuccess>(), reason: 'entry=${entry.id}');
           final boughtEq = (buyRes as ShopBuySuccess).purchasedEquipment!;
 
+          if (boughtEq.isFavorite) {
+            final protectedSellRes = service.sellEquipment(
+              instanceId: boughtEq.id,
+              character: character,
+              inventory: inventory,
+            );
+            expect(protectedSellRes, isA<ShopSellNotSellable>());
+            inventory.updateEquipment(boughtEq.copyWith(isFavorite: false));
+          }
+
           final sellRes = service.sellEquipment(
             instanceId: boughtEq.id,
             character: character,

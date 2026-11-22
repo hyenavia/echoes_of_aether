@@ -6,11 +6,13 @@ import '../../app/theme/echoes_theme.dart';
 import '../../core/utils/number_formatter.dart';
 import '../../domain/entities/equipment.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/loadout_preset.dart';
 import '../../domain/services/bag_expansion_service.dart';
 import '../../game/hud/inventory_views.dart';
 import '../shared/widgets/shared_widgets.dart';
 import 'equipment_text.dart';
 import 'item_filter_widgets.dart';
+import 'loadout_preset_bar.dart';
 
 enum _EquipmentSort { defaultOrder, rarityDesc, nameAsc }
 
@@ -28,6 +30,10 @@ class EquipmentOverlay extends StatefulWidget {
     this.bagLevelProvider,
     this.playerGoldProvider,
     this.onExpandBag,
+    this.loadoutPresets = const [],
+    this.onSaveLoadoutPreset,
+    this.onApplyLoadoutPreset,
+    this.specializationNames = const {},
     this.showEquippedSummary = true,
     this.embedded = false,
     required this.onClose,
@@ -42,6 +48,10 @@ class EquipmentOverlay extends StatefulWidget {
   final int Function()? bagLevelProvider;
   final int Function()? playerGoldProvider;
   final Future<bool> Function()? onExpandBag;
+  final List<LoadoutPreset> loadoutPresets;
+  final void Function(int slotIndex)? onSaveLoadoutPreset;
+  final void Function(int slotIndex)? onApplyLoadoutPreset;
+  final Map<String, String> specializationNames;
   final bool showEquippedSummary;
   final bool embedded;
   final VoidCallback onClose;
@@ -274,6 +284,16 @@ class _EquipmentOverlayState extends State<EquipmentOverlay> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (widget.onSaveLoadoutPreset != null ||
+                          widget.onApplyLoadoutPreset != null) ...[
+                        LoadoutPresetBar(
+                          presets: widget.loadoutPresets,
+                          specializationNames: widget.specializationNames,
+                          onSavePreset: widget.onSaveLoadoutPreset,
+                          onApplyPreset: widget.onApplyLoadoutPreset,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                       if (widget.showEquippedSummary) ...[
                         const SectionHeader(
                           title: 'Stat Tempur',

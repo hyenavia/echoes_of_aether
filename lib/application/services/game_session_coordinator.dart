@@ -13,6 +13,7 @@ import '../../domain/entities/gacha_config.dart';
 import '../../domain/entities/game_config.dart';
 import '../../domain/entities/infinite_spire.dart';
 import '../../domain/entities/inventory.dart';
+import '../../domain/entities/loadout_preset.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/periodic_quest_state.dart';
 import '../../domain/entities/currency_config.dart';
@@ -66,6 +67,7 @@ class LoadedGameSession {
     this.gachaPityStates = const {},
     this.unlockedSpecializations = const {},
     this.infiniteSpireProgress = const InfiniteSpireProgressSnapshot(),
+    this.loadoutPresets = const [],
   });
 
   final PlayerCharacter character;
@@ -91,6 +93,7 @@ class LoadedGameSession {
   final Map<String, GachaPityState> gachaPityStates;
   final Set<String> unlockedSpecializations;
   final InfiniteSpireProgressSnapshot infiniteSpireProgress;
+  final List<LoadoutPreset> loadoutPresets;
 
   bool get hasRecoverableDungeonSession =>
       activeDungeonSession?.isRecoverable ?? false;
@@ -135,6 +138,7 @@ class GameSessionCoordinator {
   ClockState get clockState => _clockState;
   InfiniteSpireProgressSnapshot _lastInfiniteSpireProgress =
       const InfiniteSpireProgressSnapshot();
+  List<LoadoutPreset> _lastLoadoutPresets = const [];
 
   int? get serverOffsetMs => _serverOffsetMs;
 
@@ -218,6 +222,7 @@ class GameSessionCoordinator {
           eventShopPurchases: existing.eventShopPurchases,
           currencies: existing.currencies,
           clockState: existing.clockState,
+          loadoutPresets: existing.loadoutPresets,
         ),
       );
     });
@@ -272,6 +277,7 @@ class GameSessionCoordinator {
           eventShopPurchases: existing.eventShopPurchases,
           currencies: existing.currencies,
           clockState: existing.clockState,
+          loadoutPresets: existing.loadoutPresets,
         ),
       );
     });
@@ -336,6 +342,7 @@ class GameSessionCoordinator {
           eventShopPurchases: existing.eventShopPurchases,
           currencies: existing.currencies,
           clockState: existing.clockState,
+          loadoutPresets: existing.loadoutPresets,
         ),
       );
     });
@@ -415,6 +422,7 @@ class GameSessionCoordinator {
           periodicQuestStates: existing.periodicQuestStates,
           gachaPityStates: existing.gachaPityStates,
           unlockedSpecializations: existing.unlockedSpecializations,
+          loadoutPresets: existing.loadoutPresets,
         ),
       );
     });
@@ -535,6 +543,7 @@ class GameSessionCoordinator {
     );
     _clockState = clockReading.state;
     _lastInfiniteSpireProgress = loaded.infiniteSpireProgress;
+    _lastLoadoutPresets = loaded.loadoutPresets;
     // Saat online dengan selisih jam server melampaui toleransi, offline
     // progression dihitung terhadap waktu server (`raw + offset`). Saat
     // offline, `raw` tetap diteruskan agar deteksi `invalidClock` terjaga.
@@ -703,6 +712,7 @@ class GameSessionCoordinator {
             currencies: loaded.currencies,
             clockState: _clockState,
             infiniteSpireProgress: loaded.infiniteSpireProgress,
+            loadoutPresets: loaded.loadoutPresets,
           ),
         );
 
@@ -827,6 +837,7 @@ class GameSessionCoordinator {
                 gachaPityStates: loaded.gachaPityStates,
                 unlockedSpecializations: loaded.unlockedSpecializations,
                 infiniteSpireProgress: loaded.infiniteSpireProgress,
+                loadoutPresets: loaded.loadoutPresets,
               ),
             );
           }
@@ -891,6 +902,7 @@ class GameSessionCoordinator {
             currencies: loaded.currencies,
             clockState: _clockState,
             infiniteSpireProgress: loaded.infiniteSpireProgress,
+            loadoutPresets: loaded.loadoutPresets,
           ),
         );
       }
@@ -925,6 +937,7 @@ class GameSessionCoordinator {
       gachaPityStates: loaded.gachaPityStates,
       unlockedSpecializations: loaded.unlockedSpecializations,
       infiniteSpireProgress: loaded.infiniteSpireProgress,
+      loadoutPresets: loaded.loadoutPresets,
     );
   }
 
@@ -1121,6 +1134,7 @@ class GameSessionCoordinator {
     Map<String, GachaPityState> gachaPityStates = const {},
     Set<String> unlockedSpecializations = const {},
     InfiniteSpireProgressSnapshot? infiniteSpireProgress,
+    List<LoadoutPreset>? loadoutPresets,
     Set<String> extraClaimedEventIds = const {},
   }) {
     final now = math.max(0, _nowMs());
@@ -1166,6 +1180,9 @@ class GameSessionCoordinator {
         infiniteSpireProgress ?? _lastInfiniteSpireProgress;
     _lastInfiniteSpireProgress = resolvedInfiniteSpire;
 
+    final resolvedPresets = loadoutPresets ?? _lastLoadoutPresets;
+    _lastLoadoutPresets = resolvedPresets;
+
     return saveSnapshot(
       PlayerSaveSnapshot(
         character: updatedCharSnap,
@@ -1198,6 +1215,7 @@ class GameSessionCoordinator {
         gachaPityStates: gachaPityStates,
         unlockedSpecializations: unlockedSpecializations,
         infiniteSpireProgress: resolvedInfiniteSpire,
+        loadoutPresets: resolvedPresets,
       ),
     );
   }
@@ -1767,13 +1785,46 @@ class GameSessionCoordinator {
     final prevInventory = inventory.toSnapshot();
 
     final spireService = InfiniteSpireService(spireConfig);
-    final result = spireService.settleFloorVictory(
+    final baseResult = spireService.settleFloorVictory(
       floorNumber: floorNumber,
       character: character,
       inventory: inventory,
       currencyService: currencyService,
       progress: infiniteSpireProgress,
     );
+
+    final periodService = PeriodService(config: config.time);
+    final weeklySettlement = spireService.trySettleWeeklyBossRush(
+      floorNumber: floorNumber,
+      character: character,
+      inventory: inventory,
+      currencyService: currencyService,
+      progress: infiniteSpireProgress,
+      periodService: periodService,
+      nowMs: effectiveClockMs,
+      claimedEventIds: rewardProcessor.claimedEventIds,
+    );
+
+    final claimIds = <String>{
+      baseResult.claimId,
+      if (weeklySettlement != null && weeklySettlement.claimed)
+        weeklySettlement.claimId,
+    };
+
+    final result = (weeklySettlement != null && weeklySettlement.claimed)
+        ? InfiniteSpireSettlementResult(
+            floor: baseResult.floor,
+            isFirstClear: baseResult.isFirstClear,
+            reward: baseResult.reward,
+            updatedProgress: baseResult.updatedProgress,
+            userMessage:
+                '${baseResult.userMessage}\nBonus Bos Mingguan: +${weeklySettlement.reward.gold} Gold, +${weeklySettlement.reward.items[InfiniteSpireService.aetherScrapItemId] ?? 0} Aether Scrap, +${weeklySettlement.reward.currencies[InfiniteSpireService.aetherShardCurrencyId] ?? 0} Aether Shard',
+            claimId: baseResult.claimId,
+            weeklyBonusClaimed: true,
+            weeklyBonusClaimId: weeklySettlement.claimId,
+            weeklyBonusReward: weeklySettlement.reward,
+          )
+        : baseResult;
 
     try {
       await saveFromRuntime(
@@ -1793,9 +1844,11 @@ class GameSessionCoordinator {
         lastFailedDungeonId: lastFailedDungeonId,
         currencyService: currencyService,
         infiniteSpireProgress: result.updatedProgress,
-        extraClaimedEventIds: {result.claimId},
+        extraClaimedEventIds: claimIds,
       );
-      rewardProcessor.markClaimed(result.claimId);
+      for (final cid in claimIds) {
+        rewardProcessor.markClaimed(cid);
+      }
       return result;
     } catch (_) {
       character.restoreSnapshot(prevCharSnap);

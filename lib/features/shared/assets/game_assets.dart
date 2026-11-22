@@ -226,6 +226,16 @@ class CharacterVisualSpec {
         'Electrified magus stance, wild silver-blue hair, crackling storm rod',
     assetPath: '${GameAssetDirectories.characters}hero_stormcaller.png',
   );
+
+  CharacterClassAssetManifest get manifest =>
+      CharacterAssetCatalog.forClass(classId);
+
+  String get emblemPath => manifest.emblemPath;
+  String get portraitPath => manifest.portraitPath;
+  String get showcasePath => manifest.showcasePath;
+  String? get nameplatePath => manifest.nameplatePath;
+  String? get subtitleImagePath => manifest.subtitleImagePath;
+  String? get combatVfxGroupPath => manifest.combatVfxGroupPath;
 }
 
 /// Spesifikasi visual biome untuk latar belakang dan kartu dungeon.
@@ -332,4 +342,572 @@ abstract final class GameAssetRegistry {
 
   static bool hasRasterAsset(String assetPath) =>
       bundledRasterAssets.contains(assetPath);
+}
+
+/// Urutan animasi karakter sesuai asset manifest & gameplay state.
+enum CharacterAnimationSequence {
+  idle('idle', true),
+  idleAlternate('idle_alternate', true),
+  walk('walk', true),
+  run('run', true),
+  attack('attack', false),
+  skillSpecial('skill_special', false),
+  downed('downed', false);
+
+  const CharacterAnimationSequence(this.key, this.loops);
+
+  final String key;
+  final bool loops;
+}
+
+/// Manifest aset karakter, ikon, showcase, dan frame animasi per class.
+@immutable
+class CharacterClassAssetManifest {
+  const CharacterClassAssetManifest({
+    required this.classId,
+    required this.emblemPath,
+    required this.portraitPath,
+    required this.showcasePath,
+    this.nameplatePath,
+    this.subtitleImagePath,
+    this.combatVfxGroupPath,
+    required this.sequences,
+  });
+
+  final String classId;
+  final String emblemPath;
+  final String portraitPath;
+  final String showcasePath;
+  final String? nameplatePath;
+  final String? subtitleImagePath;
+  final String? combatVfxGroupPath;
+  final Map<CharacterAnimationSequence, List<String>> sequences;
+
+  /// Ambil frame sequence [sequence] dengan fallback aman bila sequence kosong/hilang.
+  List<String> framesForSequence(CharacterAnimationSequence sequence) {
+    final direct = sequences[sequence];
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    switch (sequence) {
+      case CharacterAnimationSequence.idleAlternate:
+        return framesForSequence(CharacterAnimationSequence.idle);
+      case CharacterAnimationSequence.run:
+        final walk = sequences[CharacterAnimationSequence.walk];
+        if (walk != null && walk.isNotEmpty) return walk;
+        return framesForSequence(CharacterAnimationSequence.idle);
+      case CharacterAnimationSequence.skillSpecial:
+        final attack = sequences[CharacterAnimationSequence.attack];
+        if (attack != null && attack.isNotEmpty) return attack;
+        return framesForSequence(CharacterAnimationSequence.idle);
+      case CharacterAnimationSequence.walk:
+      case CharacterAnimationSequence.attack:
+      case CharacterAnimationSequence.downed:
+        final idle = sequences[CharacterAnimationSequence.idle];
+        if (idle != null && idle.isNotEmpty) return idle;
+        return <String>[portraitPath];
+      case CharacterAnimationSequence.idle:
+        return <String>[portraitPath];
+    }
+  }
+
+  /// Ambil path frame ke-[frameIndex] dengan loop/clamp sesuai jenis sequence.
+  String frameFor(CharacterAnimationSequence sequence, int frameIndex) {
+    final frames = framesForSequence(sequence);
+    if (frames.isEmpty) return portraitPath;
+    if (frameIndex < 0) return frames.first;
+    final index = sequence.loops
+        ? frameIndex % frames.length
+        : frameIndex.clamp(0, frames.length - 1);
+    return frames[index];
+  }
+
+  /// Daftar seluruh asset path unik yang direferensikan class ini.
+  List<String> get allAssetPaths {
+    final seen = <String>{};
+    final out = <String>[];
+    void addPath(String? path) {
+      if (path != null && path.isNotEmpty && seen.add(path)) {
+        out.add(path);
+      }
+    }
+
+    addPath(emblemPath);
+    addPath(portraitPath);
+    addPath(showcasePath);
+    addPath(nameplatePath);
+    addPath(subtitleImagePath);
+    addPath(combatVfxGroupPath);
+    for (final frames in sequences.values) {
+      for (final frame in frames) {
+        addPath(frame);
+      }
+    }
+    return out;
+  }
+}
+
+/// Katalog terpusat aset hasil ekstraksi di `assets/characters/`,
+/// `assets/icons/class/`, dan `assets/char/` untuk Adventurer + 9 class.
+abstract final class CharacterAssetCatalog {
+  static const List<String> playableClassIds = <String>[
+    'base',
+    'vanguard',
+    'arcanist',
+    'ranger',
+    'paladin',
+    'voidblade',
+    'chronomancer',
+    'gunslinger',
+    'necromancer',
+    'stormcaller',
+  ];
+
+  static const Map<String, CharacterClassAssetManifest>
+  manifests = <String, CharacterClassAssetManifest>{
+    'base': CharacterClassAssetManifest(
+      classId: 'base',
+      emblemPath:
+          'assets/characters/adventurer/icons/adventurer_class_compass.png',
+      portraitPath: 'assets/char/frames/hero_base_idle0.png',
+      showcasePath:
+          'assets/characters/adventurer/showcase/adventurer_showcase.png',
+      nameplatePath: 'assets/characters/adventurer/ui/adventurer_nameplate.png',
+      subtitleImagePath:
+          'assets/characters/adventurer/ui/adventurer_class_description.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/adventurer/animations/idle/adventurer_idle_01.png',
+          'assets/characters/adventurer/animations/idle/adventurer_idle_02.png',
+          'assets/characters/adventurer/animations/idle/adventurer_idle_03.png',
+          'assets/characters/adventurer/animations/idle/adventurer_idle_04.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/adventurer/animations/idle_alternate/adventurer_idle_alternate_01.png',
+          'assets/characters/adventurer/animations/idle_alternate/adventurer_idle_alternate_02.png',
+          'assets/characters/adventurer/animations/idle_alternate/adventurer_idle_alternate_03.png',
+          'assets/characters/adventurer/animations/idle_alternate/adventurer_idle_alternate_04.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/adventurer/animations/walk/adventurer_walk_01.png',
+          'assets/characters/adventurer/animations/walk/adventurer_walk_02.png',
+          'assets/characters/adventurer/animations/walk/adventurer_walk_03.png',
+          'assets/characters/adventurer/animations/walk/adventurer_walk_04.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/adventurer/animations/run/adventurer_run_01.png',
+          'assets/characters/adventurer/animations/run/adventurer_run_02.png',
+          'assets/characters/adventurer/animations/run/adventurer_run_03.png',
+          'assets/characters/adventurer/animations/run/adventurer_run_04.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/characters/adventurer/animations/attack/adventurer_attack_01.png',
+          'assets/characters/adventurer/animations/attack/adventurer_attack_02.png',
+          'assets/characters/adventurer/animations/attack/adventurer_attack_03.png',
+          'assets/characters/adventurer/animations/attack/adventurer_attack_04.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/characters/adventurer/animations/skill_special/adventurer_skill_special_01.png',
+          'assets/characters/adventurer/animations/skill_special/adventurer_skill_special_02.png',
+          'assets/characters/adventurer/animations/skill_special/adventurer_skill_special_03.png',
+          'assets/characters/adventurer/animations/skill_special/adventurer_skill_special_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/adventurer/animations/downed/adventurer_downed_01.png',
+          'assets/characters/adventurer/animations/downed/adventurer_downed_02.png',
+        ],
+      },
+    ),
+    'vanguard': CharacterClassAssetManifest(
+      classId: 'vanguard',
+      emblemPath: 'assets/icons/class/crest_vanguard.png',
+      portraitPath: 'assets/char/hero_vanguard.png',
+      showcasePath: 'assets/characters/classes/vanguard/showcase/vanguard_showcase_group_02.png',
+      nameplatePath:
+          'assets/characters/classes/vanguard/ui/vanguard_nameplate_01.png',
+      combatVfxGroupPath: 'assets/characters/classes/vanguard/animations/attack/vanguard_combat_group_07.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/vanguard/sprites/vanguard_pose_08.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_03.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_04.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_03.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_05.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_06.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_05.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_04.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_06.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_vanguard_attack.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_pose_08.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_vanguard_attack.png',
+          'assets/characters/classes/vanguard/sprites/vanguard_sprite_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/vanguard/sprites/vanguard_pose_09.png',
+        ],
+      },
+    ),
+    'arcanist': CharacterClassAssetManifest(
+      classId: 'arcanist',
+      emblemPath: 'assets/icons/class/crest_arcanist.png',
+      portraitPath: 'assets/char/hero_arcanist.png',
+      showcasePath: 'assets/characters/classes/arcanist/sprites/arcanist_sprite_group_03.png',
+      nameplatePath:
+          'assets/characters/classes/arcanist/ui/arcanist_nameplate_01.png',
+      subtitleImagePath:
+          'assets/characters/classes/arcanist/ui/arcanist_subtitle_02.png',
+      combatVfxGroupPath: 'assets/characters/classes/arcanist/animations/attack/arcanist_combat_group_09.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_05.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_06.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_06.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_05.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_07.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_08.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_07.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_06.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_08.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_arcanist_attack.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_06.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_arcanist_attack.png',
+          'assets/characters/classes/arcanist/sprites/arcanist_sprite_05.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/arcanist/sprites/arcanist_pose_10.png',
+        ],
+      },
+    ),
+    'ranger': CharacterClassAssetManifest(
+      classId: 'ranger',
+      emblemPath: 'assets/icons/class/crest_ranger.png',
+      portraitPath: 'assets/char/hero_ranger.png',
+      showcasePath:
+          'assets/characters/classes/ranger/sprites/ranger_sprite_group_03.png',
+      nameplatePath:
+          'assets/characters/classes/ranger/ui/ranger_nameplate_01.png',
+      subtitleImagePath:
+          'assets/characters/classes/ranger/ui/ranger_subtitle_02.png',
+      combatVfxGroupPath: 'assets/characters/classes/ranger/animations/attack/ranger_combat_group_08.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/ranger/sprites/ranger_sprite_04.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_05.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/ranger/sprites/ranger_sprite_05.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_04.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/ranger/sprites/ranger_sprite_06.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_07.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/ranger/sprites/ranger_sprite_06.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_05.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_07.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_ranger_attack.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_05.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_ranger_attack.png',
+          'assets/characters/classes/ranger/sprites/ranger_sprite_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/ranger/sprites/ranger_pose_09.png',
+        ],
+      },
+    ),
+    'paladin': CharacterClassAssetManifest(
+      classId: 'paladin',
+      emblemPath: 'assets/icons/class/crest_paladin.png',
+      portraitPath: 'assets/char/hero_paladin.png',
+      showcasePath: 'assets/characters/classes/paladin/showcase/paladin_showcase_group_02.png',
+      nameplatePath:
+          'assets/characters/classes/paladin/ui/paladin_nameplate_01.png',
+      combatVfxGroupPath: 'assets/characters/classes/paladin/animations/attack/paladin_combat_group_08.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/paladin/sprites/paladin_sprite_04.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_05.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/paladin/sprites/paladin_sprite_05.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_04.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/paladin/sprites/paladin_sprite_06.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_07.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/paladin/sprites/paladin_sprite_06.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_05.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_07.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_paladin_attack.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_05.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_paladin_attack.png',
+          'assets/characters/classes/paladin/sprites/paladin_sprite_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/paladin/sprites/paladin_pose_09.png',
+        ],
+      },
+    ),
+    'voidblade': CharacterClassAssetManifest(
+      classId: 'voidblade',
+      emblemPath: 'assets/icons/class/crest_voidblade.png',
+      portraitPath: 'assets/char/hero_voidblade.png',
+      showcasePath: 'assets/char/hero_voidblade.png',
+      nameplatePath:
+          'assets/characters/classes/voidblade/ui/voidblade_nameplate_01.png',
+      subtitleImagePath:
+          'assets/characters/classes/voidblade/ui/voidblade_subtitle_02.png',
+      combatVfxGroupPath: 'assets/characters/classes/voidblade/animations/attack/voidblade_combat_group_07.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_03.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_04.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_04.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_03.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_05.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_06.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_05.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_04.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_06.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_voidblade_attack.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_04.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_voidblade_attack.png',
+          'assets/characters/classes/voidblade/sprites/voidblade_sprite_03.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/voidblade/sprites/voidblade_pose_08.png',
+        ],
+      },
+    ),
+    'chronomancer': CharacterClassAssetManifest(
+      classId: 'chronomancer',
+      emblemPath: 'assets/icons/class/crest_chronomancer.png',
+      portraitPath: 'assets/char/hero_chronomancer.png',
+      showcasePath: 'assets/characters/classes/chronomancer/showcase/chronomancer_showcase_group_03.png',
+      nameplatePath: 'assets/characters/classes/chronomancer/ui/chronomancer_nameplate_01.png',
+      subtitleImagePath: 'assets/characters/classes/chronomancer/ui/chronomancer_subtitle_02.png',
+      combatVfxGroupPath: 'assets/characters/classes/chronomancer/animations/attack/chronomancer_combat_group_08.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_04.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_05.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_05.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_04.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_06.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_07.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_06.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_05.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_07.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_chronomancer_attack.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_05.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_chronomancer_attack.png',
+          'assets/characters/classes/chronomancer/sprites/chronomancer_sprite_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/chronomancer/sprites/chronomancer_pose_09.png',
+        ],
+      },
+    ),
+    'gunslinger': CharacterClassAssetManifest(
+      classId: 'gunslinger',
+      emblemPath: 'assets/icons/class/crest_gunslinger.png',
+      portraitPath: 'assets/char/hero_gunslinger.png',
+      showcasePath: 'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_group_02.png',
+      nameplatePath:
+          'assets/characters/classes/gunslinger/ui/gunslinger_nameplate_01.png',
+      combatVfxGroupPath: 'assets/characters/classes/gunslinger/animations/attack/gunslinger_combat_group_08.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_04.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_05.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_05.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_04.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_06.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_07.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_06.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_05.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_07.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_gunslinger_attack.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_05.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_gunslinger_attack.png',
+          'assets/characters/classes/gunslinger/sprites/gunslinger_sprite_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/gunslinger/sprites/gunslinger_pose_09.png',
+        ],
+      },
+    ),
+    'necromancer': CharacterClassAssetManifest(
+      classId: 'necromancer',
+      emblemPath: 'assets/icons/class/crest_necromancer.png',
+      portraitPath: 'assets/char/hero_necromancer.png',
+      showcasePath: 'assets/characters/classes/necromancer/showcase/necromancer_showcase_group_03.png',
+      nameplatePath: 'assets/characters/classes/necromancer/ui/necromancer_nameplate_01.png',
+      subtitleImagePath: 'assets/characters/classes/necromancer/ui/necromancer_subtitle_02.png',
+      combatVfxGroupPath: 'assets/characters/classes/necromancer/animations/attack/necromancer_combat_group_07.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/necromancer/sprites/necromancer_sprite_04.png',
+          'assets/char/frames/hero_necromancer_idle1.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/char/frames/hero_necromancer_idle1.png',
+          'assets/characters/classes/necromancer/sprites/necromancer_sprite_04.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/necromancer/sprites/necromancer_sprite_06.png',
+          'assets/char/frames/hero_necromancer_walk1.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/char/frames/hero_necromancer_walk0.png',
+          'assets/characters/classes/necromancer/sprites/necromancer_sprite_06.png',
+          'assets/char/frames/hero_necromancer_walk1.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_necromancer_attack.png',
+          'assets/char/frames/hero_necromancer_idle1.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_necromancer_attack.png',
+          'assets/characters/classes/necromancer/sprites/necromancer_sprite_04.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/necromancer/sprites/necromancer_pose_08.png',
+        ],
+      },
+    ),
+    'stormcaller': CharacterClassAssetManifest(
+      classId: 'stormcaller',
+      emblemPath: 'assets/icons/class/crest_stormcaller.png',
+      portraitPath: 'assets/char/hero_stormcaller.png',
+      showcasePath: 'assets/char/hero_stormcaller.png',
+      nameplatePath: 'assets/characters/classes/stormcaller/ui/stormcaller_nameplate_01.png',
+      combatVfxGroupPath: 'assets/characters/classes/stormcaller/animations/attack/stormcaller_combat_group_06.png',
+      sequences: <CharacterAnimationSequence, List<String>>{
+        CharacterAnimationSequence.idle: <String>[
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_02.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_03.png',
+        ],
+        CharacterAnimationSequence.idleAlternate: <String>[
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_03.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_02.png',
+        ],
+        CharacterAnimationSequence.walk: <String>[
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_04.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_05.png',
+        ],
+        CharacterAnimationSequence.run: <String>[
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_04.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_03.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_05.png',
+        ],
+        CharacterAnimationSequence.attack: <String>[
+          'assets/char/frames/hero_stormcaller_attack.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_03.png',
+        ],
+        CharacterAnimationSequence.skillSpecial: <String>[
+          'assets/char/frames/hero_stormcaller_attack.png',
+          'assets/characters/classes/stormcaller/sprites/stormcaller_sprite_02.png',
+        ],
+        CharacterAnimationSequence.downed: <String>[
+          'assets/characters/classes/stormcaller/sprites/stormcaller_pose_07.png',
+        ],
+      },
+    ),
+  };
+
+  static CharacterClassAssetManifest forClass(String specializationId) {
+    final key = specializationId.trim().toLowerCase();
+    if (key == 'adventurer' || key.isEmpty) {
+      return manifests['base']!;
+    }
+    return manifests[key] ?? manifests['base']!;
+  }
+
+  /// Seluruh asset path unik yang perlu di-preload oleh runtime karakter.
+  static List<String> get allCharacterAssetPaths {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final manifest in manifests.values) {
+      for (final path in manifest.allAssetPaths) {
+        if (seen.add(path)) out.add(path);
+      }
+    }
+    return out;
+  }
+
+  /// Frame animasi gameplay (tanpa UI banner) untuk preload atlas Flame.
+  static List<String> get gameplaySpriteFramePaths {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final manifest in manifests.values) {
+      for (final frames in manifest.sequences.values) {
+        for (final path in frames) {
+          if (seen.add(path)) out.add(path);
+        }
+      }
+      if (seen.add(manifest.portraitPath)) out.add(manifest.portraitPath);
+    }
+    return out;
+  }
 }

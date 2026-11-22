@@ -14,6 +14,10 @@ enum SkillVfxType {
   healPulse,
   critSpark,
   defeatBurst,
+  holyBurst,
+  voidSlash,
+  timeCollapse,
+  lightningStrike,
 }
 
 /// Efek visual singkat untuk serangan fisik, skill aether/arcane, crit, heal, dan death motes.
@@ -132,6 +136,114 @@ class SkillVfxComponent extends PositionComponent {
         : (isElite ? const Color(0xFFE6BD68) : const Color(0xFF69BFE5)),
   );
 
+  factory SkillVfxComponent.radiantSmite({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.holyBurst,
+        position: position,
+        duration: 0.30,
+        radius: 17,
+        color: const Color(0xFFFFE082),
+      );
+
+  factory SkillVfxComponent.divineJudgment({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.holyBurst,
+        position: position,
+        duration: 0.40,
+        radius: 21,
+        color: const Color(0xFFFFD54F),
+      );
+
+  factory SkillVfxComponent.phantomSlash({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.voidSlash,
+        position: position,
+        duration: 0.24,
+        radius: 16,
+        color: const Color(0xFFB388FF),
+      );
+
+  factory SkillVfxComponent.voidExecution({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.voidSlash,
+        position: position,
+        duration: 0.34,
+        radius: 20,
+        color: const Color(0xFF9C27B0),
+      );
+
+  factory SkillVfxComponent.timeBolt({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.timeCollapse,
+        position: position,
+        duration: 0.28,
+        radius: 15,
+        color: const Color(0xFF80DEEA),
+      );
+
+  factory SkillVfxComponent.chronoCollapse({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.timeCollapse,
+        position: position,
+        duration: 0.40,
+        radius: 20,
+        color: const Color(0xFFE6BD68),
+      );
+
+  factory SkillVfxComponent.rapidFire({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.arrowShot,
+        position: position,
+        duration: 0.18,
+        radius: 14,
+        color: const Color(0xFFFFB74D),
+      );
+
+  factory SkillVfxComponent.aetherBarrage({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.arrowShot,
+        position: position,
+        duration: 0.28,
+        radius: 18,
+        color: const Color(0xFF4FC3F7),
+      );
+
+  factory SkillVfxComponent.deathBolt({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.lifeSiphon,
+        position: position,
+        duration: 0.30,
+        radius: 16,
+        color: const Color(0xFF7E57C2),
+      );
+
+  factory SkillVfxComponent.soulEruption({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.arcaneBurst,
+        position: position,
+        duration: 0.38,
+        radius: 21,
+        color: const Color(0xFF69F0AE),
+      );
+
+  factory SkillVfxComponent.lightningArc({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.lightningStrike,
+        position: position,
+        duration: 0.24,
+        radius: 17,
+        color: const Color(0xFF81D4FA),
+      );
+
+  factory SkillVfxComponent.thunderstorm({required Vector2 position}) =>
+      SkillVfxComponent(
+        type: SkillVfxType.lightningStrike,
+        position: position,
+        duration: 0.38,
+        radius: 22,
+        color: const Color(0xFF40C4FF),
+      );
+
   static Color _defaultColor(SkillVfxType type) {
     switch (type) {
       case SkillVfxType.slash:
@@ -154,6 +266,14 @@ class SkillVfxComponent extends PositionComponent {
         return const Color(0xFFFFD54F);
       case SkillVfxType.defeatBurst:
         return const Color(0xFF69BFE5);
+      case SkillVfxType.holyBurst:
+        return const Color(0xFFFFE082);
+      case SkillVfxType.voidSlash:
+        return const Color(0xFFB388FF);
+      case SkillVfxType.timeCollapse:
+        return const Color(0xFF80DEEA);
+      case SkillVfxType.lightningStrike:
+        return const Color(0xFF81D4FA);
     }
   }
 
@@ -428,6 +548,67 @@ class SkillVfxComponent extends PositionComponent {
             _fillPaint,
           );
         }
+
+      case SkillVfxType.holyBurst:
+        final beamW = radius * (0.55 - t * 0.25);
+        _fillPaint.color = _color.withAlpha((alpha * 0.45).round());
+        canvas.drawRect(
+          Rect.fromLTWH(cx - beamW, cy - radius * 1.1, beamW * 2, radius * 2.0),
+          _fillPaint,
+        );
+        _strokePaint
+          ..color = const Color(0xFFFFFFFF).withAlpha(alpha)
+          ..strokeWidth = 1.6;
+        canvas.drawCircle(
+          Offset(cx, cy),
+          radius * (0.35 + t * 0.65),
+          _strokePaint,
+        );
+
+      case SkillVfxType.voidSlash:
+        _strokePaint
+          ..color = _color.withAlpha(alpha)
+          ..strokeWidth = 2.8 * (1.0 - t * 0.35);
+        canvas.drawLine(
+          Offset(cx - radius * 0.75, cy - radius * 0.6),
+          Offset(cx + radius * 0.75, cy + radius * 0.6),
+          _strokePaint,
+        );
+        canvas.drawLine(
+          Offset(cx + radius * 0.75, cy - radius * 0.6),
+          Offset(cx - radius * 0.75, cy + radius * 0.6),
+          _strokePaint,
+        );
+
+      case SkillVfxType.timeCollapse:
+        final ringR = radius * (0.95 - t * 0.55);
+        _strokePaint
+          ..color = _color.withAlpha(alpha)
+          ..strokeWidth = 1.8;
+        canvas.drawCircle(Offset(cx, cy), ringR, _strokePaint);
+        canvas.drawLine(
+          Offset(cx, cy),
+          Offset(
+            cx + math.cos(t * math.pi * 2) * ringR * 0.75,
+            cy + math.sin(t * math.pi * 2) * ringR * 0.75,
+          ),
+          _strokePaint,
+        );
+
+      case SkillVfxType.lightningStrike:
+        _strokePaint
+          ..color = _color.withAlpha(alpha)
+          ..strokeWidth = 2.2 * (1.0 - t * 0.3);
+        final zig = Path()
+          ..moveTo(cx - radius * 0.2, cy - radius * 1.1)
+          ..lineTo(cx + radius * 0.25, cy - radius * 0.25)
+          ..lineTo(cx - radius * 0.15, cy + radius * 0.1)
+          ..lineTo(cx + radius * 0.15, cy + radius * 0.85);
+        canvas.drawPath(zig, _strokePaint);
+        _strokePaint
+          ..color = const Color(0xFFFFFFFF).withAlpha(alpha)
+          ..strokeWidth = 1.1;
+        canvas.drawPath(zig, _strokePaint);
     }
   }
 }

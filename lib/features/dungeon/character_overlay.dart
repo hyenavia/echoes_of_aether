@@ -480,16 +480,28 @@ class CharacterOverlay extends StatelessWidget {
             color: AppColors.textSecondary,
           ),
         ),
-        trailing: selected
-            ? Icon(Icons.check_circle, color: ext.gold)
-            : !ownedSpec
-            ? const LockedBadge(label: 'Gacha / Sanctuary')
-            : FilledButton.tonal(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClassEmblemIcon(
+              specializationId: spec.id,
+              size: 20,
+              fallbackColor: selected ? ext.gold : AppColors.textSecondary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            if (selected)
+              Icon(Icons.check_circle, color: ext.gold)
+            else if (!ownedSpec)
+              const LockedBadge(label: 'Gacha / Sanctuary')
+            else
+              FilledButton.tonal(
                 onPressed: unlocked
                     ? () => onChooseSpecialization(spec.id)
                     : null,
                 child: const Text('Pilih'),
               ),
+          ],
+        ),
       ),
     );
   }
@@ -624,6 +636,7 @@ class _HeroProfileBanner extends StatelessWidget {
                         runSpacing: 2,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          ClassEmblemIcon(specializationId: specId, size: 16),
                           Text(
                             classTitle,
                             maxLines: 1,

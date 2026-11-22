@@ -33,6 +33,8 @@ class DungeonCompletedOverlay extends StatefulWidget {
     this.completionReward,
     this.bossQuestMessage,
     this.onRetry,
+    this.onNextFloor,
+    this.nextFloorLabel,
     required this.onReturnToTown,
   });
 
@@ -45,6 +47,8 @@ class DungeonCompletedOverlay extends StatefulWidget {
   final GrantedReward? completionReward;
   final String? bossQuestMessage;
   final VoidCallback? onRetry;
+  final VoidCallback? onNextFloor;
+  final String? nextFloorLabel;
   final VoidCallback onReturnToTown;
 
   @override
@@ -453,7 +457,24 @@ class _DungeonCompletedOverlayState extends State<DungeonCompletedOverlay> {
                         runSpacing: AppSpacing.sm,
                         alignment: WrapAlignment.center,
                         children: [
-                          if (widget.onRetry == null)
+                          if (widget.onNextFloor != null) ...[
+                            GameButton.slate(
+                              text: 'Kembali ke Town',
+                              icon: Icons.home_outlined,
+                              onPressed: widget.onReturnToTown,
+                            ),
+                            GameButton.gold(
+                              key: const Key(
+                                'dungeon_completed_next_floor_button',
+                              ),
+                              text:
+                                  widget.nextFloorLabel ??
+                                  'Lanjut Lantai Berikutnya',
+                              icon: Icons.arrow_forward,
+                              pulse: true,
+                              onPressed: widget.onNextFloor,
+                            ),
+                          ] else if (widget.onRetry == null)
                             GameButton.gold(
                               text: 'Kembali ke Town',
                               icon: Icons.home_outlined,

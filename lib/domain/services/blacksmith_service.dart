@@ -100,6 +100,25 @@ class BlacksmithSalvageResult {
   bool get isSuccess => status == BlacksmithSalvageStatus.success;
 }
 
+/// Hasil eksekusi pembongkaran massal (bulk salvage) oleh [BlacksmithService].
+class BlacksmithBulkSalvageResult {
+  const BlacksmithBulkSalvageResult({
+    required this.salvagedCount,
+    required this.skippedCount,
+    required this.aetherScrapGained,
+    this.stoppedByInventoryFull = false,
+    this.salvagedIds = const [],
+  });
+
+  final int salvagedCount;
+  final int skippedCount;
+  final int aetherScrapGained;
+  final bool stoppedByInventoryFull;
+  final List<String> salvagedIds;
+
+  bool get hasSalvaged => salvagedCount > 0;
+}
+
 /// Service domain murni untuk pandai besi (Blacksmith):
 /// 1. Equipment Enhancement (+1 s/d +10) menggunakan Gold dan Material Monster.
 /// 2. Sub-stat Reforge untuk equipment Rare, Epic, dan Legendary menggunakan Gold.
@@ -459,6 +478,111 @@ class BlacksmithService {
       status: BlacksmithSalvageStatus.success,
       salvagedInstance: target,
       aetherScrapGained: scrapYield,
+    );
+  }
+
+  /// Menentukan apakah sebuah equipment memenuhi syarat untuk dibongkar massal.
+  bool isBulkSalvageCandidate(
+    EquipmentInstance item, {
+    required Set<ItemRarity> targetRarities,
+    Set<String> equippedIds = const {},
+    bool skipFavorited = true,
+    bool skipEnhanced = true,
+  }) {
+    if (!targetRarities.contains(item.rarity)) return false;
+    if (item.rarity == ItemRarity.mythical) return false;
+    if (equippedIds.contains(item.id)) return false;
+    if (skipFavorited && item.isFavorite) return false;
+    if (skipEnhanced && item.enhancementLevel > 0) return false;
+    return getSalvageScrapYield(item) > 0;
+  }
+
+  /// Mengembalikan daftar equipment di [inventory] yang memenuhi syarat
+  /// untuk pembongkaran massal berdasarkan [targetRarities] dan opsi proteksi.
+  List<EquipmentInstance> findBulkSalvageCandidates({
+    required Inventory inventory,
+    required Set<ItemRarity> targetRarities,
+    EquipmentLoadout? loadout,
+    bool skipFavorited = true,
+    bool skipEnhanced = true,
+  }) {
+    final equippedIds = loadout == null
+        ? const <String>{}
+        : {for (final eq in loadout.equipped.values) eq.id};
+    return [
+      for (final item in inventory.equipmentSnapshot())
+        if (isBulkSalvageCandidate(
+          item,
+          targetRarities: targetRarities,
+          equippedIds: equippedIds,
+          skipFavorited: skipFavorited,
+          skipEnhanced: skipEnhanced,
+        ))
+          item,
+    ];
+  }
+
+  /// Membongkar banyak equipment yang memenuhi syarat menjadi `aether_scrap`.
+  /// Secara default melindungi item terpasang, Mythical, favorit, dan `+1` ke atas.
+  /// Berhenti aman jika slot tas atau batas tumpukan `aether_scrap` penuh.
+  BlacksmithBulkSalvageResult salvageEquipmentBulk({
+    required Inventory inventory,
+    required Set<ItemRarity> targetRarities,
+    EquipmentLoadout? loadout,
+    bool skipFavorited = true,
+    bool skipEnhanced = true,
+  }) {
+    if (inventory.definitionOf(aetherScrapItemId) == null) {
+      return const BlacksmithBulkSalvageResult(
+        salvagedCount: 0,
+        skippedCount: 0,
+        aetherScrapGained: 0,
+      );
+    }
+
+    final candidates = findBulkSalvageCandidates(
+      inventory: inventory,
+      targetRarities: targetRarities,
+      loadout: loadout,
+      skipFavorited: skipFavorited,
+      skipEnhanced: skipEnhanced,
+    );
+    final allMatchingCount = inventory
+        .equipmentSnapshot()
+        .where((e) => targetRarities.contains(e.rarity))
+        .length;
+    var skippedCount = allMatchingCount - candidates.length;
+    var salvagedCount = 0;
+    var totalScrap = 0;
+    var stoppedByInventoryFull = false;
+    final salvagedIds = <String>[];
+
+    for (var i = 0; i < candidates.length; i++) {
+      final candidate = candidates[i];
+      final res = salvageEquipment(
+        inventory: inventory,
+        instanceId: candidate.id,
+        loadout: loadout,
+      );
+      if (res.isSuccess) {
+        salvagedCount++;
+        totalScrap += res.aetherScrapGained;
+        salvagedIds.add(candidate.id);
+      } else if (res.status == BlacksmithSalvageStatus.inventoryFull) {
+        stoppedByInventoryFull = true;
+        skippedCount += candidates.length - i;
+        break;
+      } else {
+        skippedCount++;
+      }
+    }
+
+    return BlacksmithBulkSalvageResult(
+      salvagedCount: salvagedCount,
+      skippedCount: skippedCount,
+      aetherScrapGained: totalScrap,
+      stoppedByInventoryFull: stoppedByInventoryFull,
+      salvagedIds: List.unmodifiable(salvagedIds),
     );
   }
 }

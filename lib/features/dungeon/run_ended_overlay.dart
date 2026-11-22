@@ -11,11 +11,25 @@ class RunEndedOverlay extends StatelessWidget {
     required this.onRetry,
     this.onReturnToTown,
     this.subtitle,
+    this.dungeonName,
+    this.progressText,
+    this.levelComparisonText,
+    this.adviceText,
   });
 
   final VoidCallback onRetry;
   final VoidCallback? onReturnToTown;
   final String? subtitle;
+  final String? dungeonName;
+  final String? progressText;
+  final String? levelComparisonText;
+  final String? adviceText;
+
+  bool get _hasSummary =>
+      (dungeonName != null && dungeonName!.trim().isNotEmpty) ||
+      (progressText != null && progressText!.trim().isNotEmpty) ||
+      (levelComparisonText != null && levelComparisonText!.trim().isNotEmpty) ||
+      (adviceText != null && adviceText!.trim().isNotEmpty);
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +113,75 @@ class RunEndedOverlay extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (_hasSummary) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    PanelFrame(
+                      key: const Key('run_ended_summary_panel'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      backgroundColor: AppColors.surfaceDark,
+                      borderColor: AppColors.panelInnerBorder,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'RINGKASAN KEKALAHAN',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              letterSpacing: 0.7,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (dungeonName != null &&
+                              dungeonName!.trim().isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              dungeonName!,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: ext.gold,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                          if ((progressText != null &&
+                                  progressText!.trim().isNotEmpty) ||
+                              (levelComparisonText != null &&
+                                  levelComparisonText!.trim().isNotEmpty)) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              [
+                                if (progressText != null &&
+                                    progressText!.trim().isNotEmpty)
+                                  progressText!.trim(),
+                                if (levelComparisonText != null &&
+                                    levelComparisonText!.trim().isNotEmpty)
+                                  levelComparisonText!.trim(),
+                              ].join(' • '),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                          if (adviceText != null &&
+                              adviceText!.trim().isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              adviceText!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   Wrap(
                     spacing: AppSpacing.sm,

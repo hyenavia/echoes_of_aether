@@ -19,6 +19,8 @@ class PathFollower {
 
   bool get isMoving => _next < _path.length;
 
+  int get remainingSteps => isMoving ? _path.length - _next : 0;
+
   /// Sel yang sedang ditempati.
   GridPoint get currentCell => GridPoint(_x.floor(), _y.floor());
 

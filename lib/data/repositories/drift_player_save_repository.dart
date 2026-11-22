@@ -16,6 +16,7 @@ import '../../domain/entities/game_config.dart';
 import '../../domain/entities/game_settings.dart';
 import '../../domain/entities/infinite_spire.dart';
 import '../../domain/entities/item_definition.dart';
+import '../../domain/entities/loadout_preset.dart';
 import '../../domain/entities/offline_activity.dart';
 import '../../domain/entities/periodic_quest_state.dart';
 import '../../domain/entities/player_progress.dart';
@@ -832,6 +833,7 @@ class DriftPlayerSaveRepository
                   offlineActivity: snapshot.offlineActivity,
                   consecutiveDefeats: snapshot.session.consecutiveDefeats,
                   lastFailedDungeonId: snapshot.session.lastFailedDungeonId,
+                  loadoutPresets: snapshot.loadoutPresets,
                 ),
               ),
             ),
@@ -1149,6 +1151,7 @@ class DriftPlayerSaveRepository
               offlineActivity: OfflineActivitySnapshot.paused(),
               consecutiveDefeats: <String, int>{},
               lastFailedDungeonId: null,
+              loadoutPresets: <LoadoutPreset>[],
             )
           : _decodeSessionData(sessionRow.sessionDataJson);
       final session = sessionRow == null
@@ -1372,6 +1375,7 @@ class DriftPlayerSaveRepository
         gachaPityStates: Map.unmodifiable(gachaPityStates),
         unlockedSpecializations: Set.unmodifiable(unlockedSpecializations),
         infiniteSpireProgress: infiniteSpire,
+        loadoutPresets: decodedSessionData.loadoutPresets,
       );
       _recordSavedBaseline(loaded, [
         ...loaded.character.equipped.values,
@@ -2119,6 +2123,7 @@ class DriftPlayerSaveRepository
         const OfflineActivitySnapshot.paused(),
     Map<String, int> consecutiveDefeats = const {},
     String? lastFailedDungeonId,
+    List<LoadoutPreset> loadoutPresets = const [],
   }) {
     final root = <String, dynamic>{};
     if (active != null) {
@@ -2163,6 +2168,25 @@ class DriftPlayerSaveRepository
     final normalizedFailedId = lastFailedDungeonId?.trim();
     if (normalizedFailedId != null && normalizedFailedId.isNotEmpty) {
       root['lastFailedDungeonId'] = normalizedFailedId;
+    }
+
+    if (loadoutPresets.isNotEmpty) {
+      root['loadoutPresets'] = [
+        for (final preset in loadoutPresets)
+          if (preset.slotIndex >= 0 &&
+              preset.slotIndex < LoadoutPreset.maxSlots)
+            {
+              'slotIndex': preset.slotIndex,
+              'name': preset.name,
+              if (preset.specializationId != null &&
+                  preset.specializationId!.trim().isNotEmpty)
+                'specializationId': preset.specializationId!.trim(),
+              'equipmentInstanceIds': {
+                for (final e in preset.equipmentInstanceIds.entries)
+                  e.key.name: e.value,
+              },
+            },
+      ];
     }
     return root;
   }
@@ -2213,6 +2237,7 @@ class DriftPlayerSaveRepository
     OfflineActivitySnapshot offlineActivity,
     Map<String, int> consecutiveDefeats,
     String? lastFailedDungeonId,
+    List<LoadoutPreset> loadoutPresets,
   })
   _decodeSessionData(String raw) {
     if (raw.trim().isEmpty || raw.trim() == '{}') {
@@ -2221,6 +2246,7 @@ class DriftPlayerSaveRepository
         offlineActivity: OfflineActivitySnapshot.paused(),
         consecutiveDefeats: <String, int>{},
         lastFailedDungeonId: null,
+        loadoutPresets: <LoadoutPreset>[],
       );
     }
     try {
@@ -2234,6 +2260,7 @@ class DriftPlayerSaveRepository
           offlineActivity: OfflineActivitySnapshot.paused(),
           consecutiveDefeats: <String, int>{},
           lastFailedDungeonId: null,
+          loadoutPresets: <LoadoutPreset>[],
         );
       }
       final active = _decodeActiveSessionMap(decoded['activeDungeonSession']);
@@ -2256,11 +2283,13 @@ class DriftPlayerSaveRepository
                   )))) {
         lastFailedDungeonId = null;
       }
+      final loadoutPresets = _decodeLoadoutPresets(decoded['loadoutPresets']);
       return (
         active: active,
         offlineActivity: offlineActivity,
         consecutiveDefeats: consecutiveDefeats,
         lastFailedDungeonId: lastFailedDungeonId,
+        loadoutPresets: loadoutPresets,
       );
     } on FormatException {
       _warn('sessionDataJson rusak; diarahkan ke Town dengan aman.');
@@ -2269,8 +2298,58 @@ class DriftPlayerSaveRepository
         offlineActivity: OfflineActivitySnapshot.paused(),
         consecutiveDefeats: <String, int>{},
         lastFailedDungeonId: null,
+        loadoutPresets: <LoadoutPreset>[],
       );
     }
+  }
+
+  List<LoadoutPreset> _decodeLoadoutPresets(Object? raw) {
+    if (raw == null) return const [];
+    if (raw is! List) {
+      _warn('loadoutPresets tidak valid; diabaikan.');
+      return const [];
+    }
+    final bySlot = <int, LoadoutPreset>{};
+    for (final entry in raw) {
+      if (entry is! Map<String, dynamic>) continue;
+      final slotIndex = entry['slotIndex'];
+      if (slotIndex is! int ||
+          slotIndex < 0 ||
+          slotIndex >= LoadoutPreset.maxSlots) {
+        continue;
+      }
+      final rawName = entry['name'];
+      final name = (rawName is String && rawName.trim().isNotEmpty)
+          ? rawName.trim()
+          : LoadoutPreset.defaultNameForSlot(slotIndex);
+      final rawSpec = entry['specializationId'];
+      final specId = (rawSpec is String && rawSpec.trim().isNotEmpty)
+          ? rawSpec.trim()
+          : null;
+      final rawEqMap = entry['equipmentInstanceIds'];
+      final eqIds = <EquipmentSlot, String>{};
+      if (rawEqMap is Map<String, dynamic>) {
+        for (final eqEntry in rawEqMap.entries) {
+          final slot = _parseEnum(EquipmentSlot.values, eqEntry.key);
+          final instanceId = eqEntry.value;
+          if (slot != null &&
+              instanceId is String &&
+              instanceId.trim().isNotEmpty) {
+            eqIds[slot] = instanceId.trim();
+          }
+        }
+      }
+      bySlot[slotIndex] = LoadoutPreset(
+        slotIndex: slotIndex,
+        name: name,
+        specializationId: specId,
+        equipmentInstanceIds: Map<EquipmentSlot, String>.unmodifiable(eqIds),
+      );
+    }
+    final sortedSlots = bySlot.keys.toList()..sort();
+    return List<LoadoutPreset>.unmodifiable([
+      for (final idx in sortedSlots) bySlot[idx]!,
+    ]);
   }
 
   Map<String, int> _decodeConsecutiveDefeats(Object? raw) {

@@ -5,6 +5,7 @@ import 'equipment.dart';
 import 'event_shop_purchase.dart';
 import 'gacha_config.dart';
 import 'infinite_spire.dart';
+import 'loadout_preset.dart';
 import 'offline_activity.dart';
 import 'periodic_quest_state.dart';
 import 'player_progress.dart';
@@ -241,6 +242,7 @@ class PlayerSaveSnapshot {
     this.gachaPityStates = const {},
     this.unlockedSpecializations = const {'vanguard', 'arcanist', 'ranger'},
     this.infiniteSpireProgress = const InfiniteSpireProgressSnapshot(),
+    this.loadoutPresets = const [],
   });
 
   final String playerId;
@@ -284,6 +286,9 @@ class PlayerSaveSnapshot {
   /// Progres tantangan The Infinite Spire (`InfiniteSpireProgresses`).
   final InfiniteSpireProgressSnapshot infiniteSpireProgress;
 
+  /// Preset kombinasi build (specialization + equipment) lokal milik pemain.
+  final List<LoadoutPreset> loadoutPresets;
+
   PlayerSaveSnapshot copyWith({
     String? playerId,
     PlayerCharacterSnapshot? character,
@@ -304,6 +309,7 @@ class PlayerSaveSnapshot {
     Map<String, GachaPityState>? gachaPityStates,
     Set<String>? unlockedSpecializations,
     InfiniteSpireProgressSnapshot? infiniteSpireProgress,
+    List<LoadoutPreset>? loadoutPresets,
   }) {
     return PlayerSaveSnapshot(
       playerId: playerId ?? this.playerId,
@@ -328,6 +334,7 @@ class PlayerSaveSnapshot {
           unlockedSpecializations ?? this.unlockedSpecializations,
       infiniteSpireProgress:
           infiniteSpireProgress ?? this.infiniteSpireProgress,
+      loadoutPresets: loadoutPresets ?? this.loadoutPresets,
     );
   }
 
