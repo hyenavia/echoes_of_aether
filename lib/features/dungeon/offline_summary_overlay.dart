@@ -108,7 +108,7 @@ class OfflineSummaryOverlay extends StatelessWidget {
                             Text(
                               '${_stateLabel(summary.finalState)} • '
                               'Durasi: ${_formatDurationMs(summary.effectiveElapsedMs)}'
-                              '${summary.cappedAtMaxDuration ? ' (maks 8 jam)' : ''}',
+                              '${summary.cappedAtMaxDuration ? ' (maks 4 jam)' : ''}',
                               style: AppTypography.numeric(
                                 theme.textTheme.bodySmall?.copyWith(
                                   color: AppColors.textSecondary,

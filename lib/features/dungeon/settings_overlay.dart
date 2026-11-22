@@ -230,7 +230,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                   dense: true,
                                   contentPadding: EdgeInsets.zero,
                                   title: const Text(
-                                    'Auto Farming penuh (8 jam)',
+                                    'Auto Farming penuh (4 jam)',
                                   ),
                                   value: s.notifyAutoFarmingFull,
                                   onChanged: (v) => _toggleNotificationCategory(
@@ -243,7 +243,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                   key: const Key('settings_notify_daily_boss'),
                                   dense: true,
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('Pengingat Daily Boss'),
+                                  title: const Text('Notifikasi Daily Reset'),
                                   value: s.notifyDailyBossReminder,
                                   onChanged: (v) => _toggleNotificationCategory(
                                     s,
@@ -256,13 +256,30 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                   key: const Key('settings_notify_weekly_boss'),
                                   dense: true,
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('Pengingat Weekly Boss'),
+                                  title: const Text('Notifikasi Weekly Reset'),
                                   value: s.notifyWeeklyBossReminder,
                                   onChanged: (v) => _toggleNotificationCategory(
                                     s,
                                     v,
                                     (e) =>
                                         s.copyWith(notifyWeeklyBossReminder: e),
+                                  ),
+                                ),
+                                SwitchListTile(
+                                  key: const Key(
+                                    'settings_notify_abyssal_spire_reset',
+                                  ),
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Notifikasi Menara Bos Abyssal Reset',
+                                  ),
+                                  value: s.notifyAbyssalSpireReset,
+                                  onChanged: (v) => _toggleNotificationCategory(
+                                    s,
+                                    v,
+                                    (e) =>
+                                        s.copyWith(notifyAbyssalSpireReset: e),
                                   ),
                                 ),
                                 SwitchListTile(
@@ -277,17 +294,6 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                                     s,
                                     v,
                                     (e) => s.copyWith(notifyEventShopEnding: e),
-                                  ),
-                                ),
-                                const Divider(height: AppSpacing.sm),
-                                SwitchListTile(
-                                  key: const Key('settings_notify_quiet_hours'),
-                                  dense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                  title: const Text('Jam Tenang (Quiet Hours)'),
-                                  value: s.notifyQuietHoursEnabled,
-                                  onChanged: (v) => widget.onChanged(
-                                    s.copyWith(notifyQuietHoursEnabled: v),
                                   ),
                                 ),
                                 const Divider(height: AppSpacing.sm),

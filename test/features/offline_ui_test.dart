@@ -229,7 +229,7 @@ void main() {
         expect(find.text('Ringkasan Offline'), findsOneWidget);
         expect(find.text('Auto Farming • Forgotten Forest'), findsOneWidget);
         expect(find.textContaining('8 jam'), findsOneWidget);
-        expect(find.textContaining('(maks 8 jam)'), findsOneWidget);
+        expect(find.textContaining('(maks 4 jam)'), findsOneWidget);
         expect(find.text('Kalah saat revive sedang cooldown.'), findsOneWidget);
         expect(find.text('3/4 selesai (1 gagal)'), findsOneWidget);
         expect(find.text('+1.2K EXP • +650 Gold (+2 Lv)'), findsOneWidget);

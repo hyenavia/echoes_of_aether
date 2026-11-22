@@ -23,7 +23,7 @@ class NotificationConfig {
     this.weeklyReminderWeekday = DateTime.sunday,
     this.weeklyReminderHour = 18,
     this.quietHours = const QuietHoursConfig(),
-    this.maxPerDay = 3,
+    this.maxPerDay = 5,
   });
 
   final int dailyReminderHour;

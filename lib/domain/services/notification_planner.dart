@@ -2,12 +2,14 @@ import '../entities/game_settings.dart';
 import '../entities/notification_config.dart';
 import '../entities/offline_activity.dart';
 import '../entities/time_config.dart';
+import 'period_service.dart';
 
 /// Kategori notifikasi lokal yang dapat diatur secara independen.
 enum NotificationCategory {
   autoFarmingFull,
   dailyBossReminder,
   weeklyBossReminder,
+  abyssalSpireReset,
   eventShopEnding,
 }
 
@@ -37,7 +39,7 @@ class NotificationInputs {
     required this.settings,
     required this.offlineMode,
     required this.lastOfflineClaimAtMs,
-    this.offlineMaxDurationMs = 8 * 60 * 60 * 1000,
+    this.offlineMaxDurationMs = 4 * 60 * 60 * 1000,
     this.dailyBossQuestCompleted = false,
     this.weeklyBossQuestCompleted = false,
     this.hasPurchasableUnboughtEventItem = false,
@@ -67,6 +69,7 @@ class NotificationPlanner {
   static const int idDailyBossReminder = 1002;
   static const int idWeeklyBossReminder = 1003;
   static const int idEventShopEnding = 1004;
+  static const int idAbyssalSpireReset = 1005;
 
   static const String channelOffline = 'offline_farming';
   static const String channelBossEvents = 'boss_events';
@@ -74,9 +77,13 @@ class NotificationPlanner {
 
   List<PlannedNotification> plan(NotificationInputs inputs) {
     final tzOffset = inputs.timeZoneOffset ?? DateTime.now().timeZoneOffset;
+    final periodService = PeriodService(
+      config: inputs.timeConfig,
+      timeZoneOffset: () => tzOffset,
+    );
     final rawCandidates = <PlannedNotification>[];
 
-    // 1. Auto Farming / Continue Dungeon penuh (batas 8 jam).
+    // 1. Auto Farming / Continue Dungeon penuh (batas 4 jam).
     final isOfflineRunnable =
         inputs.offlineMode == OfflineActivityMode.autoFarming ||
         inputs.offlineMode == OfflineActivityMode.continueDungeon;
@@ -88,79 +95,76 @@ class NotificationPlanner {
           : inputs.nowMs;
       final rawFireMs = anchorMs + inputs.offlineMaxDurationMs;
       if (rawFireMs > inputs.nowMs) {
-        final shiftedMs = _applyQuietHours(
-          utcMs: rawFireMs,
-          tzOffset: tzOffset,
-          config: inputs.config,
-          enabled: inputs.settings.notifyQuietHoursEnabled,
-        );
         rawCandidates.add(
           PlannedNotification(
             id: idAutoFarmingFull,
             channel: channelOffline,
             category: NotificationCategory.autoFarmingFull,
-            fireAtMs: shiftedMs,
+            fireAtMs: rawFireMs,
             title: 'Auto Farming Selesai',
-            body: 'Batas offline 8 jam tercapai. Hasil farming siap diklaim.',
+            body: 'Batas offline 4 jam tercapai. Hasil farming siap diklaim.',
           ),
         );
       }
     }
 
-    // 2. Pengingat Daily Boss (bila belum selesai pada periode ini).
-    if (inputs.settings.notifyDailyBossReminder &&
-        !inputs.dailyBossQuestCompleted) {
-      final rawFireMs = _nextDailyReminderMs(
-        nowMs: inputs.nowMs,
-        tzOffset: tzOffset,
-        hour: inputs.config.dailyReminderHour,
-      );
-      final shiftedMs = _applyQuietHours(
-        utcMs: rawFireMs,
-        tzOffset: tzOffset,
-        config: inputs.config,
-        enabled: inputs.settings.notifyQuietHoursEnabled,
+    // 2. Notifikasi Daily Reset (saat pergantian hari / reset_hour).
+    if (inputs.settings.notifyDailyBossReminder) {
+      final fireMs = periodService.nextResetMs(
+        Period.daily,
+        inputs.nowMs,
+        offset: tzOffset,
       );
       rawCandidates.add(
         PlannedNotification(
           id: idDailyBossReminder,
           channel: channelBossEvents,
           category: NotificationCategory.dailyBossReminder,
-          fireAtMs: shiftedMs,
-          title: 'Daily Boss Menanti',
-          body: 'Daily Boss hari ini belum dikalahkan. Hadiah menanti di Town.',
+          fireAtMs: fireMs,
+          title: 'Daily Reset',
+          body: 'Quest & Daily Boss hari baru sudah tersedia!',
         ),
       );
     }
 
-    // 3. Pengingat Weekly Boss (bila belum selesai pada minggu ini).
-    if (inputs.settings.notifyWeeklyBossReminder &&
-        !inputs.weeklyBossQuestCompleted) {
-      final rawFireMs = _nextWeeklyReminderMs(
-        nowMs: inputs.nowMs,
-        tzOffset: tzOffset,
-        weekday: inputs.config.weeklyReminderWeekday,
-        hour: inputs.config.weeklyReminderHour,
-      );
-      final shiftedMs = _applyQuietHours(
-        utcMs: rawFireMs,
-        tzOffset: tzOffset,
-        config: inputs.config,
-        enabled: inputs.settings.notifyQuietHoursEnabled,
+    // 3. Notifikasi Weekly Reset (Senin pukul reset_hour).
+    if (inputs.settings.notifyWeeklyBossReminder) {
+      final fireMs = periodService.nextResetMs(
+        Period.weekly,
+        inputs.nowMs,
+        offset: tzOffset,
       );
       rawCandidates.add(
         PlannedNotification(
           id: idWeeklyBossReminder,
           channel: channelBossEvents,
           category: NotificationCategory.weeklyBossReminder,
-          fireAtMs: shiftedMs,
-          title: 'Weekly Boss Menanti',
-          body: 'Weekly Boss minggu ini masih tersedia untuk ditantang.',
+          fireAtMs: fireMs,
+          title: 'Weekly Reset',
+          body: 'Quest & Weekly Boss minggu baru sudah direset!',
         ),
       );
     }
 
-    // 4. Pengingat Event Shop berganti (Minggu pukul weeklyReminderHour bila
+    // 4. Notifikasi Menara Bos Abyssal Reset (siklus 2 mingguan).
+    if (inputs.settings.notifyAbyssalSpireReset) {
+      final fireMs = periodService.nextBiweeklyResetMs(
+        inputs.nowMs,
+        offset: tzOffset,
+      );
+      rawCandidates.add(
+        PlannedNotification(
+          id: idAbyssalSpireReset,
+          channel: channelBossEvents,
+          category: NotificationCategory.abyssalSpireReset,
+          fireAtMs: fireMs,
+          title: 'Menara Bos Abyssal Reset',
+          body: 'Siklus baru Menara Bos Abyssal telah dimulai!',
+        ),
+      );
+    }
+
+    // 5. Pengingat Event Shop berganti (Minggu pukul weeklyReminderHour bila
     //    masih ada item event yang belum dibeli & syaratnya terpenuhi).
     if (inputs.settings.notifyEventShopEnding &&
         inputs.hasPurchasableUnboughtEventItem) {
@@ -170,18 +174,12 @@ class NotificationPlanner {
         weekday: inputs.config.weeklyReminderWeekday,
         hour: inputs.config.weeklyReminderHour,
       );
-      final shiftedMs = _applyQuietHours(
-        utcMs: rawFireMs,
-        tzOffset: tzOffset,
-        config: inputs.config,
-        enabled: inputs.settings.notifyQuietHoursEnabled,
-      );
       rawCandidates.add(
         PlannedNotification(
           id: idEventShopEnding,
           channel: channelEventShop,
           category: NotificationCategory.eventShopEnding,
-          fireAtMs: shiftedMs,
+          fireAtMs: rawFireMs,
           title: 'Event Shop Akan Berganti',
           body: 'Item mingguan Event Shop tersedia sebelum rotasi berganti.',
         ),
@@ -213,27 +211,6 @@ class NotificationPlanner {
     return List<PlannedNotification>.unmodifiable(result);
   }
 
-  static int _nextDailyReminderMs({
-    required int nowMs,
-    required Duration tzOffset,
-    required int hour,
-  }) {
-    final nowLocal = DateTime.fromMillisecondsSinceEpoch(
-      nowMs,
-      isUtc: true,
-    ).add(tzOffset);
-    var targetLocal = DateTime.utc(
-      nowLocal.year,
-      nowLocal.month,
-      nowLocal.day,
-      hour,
-    );
-    if (!targetLocal.isAfter(nowLocal)) {
-      targetLocal = targetLocal.add(const Duration(days: 1));
-    }
-    return targetLocal.subtract(tzOffset).millisecondsSinceEpoch;
-  }
-
   static int _nextWeeklyReminderMs({
     required int nowMs,
     required Duration tzOffset,
@@ -256,30 +233,5 @@ class NotificationPlanner {
       targetLocal = targetLocal.add(const Duration(days: 7));
     }
     return targetLocal.subtract(tzOffset).millisecondsSinceEpoch;
-  }
-
-  static int _applyQuietHours({
-    required int utcMs,
-    required Duration tzOffset,
-    required NotificationConfig config,
-    required bool enabled,
-  }) {
-    if (!enabled) return utcMs;
-    final qh = config.quietHours;
-    final local = DateTime.fromMillisecondsSinceEpoch(
-      utcMs,
-      isUtc: true,
-    ).add(tzOffset);
-    if (!qh.containsHour(local.hour)) return utcMs;
-
-    var endLocal = DateTime.utc(local.year, local.month, local.day, qh.endHour);
-    // Jika rentang melewati tengah malam dan saat ini berada pada jam >= startHour,
-    // akhir jam tenang ada di hari berikutnya pukul endHour:00.
-    if (qh.startHour > qh.endHour && local.hour >= qh.startHour) {
-      endLocal = endLocal.add(const Duration(days: 1));
-    } else if (!endLocal.isAfter(local)) {
-      endLocal = endLocal.add(const Duration(days: 1));
-    }
-    return endLocal.subtract(tzOffset).millisecondsSinceEpoch;
   }
 }

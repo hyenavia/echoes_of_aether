@@ -8,8 +8,8 @@ class GameSettingsData {
     this.notifyAutoFarmingFull = false,
     this.notifyDailyBossReminder = false,
     this.notifyWeeklyBossReminder = false,
+    this.notifyAbyssalSpireReset = false,
     this.notifyEventShopEnding = false,
-    this.notifyQuietHoursEnabled = true,
     this.autoSalvageOfflineEquipment = false,
     this.lastSeenUpdateNoticeVersion = 0,
   }) : bgmVolume = bgmVolume < 0 ? 0.0 : (bgmVolume > 1 ? 1.0 : bgmVolume),
@@ -22,8 +22,8 @@ class GameSettingsData {
   final bool notifyAutoFarmingFull;
   final bool notifyDailyBossReminder;
   final bool notifyWeeklyBossReminder;
+  final bool notifyAbyssalSpireReset;
   final bool notifyEventShopEnding;
-  final bool notifyQuietHoursEnabled;
   final bool autoSalvageOfflineEquipment;
   final int lastSeenUpdateNoticeVersion;
 
@@ -31,6 +31,7 @@ class GameSettingsData {
       notifyAutoFarmingFull ||
       notifyDailyBossReminder ||
       notifyWeeklyBossReminder ||
+      notifyAbyssalSpireReset ||
       notifyEventShopEnding;
 
   GameSettingsData copyWith({
@@ -41,8 +42,8 @@ class GameSettingsData {
     bool? notifyAutoFarmingFull,
     bool? notifyDailyBossReminder,
     bool? notifyWeeklyBossReminder,
+    bool? notifyAbyssalSpireReset,
     bool? notifyEventShopEnding,
-    bool? notifyQuietHoursEnabled,
     bool? autoSalvageOfflineEquipment,
     int? lastSeenUpdateNoticeVersion,
   }) => GameSettingsData(
@@ -55,9 +56,9 @@ class GameSettingsData {
         notifyDailyBossReminder ?? this.notifyDailyBossReminder,
     notifyWeeklyBossReminder:
         notifyWeeklyBossReminder ?? this.notifyWeeklyBossReminder,
+    notifyAbyssalSpireReset:
+        notifyAbyssalSpireReset ?? this.notifyAbyssalSpireReset,
     notifyEventShopEnding: notifyEventShopEnding ?? this.notifyEventShopEnding,
-    notifyQuietHoursEnabled:
-        notifyQuietHoursEnabled ?? this.notifyQuietHoursEnabled,
     autoSalvageOfflineEquipment:
         autoSalvageOfflineEquipment ?? this.autoSalvageOfflineEquipment,
     lastSeenUpdateNoticeVersion:
@@ -75,8 +76,8 @@ class GameSettingsData {
           notifyAutoFarmingFull == other.notifyAutoFarmingFull &&
           notifyDailyBossReminder == other.notifyDailyBossReminder &&
           notifyWeeklyBossReminder == other.notifyWeeklyBossReminder &&
+          notifyAbyssalSpireReset == other.notifyAbyssalSpireReset &&
           notifyEventShopEnding == other.notifyEventShopEnding &&
-          notifyQuietHoursEnabled == other.notifyQuietHoursEnabled &&
           autoSalvageOfflineEquipment == other.autoSalvageOfflineEquipment &&
           lastSeenUpdateNoticeVersion == other.lastSeenUpdateNoticeVersion;
 
@@ -89,8 +90,8 @@ class GameSettingsData {
     notifyAutoFarmingFull,
     notifyDailyBossReminder,
     notifyWeeklyBossReminder,
+    notifyAbyssalSpireReset,
     notifyEventShopEnding,
-    notifyQuietHoursEnabled,
     autoSalvageOfflineEquipment,
     lastSeenUpdateNoticeVersion,
   );

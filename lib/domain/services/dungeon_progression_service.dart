@@ -25,13 +25,16 @@ class DeathLoopSuggestion {
 class DungeonProgressionService {
   const DungeonProgressionService([
     this.difficultyConfig = const DifficultyConfig(),
+    this.maxPlayerLevel = kDefaultMaxPlayerLevel,
   ]);
 
   /// Batas rank dunia puncak (*Peak World Tier*).
   static const int kPeakWorldRank = 5;
   static const int kMaxRank = 5;
+  static const int kDefaultMaxPlayerLevel = 90;
 
   final DifficultyConfig difficultyConfig;
+  final int maxPlayerLevel;
 
   /// Dungeon dianggap clear pada siklus saat ini jika `clearedInCycleRank`
   /// sama dengan `cycle.ascensionRank`, atau jika pemain sedang berada di rank
@@ -53,11 +56,13 @@ class DungeonProgressionService {
   /// Level minimal untuk masuk [dungeon] pada [cycleRank] (Hard Lock).
   /// Dungeon normal pertama (`order == 1`) selalu terbuka dari Lv 1 pada
   /// semua rank (Opsi 3) agar pemain tidak pernah terkunci di Town.
+  /// Syarat level dibatasi paling tinggi [maxPlayerLevel] agar dungeon Rank
+  /// tinggi tetap dapat dibuka ketika level karakter sudah mencapai cap.
   int requiredLevel(DungeonDefinition dungeon, int cycleRank) {
     if (dungeon.isNormal && dungeon.order == 1) {
       return 1;
     }
-    return recommendedLevel(dungeon, cycleRank);
+    return math.min<int>(maxPlayerLevel, recommendedLevel(dungeon, cycleRank));
   }
 
   /// Mengembalikan `true` jika level pemain memenuhi batas minimal untuk [dungeon]

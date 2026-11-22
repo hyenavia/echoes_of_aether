@@ -1607,7 +1607,7 @@ class _TownHubViewState extends State<TownHubView> {
           Text(activeStatusText, style: theme.textTheme.labelLarge),
           const SizedBox(height: 4),
           Text(
-            'Otomatis aktif saat offline (maks 8 jam) • Pilih tempat farming di bawah • Berhenti otomatis jika kalah (stopOnDefeat).',
+            'Otomatis aktif saat offline (maks 4 jam) • Pilih tempat farming di bawah • Berhenti otomatis jika kalah (stopOnDefeat).',
             style: theme.textTheme.bodySmall,
           ),
           if (defaultFarmName != null) ...[

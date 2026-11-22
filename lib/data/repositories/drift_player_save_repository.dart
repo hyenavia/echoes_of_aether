@@ -91,9 +91,9 @@ class DriftPlayerSaveRepository
   static const String _keyNotifyDailyBoss = 'notifications.daily_boss_reminder';
   static const String _keyNotifyWeeklyBoss =
       'notifications.weekly_boss_reminder';
+  static const String _keyNotifyAbyssalSpireReset =
+      'notifications.abyssal_spire_reset';
   static const String _keyNotifyEventShop = 'notifications.event_shop_ending';
-  static const String _keyNotifyQuietHours =
-      'notifications.quiet_hours_enabled';
   static const String _keyOfflineAutoSalvage = 'offline.auto_salvage_equipment';
   static const String _keyLastSeenUpdateNoticeVersion =
       'app.last_seen_update_notice_version';
@@ -144,13 +144,13 @@ class DriftPlayerSaveRepository
         _keyNotifyWeeklyBoss,
         defaults.notifyWeeklyBossReminder,
       ),
+      notifyAbyssalSpireReset: parseBool(
+        _keyNotifyAbyssalSpireReset,
+        defaults.notifyAbyssalSpireReset,
+      ),
       notifyEventShopEnding: parseBool(
         _keyNotifyEventShop,
         defaults.notifyEventShopEnding,
-      ),
-      notifyQuietHoursEnabled: parseBool(
-        _keyNotifyQuietHours,
-        defaults.notifyQuietHoursEnabled,
       ),
       autoSalvageOfflineEquipment: parseBool(
         _keyOfflineAutoSalvage,
@@ -198,12 +198,12 @@ class DriftPlayerSaveRepository
             value: normalized.notifyWeeklyBossReminder ? 'true' : 'false',
           ),
           GameSettingsCompanion.insert(
-            key: _keyNotifyEventShop,
-            value: normalized.notifyEventShopEnding ? 'true' : 'false',
+            key: _keyNotifyAbyssalSpireReset,
+            value: normalized.notifyAbyssalSpireReset ? 'true' : 'false',
           ),
           GameSettingsCompanion.insert(
-            key: _keyNotifyQuietHours,
-            value: normalized.notifyQuietHoursEnabled ? 'true' : 'false',
+            key: _keyNotifyEventShop,
+            value: normalized.notifyEventShopEnding ? 'true' : 'false',
           ),
           GameSettingsCompanion.insert(
             key: _keyOfflineAutoSalvage,

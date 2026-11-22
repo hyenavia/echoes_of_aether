@@ -20,7 +20,7 @@ void main() {
             notifyAutoFarmingFull: true,
             notifyDailyBossReminder: true,
             notifyWeeklyBossReminder: true,
-            notifyQuietHoursEnabled: true,
+            notifyAbyssalSpireReset: true,
           ),
           offlineMode: OfflineActivityMode.autoFarming,
           lastOfflineClaimAtMs: nowMs,
@@ -28,17 +28,17 @@ void main() {
         ),
       );
 
-      expect(planned, hasLength(3));
+      expect(planned, hasLength(4));
       final autoFarm = planned.firstWhere(
         (n) => n.category == NotificationCategory.autoFarmingFull,
       );
       expect(
         autoFarm.fireAtMs,
-        DateTime.utc(2026, 11, 16, 18, 0).millisecondsSinceEpoch,
+        DateTime.utc(2026, 11, 16, 14, 0).millisecondsSinceEpoch,
       );
       expect(
         autoFarm.body,
-        'Batas offline 8 jam tercapai. Hasil farming siap diklaim.',
+        'Batas offline 4 jam tercapai. Hasil farming siap diklaim.',
       );
 
       final daily = planned.firstWhere(
@@ -46,19 +46,30 @@ void main() {
       );
       expect(
         daily.fireAtMs,
-        DateTime.utc(2026, 11, 16, 18, 0).millisecondsSinceEpoch,
+        DateTime.utc(2026, 11, 17, 0, 0).millisecondsSinceEpoch,
       );
+      expect(daily.title, 'Daily Reset');
 
       final weekly = planned.firstWhere(
         (n) => n.category == NotificationCategory.weeklyBossReminder,
       );
       expect(
         weekly.fireAtMs,
-        DateTime.utc(2026, 11, 22, 18, 0).millisecondsSinceEpoch,
+        DateTime.utc(2026, 11, 23, 0, 0).millisecondsSinceEpoch,
       );
+      expect(weekly.title, 'Weekly Reset');
+
+      final abyssal = planned.firstWhere(
+        (n) => n.category == NotificationCategory.abyssalSpireReset,
+      );
+      expect(
+        abyssal.fireAtMs,
+        DateTime.utc(2026, 11, 30, 0, 0).millisecondsSinceEpoch,
+      );
+      expect(abyssal.title, 'Menara Bos Abyssal Reset');
     });
 
-    test('mode pauseProgression dan quest selesai tidak dijadwalkan', () {
+    test('mode pauseProgression tidak menjadwalkan auto farming, tetapi reset tetap terjadwal meski quest periode ini selesai', () {
       final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
       final planned = planner.plan(
         NotificationInputs(
@@ -67,6 +78,7 @@ void main() {
             notifyAutoFarmingFull: true,
             notifyDailyBossReminder: true,
             notifyWeeklyBossReminder: true,
+            notifyAbyssalSpireReset: true,
           ),
           offlineMode: OfflineActivityMode.pauseProgression,
           lastOfflineClaimAtMs: nowMs,
@@ -76,7 +88,11 @@ void main() {
         ),
       );
 
-      expect(planned, isEmpty);
+      expect(
+        planned.any((n) => n.category == NotificationCategory.autoFarmingFull),
+        isFalse,
+      );
+      expect(planned, hasLength(3));
     });
 
     test('toggle mati tidak menjadwalkan kategori terkait', () {
@@ -99,16 +115,13 @@ void main() {
       expect(planned.single.category, NotificationCategory.dailyBossReminder);
     });
 
-    test('jam tenang menggeser notifikasi ke akhir jam tenang (07:00)', () {
-      // 2026-11-16 17:00 -> +8 jam = 2026-11-17 01:00 (di dalam 23..07) -> digeser ke 07:00.
-      final nowMs = DateTime.utc(2026, 11, 16, 17, 0).millisecondsSinceEpoch;
+    test('notifikasi tengah malam tidak digeser (tanpa jam tenang)', () {
+      // 2026-11-16 21:00 -> +4 jam = 2026-11-17 01:00 tetap di 01:00.
+      final nowMs = DateTime.utc(2026, 11, 16, 21, 0).millisecondsSinceEpoch;
       final planned = planner.plan(
         NotificationInputs(
           nowMs: nowMs,
-          settings: const GameSettingsData(
-            notifyAutoFarmingFull: true,
-            notifyQuietHoursEnabled: true,
-          ),
+          settings: const GameSettingsData(notifyAutoFarmingFull: true),
           offlineMode: OfflineActivityMode.continueDungeon,
           lastOfflineClaimAtMs: nowMs,
           timeZoneOffset: Duration.zero,
@@ -118,60 +131,57 @@ void main() {
       expect(planned, hasLength(1));
       expect(
         planned.single.fireAtMs,
-        DateTime.utc(2026, 11, 17, 7, 0).millisecondsSinceEpoch,
+        DateTime.utc(2026, 11, 17, 1, 0).millisecondsSinceEpoch,
       );
     });
 
     test('max_per_day membatasi jumlah notifikasi per hari kalender', () {
       final nowMs = DateTime.utc(2026, 11, 22, 10, 0).millisecondsSinceEpoch;
-      // Minggu 10:00: autoFarm (+8h=18:00), daily (18:00), weekly (18:00) semua di hari yg sama.
+      // Minggu 10:00 -> Daily Reset & Weekly Reset sama-sama Senin 00:00 (2026-11-23 00:00),
+      // plus Menara Bos Abyssal tidak di hari yang sama (2026-11-30).
       final planned = planner.plan(
         NotificationInputs(
           nowMs: nowMs,
           settings: const GameSettingsData(
-            notifyAutoFarmingFull: true,
             notifyDailyBossReminder: true,
             notifyWeeklyBossReminder: true,
           ),
-          offlineMode: OfflineActivityMode.autoFarming,
+          offlineMode: OfflineActivityMode.pauseProgression,
           lastOfflineClaimAtMs: nowMs,
-          config: const NotificationConfig(maxPerDay: 2),
+          config: const NotificationConfig(maxPerDay: 1),
+          timeZoneOffset: Duration.zero,
+        ),
+      );
+
+      expect(planned, hasLength(1));
+    });
+
+    test('lintas pergantian hari dan minggu menjadwalkan reset berikutnya', () {
+      // Minggu 2026-11-22 19:00 -> daily & weekly reset sama-sama Senin 2026-11-23 00:00.
+      final nowMs = DateTime.utc(2026, 11, 22, 19, 0).millisecondsSinceEpoch;
+      final planned = planner.plan(
+        NotificationInputs(
+          nowMs: nowMs,
+          settings: const GameSettingsData(
+            notifyDailyBossReminder: true,
+            notifyWeeklyBossReminder: true,
+          ),
+          offlineMode: OfflineActivityMode.pauseProgression,
+          lastOfflineClaimAtMs: nowMs,
           timeZoneOffset: Duration.zero,
         ),
       );
 
       expect(planned, hasLength(2));
+      expect(
+        planned[0].fireAtMs,
+        DateTime.utc(2026, 11, 23, 0, 0).millisecondsSinceEpoch,
+      );
+      expect(
+        planned[1].fireAtMs,
+        DateTime.utc(2026, 11, 23, 0, 0).millisecondsSinceEpoch,
+      );
     });
-
-    test(
-      'lintas pergantian hari dan minggu menjadwalkan pengingat berikutnya',
-      () {
-        // Minggu 2026-11-22 19:00 (setelah jam 18:00) -> daily besok Senin 18:00, weekly Minggu depan 2026-11-29 18:00.
-        final nowMs = DateTime.utc(2026, 11, 22, 19, 0).millisecondsSinceEpoch;
-        final planned = planner.plan(
-          NotificationInputs(
-            nowMs: nowMs,
-            settings: const GameSettingsData(
-              notifyDailyBossReminder: true,
-              notifyWeeklyBossReminder: true,
-            ),
-            offlineMode: OfflineActivityMode.pauseProgression,
-            lastOfflineClaimAtMs: nowMs,
-            timeZoneOffset: Duration.zero,
-          ),
-        );
-
-        expect(planned, hasLength(2));
-        expect(
-          planned[0].fireAtMs,
-          DateTime.utc(2026, 11, 23, 18, 0).millisecondsSinceEpoch,
-        );
-        expect(
-          planned[1].fireAtMs,
-          DateTime.utc(2026, 11, 29, 18, 0).millisecondsSinceEpoch,
-        );
-      },
-    );
 
     test(
       'parser notifications menolak jam invalid dan weekday tidak dikenal',
@@ -192,7 +202,7 @@ void main() {
       },
     );
 
-    test('event_shop_ending dijadwalkan Minggu bila toggle aktif dan ada item layak beli, patuh jam tenang & maxPerDay', () {
+    test('event_shop_ending dijadwalkan Minggu bila toggle aktif dan ada item layak beli', () {
       final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
       // Tidak ada item layak beli -> tidak dijadwalkan.
       final noItemPlan = planner.plan(
@@ -228,85 +238,6 @@ void main() {
       expect(
         eligiblePlan.single.fireAtMs,
         DateTime.utc(2026, 11, 22, 18, 0).millisecondsSinceEpoch,
-      );
-
-      // Jam tenang menggeser pengingat pukul 23:00 ke 07:00 keesokan paginya.
-      final quietPlan = planner.plan(
-        NotificationInputs(
-          nowMs: nowMs,
-          settings: const GameSettingsData(
-            notifyEventShopEnding: true,
-            notifyQuietHoursEnabled: true,
-          ),
-          offlineMode: OfflineActivityMode.pauseProgression,
-          lastOfflineClaimAtMs: nowMs,
-          hasPurchasableUnboughtEventItem: true,
-          config: const NotificationConfig(weeklyReminderHour: 23),
-          timeZoneOffset: Duration.zero,
-        ),
-      );
-      expect(
-        quietPlan.single.fireAtMs,
-        DateTime.utc(2026, 11, 23, 7, 0).millisecondsSinceEpoch,
-      );
-    });
-
-    test('event_shop_ending dijadwalkan Minggu bila toggle aktif dan ada item layak beli, patuh jam tenang & maxPerDay', () {
-      final nowMs = DateTime.utc(2026, 11, 16, 10, 0).millisecondsSinceEpoch;
-      // Tidak ada item layak beli -> tidak dijadwalkan.
-      final noItemPlan = planner.plan(
-        NotificationInputs(
-          nowMs: nowMs,
-          settings: const GameSettingsData(notifyEventShopEnding: true),
-          offlineMode: OfflineActivityMode.pauseProgression,
-          lastOfflineClaimAtMs: nowMs,
-          hasPurchasableUnboughtEventItem: false,
-          timeZoneOffset: Duration.zero,
-        ),
-      );
-      expect(noItemPlan, isEmpty);
-
-      // Toggle aktif + ada item layak beli -> Minggu 2026-11-22 18:00.
-      final eligiblePlan = planner.plan(
-        NotificationInputs(
-          nowMs: nowMs,
-          settings: const GameSettingsData(notifyEventShopEnding: true),
-          offlineMode: OfflineActivityMode.pauseProgression,
-          lastOfflineClaimAtMs: nowMs,
-          hasPurchasableUnboughtEventItem: true,
-          timeZoneOffset: Duration.zero,
-        ),
-      );
-      expect(eligiblePlan, hasLength(1));
-      expect(
-        eligiblePlan.single.category,
-        NotificationCategory.eventShopEnding,
-      );
-      expect(eligiblePlan.single.id, NotificationPlanner.idEventShopEnding);
-      expect(eligiblePlan.single.channel, NotificationPlanner.channelEventShop);
-      expect(
-        eligiblePlan.single.fireAtMs,
-        DateTime.utc(2026, 11, 22, 18, 0).millisecondsSinceEpoch,
-      );
-
-      // Jam tenang menggeser pengingat pukul 23:00 ke 07:00 keesokan paginya.
-      final quietPlan = planner.plan(
-        NotificationInputs(
-          nowMs: nowMs,
-          settings: const GameSettingsData(
-            notifyEventShopEnding: true,
-            notifyQuietHoursEnabled: true,
-          ),
-          offlineMode: OfflineActivityMode.pauseProgression,
-          lastOfflineClaimAtMs: nowMs,
-          hasPurchasableUnboughtEventItem: true,
-          config: const NotificationConfig(weeklyReminderHour: 23),
-          timeZoneOffset: Duration.zero,
-        ),
-      );
-      expect(
-        quietPlan.single.fireAtMs,
-        DateTime.utc(2026, 11, 23, 7, 0).millisecondsSinceEpoch,
       );
     });
   });

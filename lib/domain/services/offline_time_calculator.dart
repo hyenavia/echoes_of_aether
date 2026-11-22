@@ -13,7 +13,7 @@ enum OfflineTimeValidationStatus {
   budgetExhausted,
 }
 
-/// Snapshot perhitungan durasi offline deterministik beserta batas 8 jam
+/// Snapshot perhitungan durasi offline deterministik beserta batas 4 jam
 /// dan anchor timestamp yang aman dari klaim ulang.
 class OfflineTimeWindow {
   const OfflineTimeWindow({
@@ -48,7 +48,7 @@ class OfflineTimeWindow {
 /// Kalkulator waktu offline yang independen dari Flutter/Flame.
 ///
 /// Menegakkan:
-/// - Batas maksimal kumulatif 8 jam (`maxOfflineDuration`).
+/// - Batas maksimal kumulatif 4 jam (`maxOfflineDuration`).
 /// - Ambang minimal simulasi (`minElapsedDuration`) tanpa memajukan cursor
 ///   `lastOfflineClaimAtMs` bila selisih belum cukup (`zeroElapsed`).
 /// - Penolakan durasi negatif / timestamp korup (`invalidClock`).
@@ -60,7 +60,7 @@ class OfflineTimeCalculator {
     this.minElapsedDuration = defaultMinElapsedDuration,
   });
 
-  static const Duration defaultMaxOfflineDuration = Duration(hours: 8);
+  static const Duration defaultMaxOfflineDuration = Duration(hours: 4);
   static const Duration defaultMinElapsedDuration = Duration(seconds: 1);
   static const int simulationTickDurationMs = 50;
 

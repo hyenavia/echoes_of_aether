@@ -526,7 +526,7 @@ void main() {
       expect(inv1.quantityOf('slime_gel'), inv2.quantityOf('slime_gel'));
     });
 
-    test('durasi offline melebihi 8 jam dibatasi tepat 8 jam dan menghormati maxLevel', () {
+    test('durasi offline melebihi 4 jam dibatasi tepat 4 jam dan menghormati maxLevel', () {
       const cleared = DungeonProgressSnapshot(
         currentDungeonId: 'forgotten_forest',
         clearsCount: 1,
@@ -540,7 +540,7 @@ void main() {
         inventory: inv8,
         config: _config,
         session: const GameSessionSnapshot(lastSavedAtMs: 1000000),
-        nowMs: 1000000 + const Duration(hours: 8).inMilliseconds,
+        nowMs: 1000000 + const Duration(hours: 4).inMilliseconds,
         offlineActivity: _configuredAutoFarm(seed: 12),
         dungeonProgress: cleared,
         maxIterations: 250000,
@@ -561,7 +561,7 @@ void main() {
 
       expect(r8.cappedAtMaxDuration, isFalse);
       expect(r24.cappedAtMaxDuration, isTrue);
-      expect(r24.effectiveElapsed, const Duration(hours: 8));
+      expect(r24.effectiveElapsed, const Duration(hours: 4));
       expect(r24.expGained, r8.expGained);
       expect(r24.goldGained, r8.goldGained);
       expect(c24.level, _progression.maxLevel);

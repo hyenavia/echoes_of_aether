@@ -92,13 +92,13 @@ void main() {
       expect(initial.notifyAutoFarmingFull, isFalse);
       expect(initial.notifyDailyBossReminder, isFalse);
       expect(initial.notifyWeeklyBossReminder, isFalse);
-      expect(initial.notifyQuietHoursEnabled, isTrue);
+      expect(initial.notifyAbyssalSpireReset, isFalse);
 
       final updated = initial.copyWith(
         notifyAutoFarmingFull: true,
         notifyDailyBossReminder: true,
         notifyWeeklyBossReminder: true,
-        notifyQuietHoursEnabled: false,
+        notifyAbyssalSpireReset: true,
       );
       await repo.saveSettings(updated);
 
@@ -174,11 +174,12 @@ void main() {
             notifyAutoFarmingFull: true,
             notifyDailyBossReminder: true,
             notifyWeeklyBossReminder: true,
+            notifyAbyssalSpireReset: true,
           ),
           offlineMode: OfflineActivityMode.autoFarming,
           lastOfflineClaimAtMs: nowMs,
           periodicQuestStates: const [
-            // Daily sudah selesai hari ini, Weekly belum.
+            // Daily sudah selesai hari ini, tetapi notifikasi reset tetap dijadwalkan.
             PeriodicQuestState(
               questId: 'daily_boss',
               periodKey: '2026-11-16',
@@ -192,7 +193,9 @@ void main() {
       expect(scheduler.replaceAllCalls, 1);
       expect(scheduler.scheduled.map((e) => e.category).toList(), [
         NotificationCategory.autoFarmingFull,
+        NotificationCategory.dailyBossReminder,
         NotificationCategory.weeklyBossReminder,
+        NotificationCategory.abyssalSpireReset,
       ]);
 
       await observer.handleLifecycleState(AppLifecycleState.resumed);

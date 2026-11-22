@@ -167,7 +167,7 @@ void main() {
           findsAtLeastNWidgets(1),
         );
         expect(
-          find.textContaining('butuh minimal Lv 93'),
+          find.textContaining('butuh minimal Lv 90'),
           findsAtLeastNWidgets(1),
         );
         expect(
@@ -175,10 +175,10 @@ void main() {
           findsNothing,
         );
 
-        // Dengan Lv 93, tombol masuk Ascension aktif.
+        // Dengan Lv 90 (max level), tombol masuk Ascension aktif.
         final rank1ReadyChar = PlayerCharacter(
           config: config.progression,
-          progress: const PlayerProgress(level: 93, gold: 100),
+          progress: const PlayerProgress(level: 90, gold: 100),
           skillCatalog: config.skills,
           specializationConfig: config.specializations,
         );

@@ -136,7 +136,7 @@
       "start": 23,
       "end": 7
     },
-    "max_per_day": 3
+    "max_per_day": 5
   },
   "dungeon_completion": {
     "exp_reward": 120,

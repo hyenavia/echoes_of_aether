@@ -239,7 +239,34 @@ void main() {
       expect(optBProgression.meetsLevelRequirement(d2, 1, 51), isFalse);
       expect(optBProgression.meetsLevelRequirement(d2, 1, 52), isTrue);
       expect(optBProgression.recommendedLevel(asc, 1), 93);
-      expect(optBProgression.requiredLevel(asc, 1), 93);
+      expect(optBProgression.requiredLevel(asc, 1), 90);
+
+      // Rank 5 + Lv 90 (max level & max rank): dungeon normal berikutnya tetap
+      // terbuka setelah dungeon sebelumnya selesai di Rank 5.
+      const rank5Cycle = CycleProgress(
+        ascensionRank: 5,
+        highestAscensionRank: 5,
+      );
+      final rank5Progresses = <String, DungeonProgressSnapshot>{
+        'forgotten_forest': const DungeonProgressSnapshot(
+          currentDungeonId: 'forgotten_forest',
+          currentRoomId: 'room_5',
+          currentRoomIndex: 4,
+          highestClearedRoomIndex: 4,
+          clearsCount: 1,
+          clearedInCycleRank: 5,
+        ),
+      };
+      expect(
+        optBProgression.isUnlocked(
+          d2,
+          rank5Cycle,
+          rank5Progresses,
+          allDungeons: config.dungeons.values,
+          playerLevel: 90,
+        ),
+        isTrue,
+      );
 
       // Rank Switcher: saat turun ke Rank 0 (ascensionRank: 0, highest: 1),
       // semua dungeon normal Rank 0 tetap dianggap clear pada siklus tsb &

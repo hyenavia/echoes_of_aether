@@ -85,14 +85,14 @@ void main() {
     });
 
     test(
-      'durasi normal (30 detik, 1 jam, tepat 8 jam) valid dan tidak di-cap',
+      'durasi normal (30 detik, 1 jam, tepat 4 jam) valid dan tidak di-cap',
       () {
         const startMs = 1000000;
 
         for (final dur in const [
           Duration(seconds: 30),
           Duration(hours: 1),
-          Duration(hours: 8),
+          Duration(hours: 4),
         ]) {
           final nowMs = startMs + dur.inMilliseconds;
           final window = calculator.calculate(
@@ -112,7 +112,7 @@ void main() {
       },
     );
 
-    test('durasi melebihi 8 jam (24 jam) dibatasi tepat 8 jam', () {
+    test('durasi melebihi 4 jam (24 jam) dibatasi tepat 4 jam', () {
       const startMs = 1000000;
       final nowMs = startMs + const Duration(hours: 24).inMilliseconds;
       final window = calculator.calculate(
@@ -122,7 +122,7 @@ void main() {
 
       expect(window.status, OfflineTimeValidationStatus.valid);
       expect(window.cappedAtMaxDuration, isTrue);
-      expect(window.effectiveElapsed, const Duration(hours: 8));
+      expect(window.effectiveElapsed, const Duration(hours: 4));
       expect(window.endTimestampMs, startMs + maxMs);
       expect(window.eventId, 'offline:$startMs:${startMs + maxMs}');
       expect(window.newLastOfflineClaimAtMs, nowMs);
@@ -153,9 +153,9 @@ void main() {
       },
     );
 
-    test('melanjutkan activity interrupted menghormati anchor checkpoint & sisa budget 8 jam', () {
+    test('melanjutkan activity interrupted menghormati anchor checkpoint & sisa budget 4 jam', () {
       const savedMs = 1000000;
-      final processedMs = const Duration(hours: 6).inMilliseconds;
+      final processedMs = const Duration(hours: 2).inMilliseconds;
       final checkpointMs = savedMs + processedMs;
       final resumeNowMs = savedMs + const Duration(hours: 10).inMilliseconds;
 
